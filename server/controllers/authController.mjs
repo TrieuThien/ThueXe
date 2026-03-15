@@ -1,4 +1,5 @@
 import {
+    createStaffByAdmin,
     forgotPassword,
     getCurrentProfile,
     login,
@@ -8,11 +9,25 @@ import {
     resetPassword,
 } from "../services/authService.js";
 import { successResponse } from "../utils/apiResponse.js";
+import {
+    clearRefreshTokenCookie,
+    getRefreshTokenFromRequest,
+    setRefreshTokenCookie,
+} from "../utils/refreshTokenCookie.js";
 
 export async function register(req, res, next) {
     try {
         const result = await registerPassenger(req.body);
-        return successResponse(res, result, "Register successful", 201);
+        setRefreshTokenCookie(res, result.refreshToken);
+        const responseData = { ...result };
+        delete responseData.refreshToken;
+
+        return successResponse(
+            res,
+            responseData,
+            "Register successful",
+            201
+        );
     } catch (error) {
         return next(error);
     }
@@ -21,7 +36,26 @@ export async function register(req, res, next) {
 export async function loginByIdentifier(req, res, next) {
     try {
         const result = await login(req.body);
-        return successResponse(res, result, "Login successful");
+        setRefreshTokenCookie(res, result.refreshToken);
+        const responseData = { ...result };
+        delete responseData.refreshToken;
+
+        return successResponse(res, responseData, "Login successful");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function createStaffAccountHandler(req, res, next) {
+    try {
+        const result = await createStaffByAdmin(req.body);
+
+        return successResponse(
+            res,
+            result,
+            "Staff account created successfully",
+            201
+        );
     } catch (error) {
         return next(error);
     }
@@ -47,8 +81,14 @@ export async function resetPasswordHandler(req, res, next) {
 
 export async function refreshTokenHandler(req, res, next) {
     try {
-        const result = await refreshToken(req.body);
-        return successResponse(res, result, "Token refreshed");
+        const refreshTokenValue = getRefreshTokenFromRequest(req);
+        const result = await refreshToken(refreshTokenValue);
+
+        setRefreshTokenCookie(res, result.refreshToken);
+        const responseData = { ...result };
+        delete responseData.refreshToken;
+
+        return successResponse(res, responseData, "Token refreshed");
     } catch (error) {
         return next(error);
     }
@@ -56,7 +96,9 @@ export async function refreshTokenHandler(req, res, next) {
 
 export async function logoutHandler(req, res, next) {
     try {
-        const result = await logout(req.body);
+        const refreshTokenValue = getRefreshTokenFromRequest(req);
+        const result = await logout(refreshTokenValue);
+        clearRefreshTokenCookie(res);
         return successResponse(res, result, result.message);
     } catch (error) {
         return next(error);

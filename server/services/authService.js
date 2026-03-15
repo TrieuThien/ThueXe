@@ -21,6 +21,7 @@ import {
     findUserByIdentifier,
     findUserByPhone,
     createPassengerAccount,
+    createStaffAccount,
     createSessionToken,
     deleteAllUserSessions,
     deleteSessionToken,
@@ -31,7 +32,13 @@ import {
     updateUserLastLogin,
     updateUserPassword,
 } from "../repositories/authRepository.js";
+import { ROLES } from "../utils/authRole.js";
 import { sendPasswordResetEmail } from "./emailService.js";
+
+const STAFF_ROLE_TO_ACCOUNT_TYPE = {
+    [ROLES.DISPATCHER]: 2,
+    [ROLES.ADMIN]: 3,
+};
 
 function normalizeEmail(email) {
     if (!email) return null;
@@ -67,6 +74,7 @@ function sanitizeAuthUser(account) {
 }
 
 function assertAccountCanAuthenticate(account) {
+    console.log("Authenticating account:", account); // Debug: Check account details during authentication
     if (!account || account.accountDeleted === 1) {
         throw new AppError(
             "Unable to authenticate with provided credentials.",
@@ -183,6 +191,83 @@ export async function registerPassenger(payload) {
     }
 }
 
+export async function createStaffByAdmin(payload) {
+    const email = normalizeEmail(payload.email);
+    const phone = normalizePhone(payload.phone);
+    const role = String(payload.role || "").trim().toLowerCase();
+
+    if (!email && !phone) {
+        throw new AppError("Either email or phone is required.", 422, "INVALID_IDENTIFIER");
+    }
+
+    const accountType = STAFF_ROLE_TO_ACCOUNT_TYPE[role];
+
+    if (!accountType) {
+        throw new AppError(
+            "Role must be one of admin or dispatcher.",
+            422,
+            "INVALID_ROLE"
+        );
+    }
+
+    const [existingUserByEmail, existingDriverByEmail, existingUserByPhone, existingDriverByPhone] =
+        await Promise.all([
+            findUserByEmail(email),
+            findDriverByEmail(email),
+            findUserByPhone(phone),
+            findDriverByPhone(phone),
+        ]);
+
+    if (
+        existingUserByEmail ||
+        existingDriverByEmail ||
+        existingUserByPhone ||
+        existingDriverByPhone
+    ) {
+        throw new AppError("Identifier is already in use.", 409, "IDENTIFIER_ALREADY_USED");
+    }
+
+    const passwordHash = await hashPassword(payload.password);
+
+    const connection = await sqldb.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const userId = await createStaffAccount(
+            {
+                firstname: payload.firstname,
+                lastname: payload.lastname,
+                email,
+                phone,
+                passwordHash,
+                accountType,
+                country: payload.country,
+                routeId: payload.route_id,
+                dispLang: payload.disp_lang,
+                countryCode: payload.country_code,
+                countryDialCode: payload.country_dial_code,
+            },
+            connection
+        );
+
+        const account = await findAccountByTypeAndId({
+            userType: USER_TYPE.USER,
+            userId,
+        });
+
+        await connection.commit();
+
+        return {
+            user: sanitizeAuthUser(account),
+        };
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
 export async function login(payload) {
     const identifier = normalizeIdentifier(payload.identifier);
 
@@ -192,10 +277,12 @@ export async function login(payload) {
     ]);
 
     const candidates = [userAccount, driverAccount].filter(Boolean);
-
     let matchedAccount = null;
-
+    console.log("Login candidates for identifier:", identifier, candidates); // Debug: Check which accounts are candidates for login
     for (const candidate of candidates) {
+
+        console.log("Password hash for candidate:", candidate.passwordHash); // Debug: Check password hash of the candidate
+        console.log("Provided password:", payload.password); // Debug: Check provided password
         const passwordOk = await verifyPassword(payload.password, candidate.passwordHash);
         if (passwordOk) {
             matchedAccount = candidate;
@@ -210,7 +297,7 @@ export async function login(payload) {
             "INVALID_CREDENTIALS"
         );
     }
-
+    console.log("Matched account for login:", matchedAccount); // Debug: Check which account matched during login
     assertAccountCanAuthenticate(matchedAccount);
 
     const connection = await sqldb.getConnection();
@@ -350,11 +437,11 @@ export async function resetPassword(payload) {
     }
 }
 
-export async function refreshToken(payload) {
+export async function refreshToken(refreshTokenValue) {
     let decoded;
 
     try {
-        decoded = verifyRefreshToken(payload.refreshToken);
+        decoded = verifyRefreshToken(refreshTokenValue);
     } catch (error) {
         throw new AppError("Invalid refresh token.", 401, "INVALID_REFRESH_TOKEN");
     }
@@ -402,8 +489,8 @@ export async function refreshToken(payload) {
     }
 }
 
-export async function logout(payload) {
-    const refreshToken = payload.refreshToken;
+export async function logout(refreshTokenValue) {
+    const refreshToken = String(refreshTokenValue || "");
 
     if (!refreshToken) {
         return {

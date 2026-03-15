@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import RoleSelector from "./RoleSelector";
+import { login } from "../../services/authService";
 
 export default function LoginForm() {
     const { t } = useTranslation();
@@ -11,9 +12,9 @@ export default function LoginForm() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const [remember, setRemember] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState({});
+    const [submitError, setSubmitError] = useState("");
 
     const validate = () => {
         const newErrors = {};
@@ -27,15 +28,34 @@ export default function LoginForm() {
         e.preventDefault();
         if (!validate()) return;
 
+        setSubmitError("");
         setLoading(true);
-        setTimeout(() => {
-            setLoading(false);
-            if (selectedRole === "dispatcher") {
-                navigate("/dispatcher/dashboard");
-            } else {
-                navigate("/admin/dashboard");
-            }
-        }, 1500);
+
+        login({
+            identifier: email,
+            password,
+        })
+            .then((authPayload) => {
+                const role = authPayload?.user?.role;
+
+                if (role === "dispatcher") {
+                    navigate("/dispatcher/dashboard");
+                    return;
+                }
+
+                if (role === "admin") {
+                    navigate("/admin/dashboard");
+                    return;
+                }
+
+                navigate("/");
+            })
+            .catch(() => {
+                setSubmitError(t("auth.error_invalid_credentials"));
+            })
+            .finally(() => {
+                setLoading(false);
+            });
     };
 
     return (
@@ -135,26 +155,11 @@ export default function LoginForm() {
                     )}
                 </div>
 
-                {/* Remember + Forgot */}
-                <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={remember}
-                            onChange={(e) => setRemember(e.target.checked)}
-                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span className="text-sm text-gray-600">{t("auth.remember")}</span>
-                    </label>
-                    <a
-                        href="#"
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors"
-                    >
-                        {t("auth.forgot")}
-                    </a>
-                </div>
-
                 {/* Submit */}
+                {submitError && (
+                    <p className="text-sm text-red-500">{submitError}</p>
+                )}
+
                 <button
                     type="submit"
                     disabled={loading}

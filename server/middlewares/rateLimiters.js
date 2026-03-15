@@ -38,6 +38,12 @@ export const authResetPasswordLimiter = createLimiter(
     "Too many reset-password attempts. Please try again later."
 );
 
+export const authCreateStaffLimiter = createLimiter(
+    15 * 60 * 1000,
+    Number(process.env.RATE_LIMIT_CREATE_STAFF_MAX) || 20,
+    "Too many create-staff attempts. Please try again later."
+);
+
 export const globalLimiter = createLimiter(
     15 * 60 * 1000,
     Number(process.env.RATE_LIMIT_GLOBAL_MAX) || 250,

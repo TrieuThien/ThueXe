@@ -42,6 +42,50 @@ export const registerValidator = [
     }),
 ];
 
+export const createStaffValidator = [
+    body("firstname")
+        .trim()
+        .isLength({ min: 2, max: 64 })
+        .withMessage("firstname must be between 2 and 64 characters"),
+    body("lastname")
+        .trim()
+        .isLength({ min: 2, max: 64 })
+        .withMessage("lastname must be between 2 and 64 characters"),
+    body("email")
+        .optional({ values: "falsy" })
+        .trim()
+        .isEmail()
+        .withMessage("Invalid email")
+        .normalizeEmail(),
+    body("phone")
+        .optional({ values: "falsy" })
+        .trim()
+        .matches(phoneRegex)
+        .withMessage("Invalid phone number format"),
+    body("password")
+        .isString()
+        .isLength({ min: 10, max: 128 })
+        .withMessage("Password must be between 10 and 128 characters")
+        .matches(/[A-Z]/)
+        .withMessage("Password must include at least one uppercase letter")
+        .matches(/[a-z]/)
+        .withMessage("Password must include at least one lowercase letter")
+        .matches(/\d/)
+        .withMessage("Password must include at least one number")
+        .matches(/[^A-Za-z0-9]/)
+        .withMessage("Password must include at least one special character"),
+    body("role")
+        .trim()
+        .isIn(["admin", "dispatcher"])
+        .withMessage("role must be one of admin or dispatcher"),
+    body().custom((value) => {
+        if (!value.email && !value.phone) {
+            throw new Error("Either email or phone is required");
+        }
+        return true;
+    }),
+];
+
 export const loginValidator = [
     body("identifier")
         .trim()
@@ -82,9 +126,10 @@ export const resetPasswordValidator = [
 
 export const refreshTokenValidator = [
     body("refreshToken")
+        .optional({ values: "falsy" })
         .trim()
         .isLength({ min: 20 })
-        .withMessage("refreshToken is required"),
+        .withMessage("refreshToken must be valid"),
 ];
 
 export const logoutValidator = [

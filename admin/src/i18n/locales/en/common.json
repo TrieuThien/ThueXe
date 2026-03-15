@@ -154,16 +154,17 @@
         "title": "Login to System",
         "subtitle": "Select your role and login to continue",
         "role_label": "Login Role",
-        "email_label": "Email or username",
+        "email_label": "Email",
         "email_placeholder": "name@company.com",
         "password_label": "Password",
         "password_placeholder": "••••••••",
-        "remember": "Remember me",
+        "remember": "Remember my email",
         "forgot": "Forgot password?",
         "login_as": "Login as {{role}}",
         "logging_in": "Logging in...",
         "error_email": "Please enter your email or username",
         "error_password": "Please enter your password",
+        "error_invalid_credentials": "Invalid credentials or insufficient permissions for this account.",
         "back_home": "Home",
         "copyright": "© {{year}} ThueXe. All rights reserved.",
         "dispatcher_label": "Dispatcher",
@@ -190,6 +191,7 @@
     "dashboard": {
         "title": "{{role}} Dashboard",
         "success": "You have successfully logged in as {{role}}.",
-        "back_home": "Back to Home"
+        "back_home": "Back to Home",
+        "logout": "Logout"
     }
 }

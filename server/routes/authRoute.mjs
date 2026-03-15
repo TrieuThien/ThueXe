@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+    createStaffAccountHandler,
     forgotPasswordHandler,
     loginByIdentifier,
     logoutHandler,
@@ -9,14 +10,17 @@ import {
     resetPasswordHandler,
 } from "../controllers/authController.mjs";
 import requireAuth from "../middlewares/authMiddleware.js";
+import requireRole from "../middlewares/roleMiddleware.js";
 import validateRequest from "../middlewares/validateRequest.js";
 import {
+    authCreateStaffLimiter,
     authForgotPasswordLimiter,
     authLoginLimiter,
     authRegisterLimiter,
     authResetPasswordLimiter,
 } from "../middlewares/rateLimiters.js";
 import {
+    createStaffValidator,
     forgotPasswordValidator,
     loginValidator,
     logoutValidator,
@@ -26,6 +30,16 @@ import {
 } from "../validators/authValidators.js";
 
 const router = Router();
+
+router.post(
+    "/api/auth/staff",
+    requireAuth,
+    requireRole("admin"),
+    authCreateStaffLimiter,
+    createStaffValidator,
+    validateRequest,
+    createStaffAccountHandler
+);
 
 router.post(
     "/api/auth/register",

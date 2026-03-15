@@ -154,16 +154,17 @@
         "title": "Đăng nhập hệ thống",
         "subtitle": "Chọn vai trò phù hợp và đăng nhập để tiếp tục",
         "role_label": "Vai trò đăng nhập",
-        "email_label": "Email hoặc tên đăng nhập",
+        "email_label": "Email",
         "email_placeholder": "name@company.com",
         "password_label": "Mật khẩu",
         "password_placeholder": "••••••••",
-        "remember": "Ghi nhớ đăng nhập",
+        "remember": "Ghi nhớ email đăng nhập",
         "forgot": "Quên mật khẩu?",
         "login_as": "Đăng nhập với quyền {{role}}",
         "logging_in": "Đang đăng nhập...",
         "error_email": "Vui lòng nhập email hoặc tên đăng nhập",
         "error_password": "Vui lòng nhập mật khẩu",
+        "error_invalid_credentials": "Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền truy cập.",
         "back_home": "Trang chủ",
         "copyright": "© {{year}} ThueXe. Bảo lưu mọi quyền.",
         "dispatcher_label": "Dispatcher",
@@ -190,6 +191,7 @@
     "dashboard": {
         "title": "Dashboard {{role}}",
         "success": "Bạn đã đăng nhập thành công với quyền {{role}}.",
-        "back_home": "Về trang chủ"
+        "back_home": "Về trang chủ",
+        "logout": "Đăng xuất"
     }
 }

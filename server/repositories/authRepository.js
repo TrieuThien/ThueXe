@@ -182,7 +182,7 @@ export async function createPassengerAccount(payload, conn) {
       (password_hash, firstname, lastname, email, phone, country,
        account_type, route_id, is_activated, account_deleted, account_active,
        disp_lang, country_code, country_dial_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             passwordHash,
             firstname,
@@ -191,6 +191,49 @@ export async function createPassengerAccount(payload, conn) {
             phone || "",
             country || "Vietnam",
             1,
+            routeId || 1,
+            1,
+            0,
+            1,
+            dispLang || "vi",
+            countryCode || "vn",
+            countryDialCode || "+84",
+        ]
+    );
+
+    return Number(result.insertId);
+}
+
+export async function createStaffAccount(payload, conn) {
+    const db = dbConnection(conn);
+    const {
+        firstname,
+        lastname,
+        email,
+        phone,
+        passwordHash,
+        accountType,
+        country,
+        routeId,
+        dispLang,
+        countryCode,
+        countryDialCode,
+    } = payload;
+
+    const [result] = await db.query(
+        `INSERT INTO users
+      (password_hash, firstname, lastname, email, phone, country,
+       account_type, route_id, is_activated, account_deleted, account_active,
+       disp_lang, country_code, country_dial_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        [
+            passwordHash,
+            firstname,
+            lastname,
+            email || null,
+            phone || "",
+            country || "Vietnam",
+            accountType,
             routeId || 1,
             1,
             0,
