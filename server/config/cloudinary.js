@@ -13,6 +13,29 @@ const connectCloudinary = () => {
   }
 };
 
+const buildCloudinaryImageUrl = (publicId, options = {}) => {
+  if (!publicId) return "";
+  return cloudinary.url(publicId, {
+    secure: true,
+    resource_type: "image",
+    ...options,
+  });
+};
+
+const uploadBufferToCloudinary = (buffer, options = {}) =>
+  new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(options, (error, result) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(result);
+    });
+
+    uploadStream.end(buffer);
+  });
+
 // Helper function to extract public_id from Cloudinary URL
 const getCloudinaryPublicId = (imageUrl) => {
   if (!imageUrl) return null;
@@ -72,4 +95,10 @@ const deleteCloudinaryImage = async (imageUrl) => {
 };
 
 export default connectCloudinary;
-export { cloudinary, getCloudinaryPublicId, deleteCloudinaryImage };
+export {
+  buildCloudinaryImageUrl,
+  cloudinary,
+  deleteCloudinaryImage,
+  getCloudinaryPublicId,
+  uploadBufferToCloudinary,
+};

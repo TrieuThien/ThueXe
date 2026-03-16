@@ -74,7 +74,6 @@ function sanitizeAuthUser(account) {
 }
 
 function assertAccountCanAuthenticate(account) {
-    console.log("Authenticating account:", account); // Debug: Check account details during authentication
     if (!account || account.accountDeleted === 1) {
         throw new AppError(
             "Unable to authenticate with provided credentials.",

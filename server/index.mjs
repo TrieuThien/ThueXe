@@ -7,7 +7,6 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { readdirSync } from "fs";
 // import dbConnect from "./config/mongodb.js";
-import sqldb from "./config/sqldatabase.js";
 import connectCloudinary from "./config/cloudinary.js";
 import { globalLimiter } from "./middlewares/rateLimiters.js";
 import { globalErrorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
@@ -62,8 +61,9 @@ app.use(helmet());
 app.use(globalLimiter);
 app.use(cookieParser());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// dbConnect();
+// Connect to databases and external services
 connectCloudinary();
 
 const __filename = fileURLToPath(import.meta.url);
