@@ -78,7 +78,6 @@ export async function register(payload) {
 
 export async function login(payload) {
     const response = await apiClient.post("/api/auth/login", payload);
-    console.log("Login response:", response.data);
     const authPayload = extractAuthPayload(response.data);
     setAccessToken(authPayload.accessToken);
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
-import { createStaffAccount, getMe } from "../services/authService";
+import { createStaffAccount } from "../services/authService";
+import { getDefaultPathForRole } from "../config/roleRoutes";
 
 const initialForm = {
     firstname: "",
@@ -86,6 +87,7 @@ function mapApiValidationErrors(details = []) {
 
 export default function StaffAccountPage() {
     const navigate = useNavigate();
+    const { currentUser, authLoading } = useOutletContext();
     const [form, setForm] = useState(initialForm);
     const [fieldErrors, setFieldErrors] = useState({});
     const [touched, setTouched] = useState({});
@@ -93,36 +95,23 @@ export default function StaffAccountPage() {
     const [submitError, setSubmitError] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
     const [loading, setLoading] = useState(false);
-    const [authChecking, setAuthChecking] = useState(true);
-
     useEffect(() => {
-        let mounted = true;
+        if (authLoading) {
+            return;
+        }
 
-        getMe()
-            .then((res) => {
-                const role = res?.user?.role;
+        if (!currentUser) {
+            navigate("/login", { replace: true });
+            return;
+        }
 
-                if (!mounted) return;
-
-                if (role !== "admin") {
-                    navigate("/admin/dashboard", { replace: true });
-                    return;
-                }
-
-                setAuthChecking(false);
-            })
-            .catch(() => {
-                if (!mounted) return;
-                navigate("/login", { replace: true });
-            });
-
-        return () => {
-            mounted = false;
-        };
-    }, [navigate]);
+        if (currentUser.role !== "admin") {
+            navigate(getDefaultPathForRole(currentUser.role), { replace: true });
+        }
+    }, [authLoading, currentUser, navigate]);
 
     const clientErrors = useMemo(() => getClientErrors(form), [form]);
-    const submitDisabled = authChecking || loading || Object.keys(clientErrors).length > 0;
+    const submitDisabled = authLoading || loading || Object.keys(clientErrors).length > 0;
 
     const setFormField = (key, value) => {
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -181,9 +170,9 @@ export default function StaffAccountPage() {
         }
     };
 
-    if (authChecking) {
+    if (authLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="flex min-h-[320px] items-center justify-center">
                 <div className="flex items-center gap-2 text-gray-600">
                     <Loader2 className="w-5 h-5 animate-spin" />
                     Checking permissions...
@@ -195,7 +184,7 @@ export default function StaffAccountPage() {
     const showError = (name) => touched[name] || submitAttempted;
 
     return (
-        <div className="min-h-screen bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-full bg-gray-50 py-10 px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto">
                 <div className="mb-6 flex items-center justify-between gap-3">
                     <div>
