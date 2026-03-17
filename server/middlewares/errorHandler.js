@@ -7,7 +7,7 @@ export function notFoundHandler(req, res) {
 export function globalErrorHandler(err, req, res, next) {
     const statusCode = err?.statusCode || 500;
     const code = err?.code || "INTERNAL_ERROR";
-    const message = err?.isOperational ? err.message : "Internal server error";
+    const message = err?.isOperational ? err.message : "Internal server error!";
     const details = err?.isOperational ? err.details : undefined;
 
     if (statusCode >= 500) {

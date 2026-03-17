@@ -7,6 +7,10 @@ import DispatcherDashboardPage from "../pages/DispatcherDashboardPage";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
 import ModulePlaceholderPage from "../pages/ModulePlaceholderPage";
+import NewCustomer from "../pages/customers/NewCustomer";
+import CustomerList from "../pages/customers/CustomerList";
+import CustomerDetail from "../pages/customers/CustomerDetail";
+import EditCustomer from "../pages/customers/EditCustomer";
 import CarList from "../pages/cars/CarList";
 import NewCar from "../pages/cars/NewCar";
 import StaffAccountPage from "../pages/StaffAccount";
@@ -32,6 +36,14 @@ function getElementByRoleAndPath(role, path) {
         return <CarList />;
     }
 
+    if (role === "admin" && path === "customer/create") {
+        return <NewCustomer />;
+    }
+
+    if (role === "admin" && path === "customers") {
+        return <CustomerList />;
+    }
+
     return <ModulePlaceholderPage role={role} />;
 }
 
@@ -50,6 +62,8 @@ export default function AppRoutes() {
             <Route path="/admin" element={<Layout allowedRole="admin" />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 {renderRoleRoutes("admin")}
+                <Route path="customers/:userId" element={<CustomerDetail />} />
+                <Route path="customers/:userId/edit" element={<EditCustomer />} />
             </Route>
 
             <Route path="/dispatcher" element={<Layout allowedRole="dispatcher" />}>

@@ -50,8 +50,14 @@ export default function LoginForm() {
 
                 navigate("/");
             })
-            .catch(() => {
-                setSubmitError(t("auth.error_invalid_credentials"));
+            .catch((error) => {
+                if (error.response) {
+                    setSubmitError(error.response.data?.message || t("auth.error_invalid_credentials"));
+                }
+                else if (error.request) {
+                    // Server did not respond
+                    setSubmitError(t("auth.server_not_responding"));
+                }
             })
             .finally(() => {
                 setLoading(false);

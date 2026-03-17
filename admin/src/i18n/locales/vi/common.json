@@ -165,6 +165,7 @@
         "error_email": "Vui lòng nhập email hoặc tên đăng nhập",
         "error_password": "Vui lòng nhập mật khẩu",
         "error_invalid_credentials": "Thông tin đăng nhập không hợp lệ hoặc tài khoản không có quyền truy cập.",
+        "server_not_responding": "Máy chủ không phản hồi. Vui lòng thử lại sau.",
         "back_home": "Trang chủ",
         "copyright": "© {{year}} ThueXe. Bảo lưu mọi quyền.",
         "dispatcher_label": "Dispatcher",

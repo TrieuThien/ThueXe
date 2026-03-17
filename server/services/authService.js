@@ -277,11 +277,7 @@ export async function login(payload) {
 
     const candidates = [userAccount, driverAccount].filter(Boolean);
     let matchedAccount = null;
-    console.log("Login candidates for identifier:", identifier, candidates); // Debug: Check which accounts are candidates for login
     for (const candidate of candidates) {
-
-        console.log("Password hash for candidate:", candidate.passwordHash); // Debug: Check password hash of the candidate
-        console.log("Provided password:", payload.password); // Debug: Check provided password
         const passwordOk = await verifyPassword(payload.password, candidate.passwordHash);
         if (passwordOk) {
             matchedAccount = candidate;
@@ -296,7 +292,6 @@ export async function login(payload) {
             "INVALID_CREDENTIALS"
         );
     }
-    console.log("Matched account for login:", matchedAccount); // Debug: Check which account matched during login
     assertAccountCanAuthenticate(matchedAccount);
 
     const connection = await sqldb.getConnection();

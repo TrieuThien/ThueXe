@@ -165,6 +165,7 @@
         "error_email": "Please enter your email or username",
         "error_password": "Please enter your password",
         "error_invalid_credentials": "Invalid credentials or insufficient permissions for this account.",
+        "server_not_responding": "Server is not responding. Please try again later.",
         "back_home": "Home",
         "copyright": "© {{year}} ThueXe. All rights reserved.",
         "dispatcher_label": "Dispatcher",
