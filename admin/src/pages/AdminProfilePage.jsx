@@ -98,7 +98,7 @@ export default function AdminProfilePage() {
             ) : staff ? (
                 <>
                     <section className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm">
-                        <div className="flex flex-col gap-6 lg:flex-row">
+                        <div className="flex flex-col gap-6 items-center lg:flex-row">
                             <div className="flex w-full max-w-sm flex-col items-center rounded-[24px] bg-white p-5 text-center shadow-sm">
                                 {staff.photo_file ? <img src={staff.photo_file} alt={staff.full_name} className="h-28 w-28 rounded-[28px] object-cover" /> : <div className="flex h-28 w-28 items-center justify-center rounded-[28px] bg-slate-200 text-3xl font-bold text-slate-600">{staff.firstname?.[0] || "S"}</div>}
                                 <h2 className="mt-4 text-xl font-bold text-slate-900">{staff.full_name}</h2>

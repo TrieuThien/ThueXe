@@ -6,6 +6,7 @@ import AdminProfilePage from "../pages/AdminProfilePage";
 import DispatcherDashboardPage from "../pages/DispatcherDashboardPage";
 import HomePage from "../pages/HomePage";
 import LoginPage from "../pages/LoginPage";
+import MapTrackingPage from "../pages/MapTrackingPage";
 import ModulePlaceholderPage from "../pages/ModulePlaceholderPage";
 import NewCustomer from "../pages/customers/NewCustomer";
 import CustomerList from "../pages/customers/CustomerList";
@@ -21,6 +22,11 @@ import NewStaff from "../pages/staff/NewStaff";
 import StaffList from "../pages/staff/StaffList";
 import StaffDetail from "../pages/staff/StaffDetail";
 import EditStaff from "../pages/staff/EditStaff";
+import TariffListPage from "../pages/tariffs/TariffListPage";
+import TariffCreatePage from "../pages/tariffs/TariffCreatePage";
+import TariffEditPage from "../pages/tariffs/TariffEditPage";
+import ZoneListPage from "../pages/zones/ZoneListPage";
+import { ZoneCreatePage, ZoneEditPage } from "../pages/zones/ZonePages";
 
 function getElementByRoleAndPath(role, path) {
     if (path === "dashboard") {
@@ -47,6 +53,22 @@ function getElementByRoleAndPath(role, path) {
         return <CarList />;
     }
 
+    if (role === "admin" && path === "tariff/create") {
+        return <TariffCreatePage />;
+    }
+
+    if (role === "admin" && path === "tariffs") {
+        return <TariffListPage />;
+    }
+
+    if (role === "admin" && path === "area/create") {
+        return <ZoneCreatePage />;
+    }
+
+    if (role === "admin" && path === "areas") {
+        return <ZoneListPage />;
+    }
+
     if (role === "admin" && path === "customer/create") {
         return <NewCustomer />;
     }
@@ -61,6 +83,10 @@ function getElementByRoleAndPath(role, path) {
 
     if (path === "drivers") {
         return <DriverList />;
+    }
+
+    if (path === "map-tracking") {
+        return <MapTrackingPage />;
     }
 
     return <ModulePlaceholderPage role={role} />;
@@ -87,6 +113,8 @@ export default function AppRoutes() {
                 <Route path="drivers/:driverId/edit" element={<EditDriver />} />
                 <Route path="staff/:userId" element={<StaffDetail />} />
                 <Route path="staff/:userId/edit" element={<EditStaff />} />
+                <Route path="tariffs/:id/edit" element={<TariffEditPage />} />
+                <Route path="areas/:id/edit" element={<ZoneEditPage />} />
             </Route>
 
             <Route path="/dispatcher" element={<Layout allowedRole="dispatcher" />}>
