@@ -12,6 +12,7 @@ export const ROLES = {
     PASSENGER: "passenger",
     DISPATCHER: "dispatcher",
     ADMIN: "admin",
+    BILLER: "biller",
     DRIVER: "driver",
 };
 
@@ -20,5 +21,6 @@ export function mapUserAccountTypeToRole(accountType) {
 
     if (numericType === 2) return ROLES.DISPATCHER;
     if (numericType === 3) return ROLES.ADMIN;
+    if (numericType === 5) return ROLES.BILLER;
     return ROLES.PASSENGER;
 }

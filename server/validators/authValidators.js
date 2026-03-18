@@ -76,8 +76,8 @@ export const createStaffValidator = [
         .withMessage("Password must include at least one special character"),
     body("role")
         .trim()
-        .isIn(["admin", "dispatcher"])
-        .withMessage("role must be one of admin or dispatcher"),
+        .isIn(["admin", "dispatcher", "biller"])
+        .withMessage("role must be one of admin, dispatcher or biller"),
     body().custom((value) => {
         if (!value.email && !value.phone) {
             throw new Error("Either email or phone is required");
