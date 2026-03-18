@@ -31,6 +31,7 @@ import CouponListPage from "../pages/coupons/CouponListPage";
 import CouponCreatePage from "../pages/coupons/CouponCreatePage";
 import CouponEditPage from "../pages/coupons/CouponEditPage";
 import CouponDetailPage from "../pages/coupons/CouponDetailPage";
+import RewardPointsPage from "../pages/reward-points/RewardPointsPage";
 
 function getElementByRoleAndPath(role, path) {
     if (path === "dashboard") {
@@ -75,6 +76,10 @@ function getElementByRoleAndPath(role, path) {
 
     if (role === "admin" && path === "coupons") {
         return <CouponListPage />;
+    }
+
+    if (role === "admin" && path === "reward-points") {
+        return <RewardPointsPage />;
     }
 
     if (role === "admin" && path === "customer/create") {
