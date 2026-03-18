@@ -32,8 +32,8 @@ const router = Router();
 
 router.get("/api/drivers/meta", requireAuth, requireRole("admin"), getDriverMetaValidator, validateRequest, getDriverMetaHandler);
 router.get("/api/drivers/summary", requireAuth, requireRole("admin"), getDriverSummaryValidator, validateRequest, getDriverSummaryHandler);
-router.get("/api/drivers", requireAuth, requireRole("admin"), getDriverListValidator, validateRequest, getDriverListHandler);
-router.get("/api/drivers/:driverId/location", requireAuth, requireRole("admin"), getDriverLocationValidator, validateRequest, getDriverLocationHandler);
+router.get("/api/drivers", requireAuth, requireRole("admin", "dispatcher"), getDriverListValidator, validateRequest, getDriverListHandler);
+router.get("/api/drivers/:driverId/location", requireAuth, requireRole("admin", "dispatcher"), getDriverLocationValidator, validateRequest, getDriverLocationHandler);
 router.get("/api/drivers/:driverId", requireAuth, requireRole("admin"), getDriverDetailValidator, validateRequest, getDriverDetailHandler);
 router.post("/api/drivers", requireAuth, requireRole("admin"), uploadSingleMemoryImage("photo_file"), createDriverValidator, validateRequest, createDriverHandler);
 router.put("/api/drivers/:driverId/personal-info", requireAuth, requireRole("admin"), uploadSingleMemoryImage("photo_file"), updateDriverPersonalInfoValidator, validateRequest, updateDriverPersonalInformationHandler);
