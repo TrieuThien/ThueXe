@@ -27,6 +27,10 @@ import TariffCreatePage from "../pages/tariffs/TariffCreatePage";
 import TariffEditPage from "../pages/tariffs/TariffEditPage";
 import ZoneListPage from "../pages/zones/ZoneListPage";
 import { ZoneCreatePage, ZoneEditPage } from "../pages/zones/ZonePages";
+import CouponListPage from "../pages/coupons/CouponListPage";
+import CouponCreatePage from "../pages/coupons/CouponCreatePage";
+import CouponEditPage from "../pages/coupons/CouponEditPage";
+import CouponDetailPage from "../pages/coupons/CouponDetailPage";
 
 function getElementByRoleAndPath(role, path) {
     if (path === "dashboard") {
@@ -67,6 +71,10 @@ function getElementByRoleAndPath(role, path) {
 
     if (role === "admin" && path === "areas") {
         return <ZoneListPage />;
+    }
+
+    if (role === "admin" && path === "coupons") {
+        return <CouponListPage />;
     }
 
     if (role === "admin" && path === "customer/create") {
@@ -115,6 +123,9 @@ export default function AppRoutes() {
                 <Route path="staff/:userId/edit" element={<EditStaff />} />
                 <Route path="tariffs/:id/edit" element={<TariffEditPage />} />
                 <Route path="areas/:id/edit" element={<ZoneEditPage />} />
+                <Route path="coupons/create" element={<CouponCreatePage />} />
+                <Route path="coupons/:id" element={<CouponDetailPage />} />
+                <Route path="coupons/:id/edit" element={<CouponEditPage />} />
             </Route>
 
             <Route path="/dispatcher" element={<Layout allowedRole="dispatcher" />}>
