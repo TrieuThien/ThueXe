@@ -13,7 +13,14 @@ import CustomerDetail from "../pages/customers/CustomerDetail";
 import EditCustomer from "../pages/customers/EditCustomer";
 import CarList from "../pages/cars/CarList";
 import NewCar from "../pages/cars/NewCar";
-import StaffAccountPage from "../pages/StaffAccount";
+import NewDriver from "../pages/drivers/NewDriver";
+import DriverList from "../pages/drivers/DriverList";
+import DriverDetail from "../pages/drivers/DriverDetail";
+import EditDriver from "../pages/drivers/EditDriver";
+import NewStaff from "../pages/staff/NewStaff";
+import StaffList from "../pages/staff/StaffList";
+import StaffDetail from "../pages/staff/StaffDetail";
+import EditStaff from "../pages/staff/EditStaff";
 
 function getElementByRoleAndPath(role, path) {
     if (path === "dashboard") {
@@ -25,7 +32,11 @@ function getElementByRoleAndPath(role, path) {
     }
 
     if (role === "admin" && path === "staff/create") {
-        return <StaffAccountPage />;
+        return <NewStaff />;
+    }
+
+    if (role === "admin" && path === "staff") {
+        return <StaffList />;
     }
 
     if (role === "admin" && path === "vehicle/create") {
@@ -42,6 +53,14 @@ function getElementByRoleAndPath(role, path) {
 
     if (role === "admin" && path === "customers") {
         return <CustomerList />;
+    }
+
+    if (role === "admin" && path === "driver/create") {
+        return <NewDriver />;
+    }
+
+    if (path === "drivers") {
+        return <DriverList />;
     }
 
     return <ModulePlaceholderPage role={role} />;
@@ -64,6 +83,10 @@ export default function AppRoutes() {
                 {renderRoleRoutes("admin")}
                 <Route path="customers/:userId" element={<CustomerDetail />} />
                 <Route path="customers/:userId/edit" element={<EditCustomer />} />
+                <Route path="drivers/:driverId" element={<DriverDetail />} />
+                <Route path="drivers/:driverId/edit" element={<EditDriver />} />
+                <Route path="staff/:userId" element={<StaffDetail />} />
+                <Route path="staff/:userId/edit" element={<EditStaff />} />
             </Route>
 
             <Route path="/dispatcher" element={<Layout allowedRole="dispatcher" />}>

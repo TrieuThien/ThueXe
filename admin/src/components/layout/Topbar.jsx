@@ -138,7 +138,7 @@ export default function Topbar({
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
                                 >
                                     <User className="h-4 w-4" />
-                                    Profile
+                                    Thông tin cá nhân
                                 </Link>
                                 <button
                                     type="button"
@@ -146,7 +146,7 @@ export default function Topbar({
                                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                                 >
                                     <LogOut className="h-4 w-4" />
-                                    Logout
+                                    Đăng xuất
                                 </button>
                             </div>
                         </div>

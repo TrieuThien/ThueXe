@@ -359,7 +359,7 @@ export default function NewCustomer() {
                             <label className="mb-2 block text-sm font-semibold text-slate-700">
                                 Số điện thoại
                             </label>
-                            <div className="grid gap-3 sm:grid-cols-[minmax(0,220px)_1fr]">
+                            <div className="grid gap-3 xl:grid-cols-2">
                                 <select
                                     value={form.country_code}
                                     onChange={(event) => updateField("country_code", event.target.value)}

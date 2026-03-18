@@ -61,11 +61,13 @@ function SidebarItem({ collapsed, isActive, isOpen, item, level, onToggle, role 
 
 function SidebarLeaf({ collapsed, item, level, role }) {
     const { icon: Icon, label, path } = item;
+    const exactMatchOnly = path === "staff";
 
     return (
         <NavLink
             key={`${label}-${path}`}
             to={buildRolePath(role, path)}
+            end={exactMatchOnly}
             className={({ isActive }) =>
                 `group flex items-center rounded-2xl px-3 py-3 text-sm font-medium transition ${isActive
                     ? "bg-blue-500 text-white shadow-lg shadow-blue-950/30"

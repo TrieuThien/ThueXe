@@ -35,7 +35,7 @@ export const ROLE_BASE_PATHS = {
 export const DEFAULT_ROLE = "dispatcher";
 
 const SHARED_PROFILE_ITEM = {
-    label: "Hồ sơ cá nhân",
+    label: "Thông tin cá nhân",
     path: "profile",
     icon: FileUser,
 };
@@ -107,11 +107,11 @@ export const MENU_BY_ROLE = {
             ],
         },
         {
-            label: "Quản lý tài liệu",
+            label: "Quản lý hồ sơ",
             icon: ScrollText,
             subItems: [
-                { label: "Tài liệu khách hàng", path: "documents/users", icon: User },
-                { label: "Tài liệu tài xế", path: "documents/drivers", icon: CircleUserRound },
+                { label: "Hồ sơ khách hàng", path: "documents/users", icon: User },
+                { label: "Hồ sơ tài xế", path: "documents/drivers", icon: CircleUserRound },
             ],
         },
         { label: "Bản đồ theo dõi", path: "map-tracking", icon: MapPinned },
