@@ -1,34 +1,42 @@
 import sqldb from "../config/sqldatabase.js";
 
 const CUSTOMER_ACCOUNT_TYPE = 1;
+const USER_WALLET_ACTOR_TYPE = 0;
 
-// Aggregate document status with precedence: failed > expired > pending > approved.
 const CUSTOMER_DOCUMENT_AGGREGATE_JOIN = `
     LEFT JOIN (
         SELECT
-            ud.u_id,
+            ud.user_id,
             COUNT(*) AS document_count,
-            SUM(CASE WHEN ud.u_doc_status = 0 THEN 1 ELSE 0 END) AS pending_count,
-            SUM(CASE WHEN ud.u_doc_status = 1 THEN 1 ELSE 0 END) AS failed_count,
-            SUM(CASE WHEN ud.u_doc_status = 2 THEN 1 ELSE 0 END) AS expired_count,
-            SUM(CASE WHEN ud.u_doc_status = 3 THEN 1 ELSE 0 END) AS approved_count,
+            SUM(CASE WHEN ud.verified = 0 AND (ud.doc_expiry_date IS NULL OR ud.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) AS pending_count,
+            0 AS failed_count,
+            SUM(CASE WHEN ud.doc_expiry_date IS NOT NULL AND ud.doc_expiry_date < CURDATE() THEN 1 ELSE 0 END) AS expired_count,
+            SUM(CASE WHEN ud.verified = 1 AND (ud.doc_expiry_date IS NULL OR ud.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) AS approved_count,
             CASE
-                WHEN SUM(CASE WHEN ud.u_doc_status = 1 THEN 1 ELSE 0 END) > 0 THEN 'failed'
-                WHEN SUM(CASE WHEN ud.u_doc_status = 2 THEN 1 ELSE 0 END) > 0 THEN 'expired'
-                WHEN SUM(CASE WHEN ud.u_doc_status = 0 THEN 1 ELSE 0 END) > 0 THEN 'pending'
-                ELSE 'approved'
+                WHEN SUM(CASE WHEN ud.doc_expiry_date IS NOT NULL AND ud.doc_expiry_date < CURDATE() THEN 1 ELSE 0 END) > 0 THEN 'expired'
+                WHEN SUM(CASE WHEN ud.verified = 0 AND (ud.doc_expiry_date IS NULL OR ud.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) > 0 THEN 'pending'
+                WHEN COUNT(*) > 0 THEN 'approved'
+                ELSE NULL
             END AS document_status
-        FROM users_documents ud
-        WHERE ud.u_type = 0
-        GROUP BY ud.u_id
-    ) doc ON doc.u_id = u.user_id
+        FROM user_documents ud
+        GROUP BY ud.user_id
+    ) doc ON doc.user_id = u.user_id
+`;
+
+const CUSTOMER_WALLET_AGGREGATE_JOIN = `
+    LEFT JOIN (
+        SELECT actor_id, SUM(balance) AS wallet_amount
+        FROM wallet_accounts
+        WHERE actor_type = ${USER_WALLET_ACTOR_TYPE}
+        GROUP BY actor_id
+    ) wa ON wa.actor_id = u.user_id
 `;
 
 const SORT_COLUMN_MAP = {
     account_create_date: "u.account_create_date",
     firstname: "u.firstname",
     user_rating: "u.user_rating",
-    wallet_amount: "u.wallet_amount",
+    wallet_amount: "COALESCE(wa.wallet_amount, 0)",
     user_id: "u.user_id",
 };
 
@@ -58,7 +66,7 @@ function mapCustomerRow(row) {
         account_active: Number(row.account_active),
         is_activated: Number(row.is_activated),
         account_deleted: Number(row.account_deleted),
-        wallet_amount: Number(row.wallet_amount),
+        wallet_amount: Number(row.wallet_amount || 0),
         photo_file: row.photo_file,
         account_create_date: row.account_create_date,
         document_status: row.document_status,
@@ -141,6 +149,7 @@ function buildCustomerFilterQueryParts(filters = {}) {
     return {
         joins: `
             LEFT JOIN routes r ON r.id = u.route_id
+            ${CUSTOMER_WALLET_AGGREGATE_JOIN}
             ${CUSTOMER_DOCUMENT_AGGREGATE_JOIN}
         `,
         whereSql: whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "",
@@ -220,7 +229,7 @@ export async function routeExists(routeId) {
 export async function referalCodeExists(referalCode, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(
-        `SELECT user_id FROM users WHERE referal_code = ? LIMIT 1`,
+        `SELECT user_id FROM users WHERE u_uuid = ? LIMIT 1`,
         [referalCode]
     );
 
@@ -239,7 +248,7 @@ export async function insertCustomer(payload, conn) {
                 lastname,
                 phone,
                 country,
-                referal_code,
+                u_uuid,
                 account_type,
                 route_id,
                 account_create_date,
@@ -297,7 +306,7 @@ export async function findCustomerById(userId) {
                 u.account_active,
                 u.is_activated,
                 u.account_deleted,
-                u.wallet_amount,
+                COALESCE(wa.wallet_amount, 0) AS wallet_amount,
                 u.photo_file,
                 u.account_create_date,
                 COALESCE(doc.document_status, 'no_documents') AS document_status,
@@ -308,6 +317,7 @@ export async function findCustomerById(userId) {
                 COALESCE(doc.approved_count, 0) AS approved_count
             FROM users u
             LEFT JOIN routes r ON r.id = u.route_id
+            ${CUSTOMER_WALLET_AGGREGATE_JOIN}
             ${CUSTOMER_DOCUMENT_AGGREGATE_JOIN}
             WHERE u.user_id = ? AND u.account_type = ?
             LIMIT 1
@@ -343,7 +353,7 @@ export async function findCustomers(filters) {
                 u.account_active,
                 u.is_activated,
                 u.account_deleted,
-                u.wallet_amount,
+                COALESCE(wa.wallet_amount, 0) AS wallet_amount,
                 u.photo_file,
                 u.account_create_date,
                 COALESCE(doc.document_status, 'no_documents') AS document_status,
@@ -496,59 +506,27 @@ export async function findCustomerTransactions(userId) {
     const [rows] = await sqldb.query(
         `
             SELECT
-                tx.row_key,
-                tx.source_id,
-                tx.source_type,
-                tx.reference_id,
-                tx.booking_id,
-                tx.amount,
-                tx.cur_symbol,
-                tx.cur_code,
-                tx.wallet_balance,
-                tx.description,
-                tx.type_code,
-                tx.actor_name,
-                tx.transaction_date
-            FROM (
-                SELECT
-                    CONCAT('wallet-transaction-', wt.id) AS row_key,
-                    wt.id AS source_id,
-                    'wallet_transaction' AS source_type,
-                    wt.transaction_id AS reference_id,
-                    wt.book_id AS booking_id,
-                    wt.amount,
-                    wt.cur_symbol,
-                    wt.cur_code,
-                    wt.wallet_balance,
-                    wt.desc AS description,
-                    wt.type AS type_code,
-                    NULL AS actor_name,
-                    wt.transaction_date
-                FROM wallet_transactions wt
-                WHERE wt.user_id = ? AND wt.user_type = 0
-
-                UNION ALL
-
-                SELECT
-                    CONCAT('wallet-fund-', wf.id) AS row_key,
-                    wf.id AS source_id,
-                    'wallet_fund' AS source_type,
-                    NULL AS reference_id,
-                    0 AS booking_id,
-                    wf.fund_amount AS amount,
-                    wf.cur_symbol,
-                    wf.cur_code,
-                    wf.wallet_balance,
-                    wf.fund_comment AS description,
-                    NULL AS type_code,
-                    NULLIF(TRIM(CONCAT(COALESCE(wf.staff_firstname, ''), ' ', COALESCE(wf.staff_lastname, ''))), '') AS actor_name,
-                    wf.date_fund AS transaction_date
-                FROM wallet_fund wf
-                WHERE wf.customer_id = ? AND wf.fund_type = 2
-            ) tx
-            ORDER BY tx.transaction_date DESC, tx.source_id DESC
+                CONCAT('wallet-ledger-', wl.ledger_id) AS row_key,
+                wl.ledger_id AS source_id,
+                wl.source_type AS source_type,
+                COALESCE(p.payment_code, CAST(wl.payment_id AS CHAR)) AS reference_id,
+                COALESCE(p.booking_id, 0) AS booking_id,
+                wl.amount,
+                c.symbol AS cur_symbol,
+                c.iso_code AS cur_code,
+                wl.balance_after AS wallet_balance,
+                wl.description,
+                CASE WHEN wl.direction = 'credit' THEN 2 ELSE 3 END AS type_code,
+                NULL AS actor_name,
+                wl.created_at AS transaction_date
+            FROM wallet_accounts wa
+            INNER JOIN wallet_ledger wl ON wl.wallet_id = wa.wallet_id
+            LEFT JOIN payments p ON p.payment_id = wl.payment_id
+            LEFT JOIN currencies c ON c.id = wa.currency_id
+            WHERE wa.actor_id = ? AND wa.actor_type = ?
+            ORDER BY wl.created_at DESC, wl.ledger_id DESC
         `,
-        [userId, userId]
+        [userId, USER_WALLET_ACTOR_TYPE]
     );
 
     return rows.map((row) => ({
@@ -705,21 +683,25 @@ export async function findCustomerDocuments(userId) {
         `
             SELECT
                 ud.id,
-                ud.doc_id,
-                COALESCE(NULLIF(ud.u_doc_title, ''), doc.title) AS document_title,
+                ud.document_id AS doc_id,
+                doc.title AS document_title,
                 doc.doc_desc AS document_description,
-                ud.u_doc_id_num_title,
-                ud.u_doc_id_num,
-                ud.u_can_edit,
-                ud.u_doc_expiry_date,
-                ud.u_doc_img,
-                ud.u_doc_status,
-                ud.date_created,
-                ud.date_updated
-            FROM users_documents ud
-            LEFT JOIN documents doc ON doc.id = ud.doc_id
-            WHERE ud.u_id = ? AND ud.u_type = 0
-            ORDER BY ud.date_updated DESC, ud.id DESC
+                doc.doc_id_num_title AS u_doc_id_num_title,
+                ud.doc_number AS u_doc_id_num,
+                1 AS u_can_edit,
+                ud.doc_expiry_date AS u_doc_expiry_date,
+                NULL AS u_doc_img,
+                CASE
+                    WHEN ud.doc_expiry_date IS NOT NULL AND ud.doc_expiry_date < CURDATE() THEN 2
+                    WHEN ud.verified = 1 THEN 3
+                    ELSE 0
+                END AS u_doc_status,
+                ud.date_submitted AS date_created,
+                ud.date_submitted AS date_updated
+            FROM user_documents ud
+            LEFT JOIN documents doc ON doc.id = ud.document_id
+            WHERE ud.user_id = ?
+            ORDER BY ud.date_submitted DESC, ud.id DESC
         `,
         [userId]
     );

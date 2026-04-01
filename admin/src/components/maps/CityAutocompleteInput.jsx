@@ -1,72 +1,128 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { loadGoogleMaps } from "./googleMapsLoader";
 
 export default function CityAutocompleteInput({ value, onChange, onCitySelect, className = "" }) {
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY?.trim() || "";
-    const inputRef = useRef(null);
+    const hostRef = useRef(null);
     const autocompleteRef = useRef(null);
+    const onChangeRef = useRef(onChange);
+    const onCitySelectRef = useRef(onCitySelect);
     const [errorMessage, setErrorMessage] = useState("");
 
     useEffect(() => {
-        if (!apiKey || !inputRef.current || autocompleteRef.current || !window.document) {
-            if (!apiKey) {
-                setErrorMessage("Thiếu VITE_GOOGLE_MAPS_API_KEY, không thể gợi ý thành phố.");
-            }
-            return;
+        onChangeRef.current = onChange;
+        onCitySelectRef.current = onCitySelect;
+    }, [onChange, onCitySelect]);
+
+    useEffect(() => {
+        if (!apiKey || !window.document) {
+            if (!apiKey) setErrorMessage("Missing VITE_GOOGLE_MAPS_API_KEY.");
+            return undefined;
         }
 
-        let mounted = true;
+        let cancelled = false;
+        let cleanup = () => {};
 
         loadGoogleMaps({ apiKey, libraries: ["places"] })
             .then(() => {
-                if (!mounted || !window.google?.maps?.places || !inputRef.current) return;
+                if (cancelled || !hostRef.current || !window.google?.maps?.places?.PlaceAutocompleteElement) return;
 
-                const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-                    types: ["(cities)"],
-                    fields: ["name", "formatted_address", "geometry"],
+                const element = new window.google.maps.places.PlaceAutocompleteElement({
+                    placeholder: "Vi du: Ho Chi Minh City, Vietnam",
+                    includedPrimaryTypes: ["locality", "administrative_area_level_1"],
                 });
 
-                autocompleteRef.current = autocomplete;
+                element.className = className || "w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none";
+                element.style.display = "block";
+                element.style.width = "100%";
+                if (typeof value === "string" && value.trim()) {
+                    element.value = value;
+                }
 
-                autocomplete.addListener("place_changed", () => {
-                    const place = autocomplete.getPlace();
-                    const selectedName = place?.formatted_address || place?.name || "";
+                const handleInput = (event) => {
+                    const nextValue = event?.target?.value ?? element.value ?? "";
+                    if (typeof onChangeRef.current === "function") {
+                        onChangeRef.current(nextValue);
+                    }
+                };
 
-                    if (selectedName) {
-                        onChange(selectedName);
+                const handleSelect = async (event) => {
+                    const placePrediction = event?.placePrediction;
+                    const place = placePrediction?.toPlace?.() || event?.place;
+                    if (!place) return;
+
+                    await place.fetchFields({
+                        fields: ["formattedAddress", "displayName", "location"],
+                    });
+
+                    const selectedName = place.formattedAddress || place.displayName || "";
+                    const lat = place?.location?.lat?.();
+                    const lng = place?.location?.lng?.();
+
+                    if (selectedName && typeof onChangeRef.current === "function") {
+                        onChangeRef.current(selectedName);
                     }
 
-                    const location = place?.geometry?.location;
-                    if (location && typeof onCitySelect === "function") {
-                        onCitySelect({
+                    if (
+                        selectedName &&
+                        Number.isFinite(lat) &&
+                        Number.isFinite(lng) &&
+                        typeof onCitySelectRef.current === "function"
+                    ) {
+                        onCitySelectRef.current({
                             name: selectedName,
-                            lat: location.lat(),
-                            lng: location.lng(),
+                            lat,
+                            lng,
                         });
                     }
-                });
+                };
+
+                hostRef.current.innerHTML = "";
+                hostRef.current.appendChild(element);
+                autocompleteRef.current = element;
+
+                element.addEventListener("input", handleInput);
+                element.addEventListener("change", handleInput);
+                element.addEventListener("gmp-select", handleSelect);
+                element.addEventListener("gmp-placeselect", handleSelect);
+
+                cleanup = () => {
+                    element.removeEventListener("input", handleInput);
+                    element.removeEventListener("change", handleInput);
+                    element.removeEventListener("gmp-select", handleSelect);
+                    element.removeEventListener("gmp-placeselect", handleSelect);
+                    if (hostRef.current?.contains(element)) {
+                        hostRef.current.removeChild(element);
+                    }
+                    if (hostRef.current) {
+                        hostRef.current.innerHTML = "";
+                    }
+                    autocompleteRef.current = null;
+                };
             })
             .catch((error) => {
-                if (!mounted) return;
-                setErrorMessage(error?.message || "Không thể tải gợi ý thành phố.");
+                if (cancelled) return;
+                setErrorMessage(error?.message || "Cannot load city suggestions.");
             });
 
         return () => {
-            mounted = false;
+            cancelled = true;
+            cleanup();
         };
-    }, [apiKey, onChange, onCitySelect]);
+    }, [apiKey, className]);
+
+    useEffect(() => {
+        const element = autocompleteRef.current;
+        if (!element || typeof value !== "string") return;
+        if (element.value !== value) {
+            element.value = value;
+        }
+    }, [value]);
 
     return (
-        <>
-            <input
-                ref={inputRef}
-                type="text"
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-                className={className}
-                placeholder="Ví dụ: Ho Chi Minh City, Vietnam"
-            />
+        <div className="relative">
+            <div ref={hostRef} className="w-full" />
             {errorMessage ? <p className="mt-1 text-xs text-amber-700">{errorMessage}</p> : null}
-        </>
+        </div>
     );
 }

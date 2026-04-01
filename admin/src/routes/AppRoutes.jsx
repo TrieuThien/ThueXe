@@ -32,6 +32,11 @@ import CouponCreatePage from "../pages/coupons/CouponCreatePage";
 import CouponEditPage from "../pages/coupons/CouponEditPage";
 import CouponDetailPage from "../pages/coupons/CouponDetailPage";
 import RewardPointsPage from "../pages/reward-points/RewardPointsPage";
+import BookingCreatePage from "../pages/bookings/BookingCreatePage";
+import BookingDispatchPage from "../pages/bookings/BookingDispatchPage";
+import BookingListPage from "../pages/bookings/BookingListPage";
+import ScheduledBookingListPage from "../pages/bookings/ScheduledBookingListPage";
+import BookingDetailPage from "../pages/bookings/BookingDetailPage";
 
 function getElementByRoleAndPath(role, path) {
     if (path === "dashboard") {
@@ -102,6 +107,22 @@ function getElementByRoleAndPath(role, path) {
         return <MapTrackingPage />;
     }
 
+    if (path === "booking/create") {
+        return <BookingCreatePage />;
+    }
+
+    if (path === "booking/dispatch") {
+        return <BookingDispatchPage />;
+    }
+
+    if (path === "bookings") {
+        return <BookingListPage />;
+    }
+
+    if (path === "scheduled-bookings") {
+        return <ScheduledBookingListPage />;
+    }
+
     return <ModulePlaceholderPage role={role} />;
 }
 
@@ -131,11 +152,13 @@ export default function AppRoutes() {
                 <Route path="coupons/create" element={<CouponCreatePage />} />
                 <Route path="coupons/:id" element={<CouponDetailPage />} />
                 <Route path="coupons/:id/edit" element={<CouponEditPage />} />
+                <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
             </Route>
 
             <Route path="/dispatcher" element={<Layout allowedRole="dispatcher" />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 {renderRoleRoutes("dispatcher")}
+                <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
             </Route>
 
             <Route

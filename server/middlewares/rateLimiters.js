@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 function createLimiter(windowMs, max, message) {
     return rateLimit({
@@ -49,3 +49,19 @@ export const globalLimiter = createLimiter(
     Number(process.env.RATE_LIMIT_GLOBAL_MAX) || 250,
     "Too many requests. Please try again later."
 );
+
+export const passengerBookingCreateLimiter = rateLimit({
+    windowMs: Number(process.env.RATE_LIMIT_PASSENGER_BOOKING_WINDOW_MS) || 60 * 1000,
+    max: Number(process.env.RATE_LIMIT_PASSENGER_BOOKING_MAX) || 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req) => {
+        const userId = req?.auth?.userId ? `u:${req.auth.userId}` : "u:anonymous";
+        return `${userId}|ip:${ipKeyGenerator(req)}`;
+    },
+    message: {
+        success: false,
+        message: "Too many booking create attempts. Please try again shortly.",
+        code: "PASSENGER_BOOKING_RATE_LIMITED",
+    },
+});

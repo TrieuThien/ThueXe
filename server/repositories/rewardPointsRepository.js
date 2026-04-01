@@ -1,5 +1,7 @@
 import sqldb from "../config/sqldatabase.js";
 
+const USER_HISTORY_TABLE = "user_reward_points_history";
+
 function dbConnection(conn) {
     return conn || sqldb;
 }
@@ -86,8 +88,9 @@ function buildHistoryWhere(filters = {}, params = []) {
     }
 
     if (filters.userType !== undefined && filters.userType !== null) {
-        where.push("h.user_type = ?");
-        params.push(filters.userType);
+        if (Number(filters.userType) !== 0) {
+            where.push("1 = 0");
+        }
     }
 
     if (filters.search) {
@@ -227,9 +230,8 @@ export async function findEarnHistoryByBookingId(bookingId, userId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(
         `SELECT id, points, money_value, balance_before, balance_after, date_created
-         FROM reward_points_history
+         FROM ${USER_HISTORY_TABLE}
          WHERE booking_id = ?
-           AND user_type = 0
            AND user_id = ?
            AND action_type = 1
          LIMIT 1`,
@@ -251,8 +253,7 @@ export async function findEarnHistoryByBookingId(bookingId, userId, conn) {
 export async function insertRewardHistory(payload, conn) {
     const db = dbConnection(conn);
     const [result] = await db.query(
-        `INSERT INTO reward_points_history (
-            user_type,
+        `INSERT INTO ${USER_HISTORY_TABLE} (
             user_id,
             booking_id,
             action_type,
@@ -265,9 +266,8 @@ export async function insertRewardHistory(payload, conn) {
             note,
             created_by,
             date_created
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
         [
-            payload.user_type,
             payload.user_id,
             payload.booking_id ?? null,
             payload.action_type,
@@ -293,7 +293,7 @@ export async function findRewardHistory(filters = {}) {
     const [rows] = await sqldb.query(
         `SELECT
             h.id,
-            h.user_type,
+            0 AS user_type,
             h.user_id,
             h.booking_id,
             h.action_type,
@@ -313,7 +313,7 @@ export async function findRewardHistory(filters = {}) {
                 WHEN ca.user_id IS NULL THEN NULL
                 ELSE CONCAT(COALESCE(ca.firstname, ''), ' ', COALESCE(ca.lastname, ''))
             END AS created_by_name
-         FROM reward_points_history h
+         FROM ${USER_HISTORY_TABLE} h
          LEFT JOIN users u ON u.user_id = h.user_id
          LEFT JOIN users ca ON ca.user_id = h.created_by
          ${whereSql}
@@ -331,7 +331,7 @@ export async function countRewardHistory(filters = {}) {
 
     const [rows] = await sqldb.query(
         `SELECT COUNT(*) AS total_items
-         FROM reward_points_history h
+         FROM ${USER_HISTORY_TABLE} h
          LEFT JOIN users u ON u.user_id = h.user_id
          ${whereSql}`,
         params
@@ -364,9 +364,8 @@ export async function findEligibleBookingIdsMissingEarnHistoryByUserId(userId, l
     const [rows] = await sqldb.query(
         `SELECT b.id
          FROM bookings b
-         LEFT JOIN reward_points_history h
+         LEFT JOIN ${USER_HISTORY_TABLE} h
             ON h.booking_id = b.id
-            AND h.user_type = 0
             AND h.user_id = b.user_id
             AND h.action_type = 1
          WHERE b.user_id = ?

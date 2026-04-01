@@ -1,32 +1,41 @@
 import sqldb from "../config/sqldatabase.js";
 
+const DRIVER_WALLET_ACTOR_TYPE = 1;
+
 const DRIVER_DOCUMENT_AGGREGATE_JOIN = `
     LEFT JOIN (
         SELECT
-            ud.u_id,
+            dd.driver_id,
             COUNT(*) AS document_count,
-            SUM(CASE WHEN ud.u_doc_status = 0 THEN 1 ELSE 0 END) AS pending_count,
-            SUM(CASE WHEN ud.u_doc_status = 1 THEN 1 ELSE 0 END) AS failed_count,
-            SUM(CASE WHEN ud.u_doc_status = 2 THEN 1 ELSE 0 END) AS expired_count,
-            SUM(CASE WHEN ud.u_doc_status = 3 THEN 1 ELSE 0 END) AS approved_count,
+            SUM(CASE WHEN dd.verified = 0 AND (dd.doc_expiry_date IS NULL OR dd.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) AS pending_count,
+            0 AS failed_count,
+            SUM(CASE WHEN dd.doc_expiry_date IS NOT NULL AND dd.doc_expiry_date < CURDATE() THEN 1 ELSE 0 END) AS expired_count,
+            SUM(CASE WHEN dd.verified = 1 AND (dd.doc_expiry_date IS NULL OR dd.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) AS approved_count,
             CASE
-                WHEN SUM(CASE WHEN ud.u_doc_status = 1 THEN 1 ELSE 0 END) > 0 THEN 'failed'
-                WHEN SUM(CASE WHEN ud.u_doc_status = 2 THEN 1 ELSE 0 END) > 0 THEN 'expired'
-                WHEN SUM(CASE WHEN ud.u_doc_status = 0 THEN 1 ELSE 0 END) > 0 THEN 'pending'
+                WHEN SUM(CASE WHEN dd.doc_expiry_date IS NOT NULL AND dd.doc_expiry_date < CURDATE() THEN 1 ELSE 0 END) > 0 THEN 'expired'
+                WHEN SUM(CASE WHEN dd.verified = 0 AND (dd.doc_expiry_date IS NULL OR dd.doc_expiry_date >= CURDATE()) THEN 1 ELSE 0 END) > 0 THEN 'pending'
                 WHEN COUNT(*) > 0 THEN 'approved'
                 ELSE NULL
             END AS document_status
-        FROM users_documents ud
-        WHERE ud.u_type = 1
-        GROUP BY ud.u_id
-    ) doc ON doc.u_id = d.driver_id
+        FROM driver_documents dd
+        GROUP BY dd.driver_id
+    ) doc ON doc.driver_id = d.driver_id
+`;
+
+const DRIVER_WALLET_AGGREGATE_JOIN = `
+    LEFT JOIN (
+        SELECT actor_id, SUM(balance) AS wallet_amount
+        FROM wallet_accounts
+        WHERE actor_type = ${DRIVER_WALLET_ACTOR_TYPE}
+        GROUP BY actor_id
+    ) wa ON wa.actor_id = d.driver_id
 `;
 
 const SORT_COLUMN_MAP = {
     account_create_date: "d.account_create_date",
     firstname: "d.firstname",
     driver_rating: "d.driver_rating",
-    wallet_amount: "d.wallet_amount",
+    wallet_amount: "COALESCE(wa.wallet_amount, 0)",
     driver_id: "d.driver_id",
 };
 
@@ -175,6 +184,7 @@ function buildDriverFilterQueryParts(filters = {}) {
             LEFT JOIN routes route_current ON route_current.id = d.route_id
             LEFT JOIN routes route_registered ON route_registered.id = d.reg_route_id
             LEFT JOIN rides rd ON rd.id = d.ride_id
+            ${DRIVER_WALLET_AGGREGATE_JOIN}
             ${DRIVER_DOCUMENT_AGGREGATE_JOIN}
         `,
         whereSql: whereClauses.length > 0 ? `WHERE ${whereClauses.join(" AND ")}` : "",
@@ -273,11 +283,11 @@ export async function insertDriver(payload, conn) {
                 password_hash, drv_address, email, firstname, lastname, phone, state, drv_country,
                 car_plate_num, car_reg_num, car_model, car_color, car_year, route_id, ride_id,
                 reg_route_id, is_activated, account_deleted, available, operation_status,
-                account_active, photo_file, wallet_amount, bank_name, bank_acc_holder_name,
+                account_active, photo_file, bank_name, bank_acc_holder_name,
                 bank_acc_num, bank_code, bank_swift_code, country_code, country_dial_code,
                 driver_commision
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         [
             payload.passwordHash,
@@ -302,7 +312,6 @@ export async function insertDriver(payload, conn) {
             payload.operationStatus,
             payload.accountActive,
             payload.photoFile,
-            payload.walletAmount,
             payload.bankName,
             payload.bankAccHolderName,
             payload.bankAccNum,
@@ -333,7 +342,7 @@ export async function findDrivers(filters) {
                 route_registered.r_title AS reg_route_name, d.ride_id, rd.ride_type,
                 d.is_activated, d.account_deleted, d.available, d.operation_status,
                 d.driver_rating, d.account_active, d.photo_file, d.driving_license_file,
-                d.road_worthiness_file, d.wallet_amount, d.bank_name, d.bank_acc_holder_name,
+                d.road_worthiness_file, COALESCE(wa.wallet_amount, 0) AS wallet_amount, d.bank_name, d.bank_acc_holder_name,
                 d.bank_acc_num, d.bank_code, d.bank_swift_code, d.completed_rides,
                 d.cancelled_rides, d.rejected_rides, d.country_code, d.country_dial_code,
                 d.driver_commision, d.account_create_date,
@@ -421,7 +430,7 @@ export async function findDriverById(driverId) {
                 route_registered.r_title AS reg_route_name, d.ride_id, rd.ride_type,
                 d.is_activated, d.account_deleted, d.available, d.operation_status,
                 d.driver_rating, d.account_active, d.photo_file, d.driving_license_file,
-                d.road_worthiness_file, d.wallet_amount, d.bank_name, d.bank_acc_holder_name,
+                d.road_worthiness_file, COALESCE(wa.wallet_amount, 0) AS wallet_amount, d.bank_name, d.bank_acc_holder_name,
                 d.bank_acc_num, d.bank_code, d.bank_swift_code, d.completed_rides,
                 d.cancelled_rides, d.rejected_rides, d.country_code, d.country_dial_code,
                 d.driver_commision, d.account_create_date,
@@ -435,6 +444,7 @@ export async function findDriverById(driverId) {
             LEFT JOIN routes route_current ON route_current.id = d.route_id
             LEFT JOIN routes route_registered ON route_registered.id = d.reg_route_id
             LEFT JOIN rides rd ON rd.id = d.ride_id
+            ${DRIVER_WALLET_AGGREGATE_JOIN}
             ${DRIVER_DOCUMENT_AGGREGATE_JOIN}
             WHERE d.driver_id = ?
             LIMIT 1
@@ -518,40 +528,22 @@ export async function findDriverTransactions(driverId) {
     const [rows] = await sqldb.query(
         `
             SELECT
-                tx.row_key, tx.source_id, tx.reference_id, tx.amount, tx.wallet_balance,
-                tx.booking_id, tx.type_code, tx.description, tx.transaction_date
-            FROM (
-                SELECT
-                    CONCAT('wallet-transaction-', wt.id) AS row_key,
-                    wt.id AS source_id,
-                    wt.transaction_id AS reference_id,
-                    wt.amount,
-                    wt.wallet_balance,
-                    wt.book_id AS booking_id,
-                    wt.type AS type_code,
-                    wt.desc AS description,
-                    wt.transaction_date
-                FROM wallet_transactions wt
-                WHERE wt.user_id = ? AND wt.user_type = 1
-
-                UNION ALL
-
-                SELECT
-                    CONCAT('wallet-fund-', wf.id) AS row_key,
-                    wf.id AS source_id,
-                    CONCAT('WF-', wf.id) AS reference_id,
-                    wf.fund_amount AS amount,
-                    wf.wallet_balance,
-                    0 AS booking_id,
-                    1 AS type_code,
-                    wf.fund_comment AS description,
-                    wf.date_fund AS transaction_date
-                FROM wallet_fund wf
-                WHERE wf.driver_id = ? AND wf.fund_type = 1
-            ) tx
-            ORDER BY tx.transaction_date DESC, tx.source_id DESC
+                CONCAT('wallet-ledger-', wl.ledger_id) AS row_key,
+                wl.ledger_id AS source_id,
+                COALESCE(p.payment_code, CAST(wl.payment_id AS CHAR)) AS reference_id,
+                wl.amount,
+                wl.balance_after AS wallet_balance,
+                COALESCE(p.booking_id, 0) AS booking_id,
+                CASE WHEN wl.direction = 'credit' THEN 2 ELSE 3 END AS type_code,
+                wl.description,
+                wl.created_at AS transaction_date
+            FROM wallet_accounts wa
+            INNER JOIN wallet_ledger wl ON wl.wallet_id = wa.wallet_id
+            LEFT JOIN payments p ON p.payment_id = wl.payment_id
+            WHERE wa.actor_id = ? AND wa.actor_type = ?
+            ORDER BY wl.created_at DESC, wl.ledger_id DESC
         `,
-        [driverId, driverId]
+        [driverId, DRIVER_WALLET_ACTOR_TYPE]
     );
 
     return rows.map((row) => ({
@@ -604,12 +596,24 @@ export async function findDriverBookings(driverId) {
 export async function findDriverWithdrawals(driverId) {
     const [rows] = await sqldb.query(
         `
-            SELECT id, withdrawal_amount, wallet_amount, wallet_balance, request_status, date_requested, date_settled
-            FROM wallet_withdrawal
-            WHERE person_id = ? AND user_type = 0
-            ORDER BY date_requested DESC, id DESC
+            SELECT
+                wr.withdrawal_id AS id,
+                wr.amount AS withdrawal_amount,
+                wr.amount AS wallet_amount,
+                wa.balance AS wallet_balance,
+                CASE
+                    WHEN wr.status = 'pending' THEN 0
+                    WHEN wr.status IN ('cancelled', 'rejected') THEN 1
+                    ELSE 2
+                END AS request_status,
+                wr.requested_at AS date_requested,
+                wr.processed_at AS date_settled
+            FROM wallet_accounts wa
+            INNER JOIN withdrawal_requests wr ON wr.wallet_id = wa.wallet_id
+            WHERE wa.actor_id = ? AND wa.actor_type = ?
+            ORDER BY wr.requested_at DESC, wr.withdrawal_id DESC
         `,
-        [driverId]
+        [driverId, DRIVER_WALLET_ACTOR_TYPE]
     );
 
     return rows.map((row) => ({
@@ -652,12 +656,26 @@ export async function findDriverDocuments(driverId) {
     const [rows] = await sqldb.query(
         `
             SELECT
-                ud.id, ud.doc_id, ud.u_vehicle_id, ud.u_doc_title, ud.u_doc_id_num_title,
-                ud.u_doc_id_num, ud.u_can_edit, ud.u_doc_expiry_date, ud.u_doc_img,
-                ud.u_doc_status, ud.date_created, ud.date_updated
-            FROM users_documents ud
-            WHERE ud.u_id = ? AND ud.u_type = 1
-            ORDER BY ud.date_updated DESC, ud.id DESC
+                dd.id,
+                dd.document_id AS doc_id,
+                0 AS u_vehicle_id,
+                doc.title AS u_doc_title,
+                doc.doc_id_num_title AS u_doc_id_num_title,
+                dd.doc_number AS u_doc_id_num,
+                1 AS u_can_edit,
+                dd.doc_expiry_date AS u_doc_expiry_date,
+                NULL AS u_doc_img,
+                CASE
+                    WHEN dd.doc_expiry_date IS NOT NULL AND dd.doc_expiry_date < CURDATE() THEN 2
+                    WHEN dd.verified = 1 THEN 3
+                    ELSE 0
+                END AS u_doc_status,
+                dd.date_submitted AS date_created,
+                dd.date_submitted AS date_updated
+            FROM driver_documents dd
+            LEFT JOIN documents doc ON doc.id = dd.document_id
+            WHERE dd.driver_id = ?
+            ORDER BY dd.date_submitted DESC, dd.id DESC
         `,
         [driverId]
     );
@@ -681,10 +699,9 @@ export async function findDriverDocuments(driverId) {
 export async function findLatestDriverLocation(driverId) {
     const [rows] = await sqldb.query(
         `
-            SELECT id, driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, location_date
-            FROM driver_location
+            SELECT driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+            FROM driver_current_locations
             WHERE driver_id = ?
-            ORDER BY location_date DESC, id DESC
             LIMIT 1
         `,
         [driverId]
@@ -694,14 +711,14 @@ export async function findLatestDriverLocation(driverId) {
     if (!row) return null;
 
     return {
-        id: Number(row.id),
+        id: Number(row.driver_id),
         driver_id: Number(row.driver_id),
         long: Number(row.long),
         lat: Number(row.lat),
         b_angle: Number(row.b_angle || 0),
         loc_static_status: Number(row.loc_static_status || 0),
         loc_static_duration: row.loc_static_duration === null ? null : Number(row.loc_static_duration),
-        location_date: row.location_date,
+        location_date: row.updated_at,
     };
 }
 
@@ -726,12 +743,24 @@ export async function softDeleteDriverAccount(driverId, conn) {
 export async function findDriverWithdrawalById(driverId, withdrawalId) {
     const [rows] = await sqldb.query(
         `
-            SELECT id, person_id, user_type, request_status, wallet_amount, wallet_balance, withdrawal_amount
-            FROM wallet_withdrawal
-            WHERE id = ? AND person_id = ? AND user_type = 0
+            SELECT
+                wr.withdrawal_id AS id,
+                wa.actor_id AS person_id,
+                wa.actor_type AS user_type,
+                CASE
+                    WHEN wr.status = 'pending' THEN 0
+                    WHEN wr.status IN ('cancelled', 'rejected') THEN 1
+                    ELSE 2
+                END AS request_status,
+                wr.amount AS wallet_amount,
+                wa.balance AS wallet_balance,
+                wr.amount AS withdrawal_amount
+            FROM wallet_accounts wa
+            INNER JOIN withdrawal_requests wr ON wr.wallet_id = wa.wallet_id
+            WHERE wr.withdrawal_id = ? AND wa.actor_id = ? AND wa.actor_type = ?
             LIMIT 1
         `,
-        [withdrawalId, driverId]
+        [withdrawalId, driverId, DRIVER_WALLET_ACTOR_TYPE]
     );
 
     const row = rows[0];
@@ -750,14 +779,22 @@ export async function findDriverWithdrawalById(driverId, withdrawalId) {
 
 export async function updateDriverWithdrawalStatus({ withdrawalId, requestStatus }, conn) {
     const db = dbConnection(conn);
+
+    let status = "pending";
+    if (Number(requestStatus) === 1) {
+        status = "cancelled";
+    } else if (Number(requestStatus) === 2) {
+        status = "approved";
+    }
+
     const [result] = await db.query(
         `
-            UPDATE wallet_withdrawal
-            SET request_status = ?, date_settled = CASE WHEN ? = 0 THEN NULL ELSE NOW() END
-            WHERE id = ? AND user_type = 0
+            UPDATE withdrawal_requests
+            SET status = ?, processed_at = CASE WHEN ? = 'pending' THEN NULL ELSE NOW() END
+            WHERE withdrawal_id = ?
             LIMIT 1
         `,
-        [requestStatus, requestStatus, withdrawalId]
+        [status, status, withdrawalId]
     );
 
     return result.affectedRows === 1;

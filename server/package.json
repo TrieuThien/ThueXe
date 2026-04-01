@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node index.mjs",
     "dev": "nodemon index.mjs",
-    "seed:admin": "node scripts/seedAdmin.mjs"
+    "seed:admin": "node scripts/seedAdmin.mjs",
+    "test": "node ./tests/run-booking-tests.mjs"
   },
   "repository": {
     "type": "git",

@@ -73,6 +73,7 @@ function mapTariffDetail(row) {
         id: Number(row.id),
         ride_id: Number(row.ride_id),
         routes_id: Number(row.routes_id),
+        service_type: Number(row.service_type || 0),
         cost_per_km: Number(row.cost_per_km || 0),
         cost_per_minute: Number(row.cost_per_minute || 0),
         wait_time: Number(row.wait_time || 0),
@@ -102,7 +103,12 @@ function mapTariffDetail(row) {
         pp_active_days: row.pp_active_days,
         pp_charge_type: Number(row.pp_charge_type || 0),
         pp_charge_value: Number(row.pp_charge_value || 0),
-        alt_cars: row.alt_cars,
+        hour_rate: Number(row.hour_rate || 0),
+        day_rate: Number(row.day_rate || 0),
+        deposit: Number(row.deposit || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        alt_cars: null,
         ride_type: row.ride_type,
         ride_desc: row.ride_desc,
         ride_img: row.ride_img,
@@ -254,6 +260,7 @@ export async function findTariffsByRouteId(routeId) {
             rt.id,
             rt.ride_id,
             rt.routes_id,
+            rt.service_type,
             rt.cost_per_km,
             rt.cost_per_minute,
             rt.wait_time,
@@ -283,7 +290,11 @@ export async function findTariffsByRouteId(routeId) {
             rt.pp_active_days,
             rt.pp_charge_type,
             rt.pp_charge_value,
-            rt.alt_cars,
+            rt.hour_rate,
+            rt.day_rate,
+            rt.deposit,
+            rt.distance_limit_km,
+            rt.extra_km_fee,
             rd.ride_type,
             rd.ride_desc,
             rd.ride_img,
@@ -420,6 +431,7 @@ export async function insertRideTariff(payload, conn) {
         `INSERT INTO rides_tariffs (
             ride_id,
             routes_id,
+            service_type,
             cost_per_km,
             cost_per_minute,
             wait_time,
@@ -449,11 +461,16 @@ export async function insertRideTariff(payload, conn) {
             pp_active_days,
             pp_charge_type,
             pp_charge_value,
-            alt_cars
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            hour_rate,
+            day_rate,
+            deposit,
+            distance_limit_km,
+            extra_km_fee
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             payload.ride_id,
             payload.routes_id,
+            payload.service_type ?? 0,
             payload.cost_per_km,
             payload.cost_per_minute,
             payload.wait_time,
@@ -483,7 +500,11 @@ export async function insertRideTariff(payload, conn) {
             payload.pp_active_days,
             payload.pp_charge_type,
             payload.pp_charge_value,
-            payload.alt_cars,
+            payload.hour_rate ?? 0,
+            payload.day_rate ?? 0,
+            payload.deposit ?? 0,
+            payload.distance_limit_km ?? 0,
+            payload.extra_km_fee ?? 0,
         ]
     );
 
@@ -497,6 +518,7 @@ export async function updateRideTariffById(tariffId, payload, conn) {
         `UPDATE rides_tariffs
          SET
             ride_id = ?,
+            service_type = ?,
             cost_per_km = ?,
             cost_per_minute = ?,
             wait_time = ?,
@@ -526,11 +548,16 @@ export async function updateRideTariffById(tariffId, payload, conn) {
             pp_active_days = ?,
             pp_charge_type = ?,
             pp_charge_value = ?,
-            alt_cars = ?
+            hour_rate = ?,
+            day_rate = ?,
+            deposit = ?,
+            distance_limit_km = ?,
+            extra_km_fee = ?
          WHERE id = ?
          LIMIT 1`,
         [
             payload.ride_id,
+            payload.service_type ?? 0,
             payload.cost_per_km,
             payload.cost_per_minute,
             payload.wait_time,
@@ -560,7 +587,11 @@ export async function updateRideTariffById(tariffId, payload, conn) {
             payload.pp_active_days,
             payload.pp_charge_type,
             payload.pp_charge_value,
-            payload.alt_cars,
+            payload.hour_rate ?? 0,
+            payload.day_rate ?? 0,
+            payload.deposit ?? 0,
+            payload.distance_limit_km ?? 0,
+            payload.extra_km_fee ?? 0,
             tariffId,
         ]
     );

@@ -21,7 +21,7 @@ import AppError from "../utils/appError.js";
 
 function assertAdmin(auth) {
     if (!auth || Number(auth.accountType) !== 3) {
-        throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403, "FORBIDDEN");
+        throw new AppError("You are not have permission to perform this action.", 403, "FORBIDDEN");
     }
 }
 
@@ -46,10 +46,10 @@ function normalizeNumber(value, { fallback = 0, min = null } = {}) {
     if (value === undefined || value === null || value === "") return fallback;
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) {
-        throw new AppError("Giá trị số không hợp lệ.", 422, "INVALID_NUMBER");
+        throw new AppError("Invalid number.", 422, "INVALID_NUMBER");
     }
     if (min !== null && parsed < min) {
-        throw new AppError("Giá trị số không hợp lệ.", 422, "INVALID_NUMBER");
+        throw new AppError("Invalid number.", 422, "INVALID_NUMBER");
     }
     return parsed;
 }
@@ -57,14 +57,14 @@ function normalizeNumber(value, { fallback = 0, min = null } = {}) {
 function normalizeCouponCode(value) {
     const text = normalizeText(value, { maxLength: 15 });
     if (!text) {
-        throw new AppError("Mã giảm giá là bắt buộc.", 422, "COUPON_CODE_REQUIRED");
+        throw new AppError("Coupon code is required.", 422, "COUPON_CODE_REQUIRED");
     }
 
     const normalized = text.toUpperCase();
 
     if (!/^[A-Z0-9_-]{3,15}$/.test(normalized)) {
         throw new AppError(
-            "Mã giảm giá chỉ được chứa chữ in hoa, số, dấu gạch dưới hoặc gạch ngang (3-15 ký tự).",
+            "Coupon code can only contain uppercase letters, numbers, underscores, or hyphens (3-15 characters).",
             422,
             "INVALID_COUPON_CODE"
         );
@@ -76,7 +76,7 @@ function normalizeCouponCode(value) {
 function normalizeDateTime(value, fieldName) {
     const text = normalizeText(value);
     if (!text) {
-        throw new AppError(`${fieldName} là bắt buộc.`, 422, "DATE_REQUIRED");
+        throw new AppError(`${fieldName} is required.`, 422, "DATE_REQUIRED");
     }
 
     const normalized = text.includes("T") ? text.replace("T", " ") : text;
@@ -84,7 +84,7 @@ function normalizeDateTime(value, fieldName) {
     const dateCheck = new Date(mysqlDateTime.replace(" ", "T"));
 
     if (Number.isNaN(dateCheck.getTime())) {
-        throw new AppError(`${fieldName} không hợp lệ.`, 422, "INVALID_DATE");
+        throw new AppError(`${fieldName} is invalid.`, 422, "INVALID_DATE");
     }
 
     return mysqlDateTime;
@@ -147,15 +147,15 @@ function normalizeListFilters(query = {}) {
         : normalizeInt(query.city, { fallback: null });
 
     if (status !== null && ![0, 1].includes(status)) {
-        throw new AppError("Bộ lọc trạng thái không hợp lệ.", 422, "INVALID_STATUS_FILTER");
+        throw new AppError("Invalid status filter.", 422, "INVALID_STATUS_FILTER");
     }
 
     if (visibility !== null && ![0, 1].includes(visibility)) {
-        throw new AppError("Bộ lọc hiển thị không hợp lệ.", 422, "INVALID_VISIBILITY_FILTER");
+        throw new AppError("Invalid visibility filter.", 422, "INVALID_VISIBILITY_FILTER");
     }
 
     if (city !== null && city < 1) {
-        throw new AppError("Bộ lọc thành phố không hợp lệ.", 422, "INVALID_CITY_FILTER");
+        throw new AppError("Invalid city filter.", 422, "INVALID_CITY_FILTER");
     }
 
     const activeFrom = query.activeFrom ? normalizeDateTime(query.activeFrom, "activeFrom") : null;
@@ -165,7 +165,7 @@ function normalizeListFilters(query = {}) {
         const fromDate = new Date(activeFrom.replace(" ", "T"));
         const toDate = new Date(activeTo.replace(" ", "T"));
         if (fromDate.getTime() > toDate.getTime()) {
-            throw new AppError("Khoảng thời gian lọc không hợp lệ.", 422, "INVALID_DATE_RANGE");
+            throw new AppError("Invalid date range.", 422, "INVALID_DATE_RANGE");
         }
     }
 
@@ -198,45 +198,45 @@ function normalizeCreatePayload(payload = {}) {
     const vehicles = parseVehicleIds(payload.vehicles);
 
     if (!city || city < 1) {
-        throw new AppError("Thành phố áp dụng không hợp lệ.", 422, "INVALID_CITY");
+        throw new AppError("Invalid city.", 422, "INVALID_CITY");
     }
 
     if (![0, 1].includes(visibility)) {
-        throw new AppError("Hiển thị công khai không hợp lệ.", 422, "INVALID_VISIBILITY");
+        throw new AppError("Invalid visibility.", 422, "INVALID_VISIBILITY");
     }
 
     if (![0, 1].includes(discount_type)) {
-        throw new AppError("Loại giảm giá không hợp lệ.", 422, "INVALID_DISCOUNT_TYPE");
+        throw new AppError("Invalid discount type.", 422, "INVALID_DISCOUNT_TYPE");
     }
 
     if (discount_value < 0) {
-        throw new AppError("Giá trị giảm không được âm.", 422, "INVALID_DISCOUNT_VALUE");
+        throw new AppError("Invalid discount value.", 422, "INVALID_DISCOUNT_VALUE");
     }
 
     if (min_fare < 0) {
-        throw new AppError("Giá trị đơn tối thiểu không được âm.", 422, "INVALID_MIN_FARE");
+        throw new AppError("Invalid minimum fare.", 422, "INVALID_MIN_FARE");
     }
 
     if (max_discount_amount < 0) {
-        throw new AppError("Giảm tối đa không được âm.", 422, "INVALID_MAX_DISCOUNT");
+        throw new AppError("Invalid maximum discount amount.", 422, "INVALID_MAX_DISCOUNT");
     }
 
     if (!Number.isInteger(limit_count) || limit_count < 0) {
-        throw new AppError("Giới hạn tổng lượt dùng không hợp lệ.", 422, "INVALID_LIMIT_COUNT");
+        throw new AppError("Invalid limit count.", 422, "INVALID_LIMIT_COUNT");
     }
 
     if (!Number.isInteger(user_limit_count) || user_limit_count < 0) {
-        throw new AppError("Giới hạn mỗi người dùng không hợp lệ.", 422, "INVALID_USER_LIMIT_COUNT");
+        throw new AppError("Invalid user limit count.", 422, "INVALID_USER_LIMIT_COUNT");
     }
 
     if (![0, 1].includes(status)) {
-        throw new AppError("Trạng thái không hợp lệ.", 422, "INVALID_STATUS");
+        throw new AppError("Invalid status.", 422, "INVALID_STATUS");
     }
 
     const activeDateObj = new Date(active_date.replace(" ", "T"));
     const expiryDateObj = new Date(expiry_date.replace(" ", "T"));
     if (expiryDateObj.getTime() < activeDateObj.getTime()) {
-        throw new AppError("Ngày hết hạn phải lớn hơn hoặc bằng ngày bắt đầu.", 422, "INVALID_DATE_RANGE");
+        throw new AppError("Invalid date range.", 422, "INVALID_DATE_RANGE");
     }
 
     return {
@@ -311,11 +311,11 @@ function buildBookingCouponPayload(coupon) {
 
 function validateCouponEligibility(coupon, { fare, cityId, vehicleId }) {
     if (!coupon) {
-        return { valid: false, message: "Không tìm thấy mã giảm giá." };
+        return { valid: false, message: "Coupon not found." };
     }
 
     if (Number(coupon.status) !== 1) {
-        return { valid: false, message: "Mã giảm giá hiện đang tạm ngưng." };
+        return { valid: false, message: "Coupon is currently disabled." };
     }
 
     const now = new Date();
@@ -323,42 +323,42 @@ function validateCouponEligibility(coupon, { fare, cityId, vehicleId }) {
     const expiryDate = toDate(coupon.expiry_date);
 
     if (!activeDate || !expiryDate) {
-        return { valid: false, message: "Mã giảm giá có thời gian hiệu lực không hợp lệ." };
+        return { valid: false, message: "Coupon has an invalid validity period." };
     }
 
     if (now.getTime() < activeDate.getTime()) {
-        return { valid: false, message: "Mã giảm giá chưa đến thời gian sử dụng." };
+        return { valid: false, message: "Coupon is not yet valid." };
     }
 
     if (now.getTime() > expiryDate.getTime()) {
-        return { valid: false, message: "Mã giảm giá đã hết hạn." };
+        return { valid: false, message: "Coupon has expired." };
     }
 
     if (Number(coupon.city) !== Number(cityId)) {
-        return { valid: false, message: "Mã giảm giá không áp dụng cho khu vực này." };
+        return { valid: false, message: "Coupon is not applicable for this area." };
     }
 
     const couponVehicles = parseCouponVehicles(coupon.vehicles);
     if (couponVehicles.length && (!vehicleId || !couponVehicles.includes(Number(vehicleId)))) {
-        return { valid: false, message: "Mã giảm giá không áp dụng cho loại xe đã chọn." };
+        return { valid: false, message: "Coupon is not applicable for the selected vehicle type." };
     }
 
     if (Number(fare) < Number(coupon.min_fare || 0)) {
         return {
             valid: false,
-            message: `Chuyến đi cần tối thiểu ${Number(coupon.min_fare || 0).toLocaleString("vi-VN")} để dùng mã này.`,
+            message: `Booking fare must be at least ${Number(coupon.min_fare || 0).toLocaleString("vi-VN")} to use this coupon.`,
         };
     }
 
     if (Number(coupon.limit_count) > 0 && Number(coupon.total_used || 0) >= Number(coupon.limit_count)) {
-        return { valid: false, message: "Mã giảm giá đã hết lượt sử dụng." };
+        return { valid: false, message: "Coupon has reached its usage limit." };
     }
 
     if (
         Number(coupon.user_limit_count) > 0 &&
         Number(coupon.user_used || 0) >= Number(coupon.user_limit_count)
     ) {
-        return { valid: false, message: "Bạn đã dùng hết lượt cho mã giảm giá này." };
+        return { valid: false, message: "You have used all available uses for this coupon." };
     }
 
     const discountAmount = calculateDiscountAmount(coupon, fare);
@@ -366,7 +366,7 @@ function validateCouponEligibility(coupon, { fare, cityId, vehicleId }) {
 
     return {
         valid: true,
-        message: "Áp dụng mã giảm giá thành công.",
+        message: "Coupon applied successfully.",
         discountAmount,
         finalFare,
         bookingCouponPayload: buildBookingCouponPayload(coupon),
@@ -376,7 +376,7 @@ function validateCouponEligibility(coupon, { fare, cityId, vehicleId }) {
 async function ensureRouteExists(cityId) {
     const exists = await routeExists(cityId);
     if (!exists) {
-        throw new AppError("Thành phố áp dụng không tồn tại.", 422, "CITY_NOT_FOUND");
+        throw new AppError("City not found.", 422, "CITY_NOT_FOUND");
     }
 }
 
@@ -385,7 +385,7 @@ async function ensureVehicleIdsValid(vehicleIds) {
     const activeRideIds = await findActiveRideIds();
     const invalidId = vehicleIds.find((id) => !activeRideIds.has(id));
     if (invalidId) {
-        throw new AppError(`Xe áp dụng không hợp lệ: #${invalidId}.`, 422, "INVALID_VEHICLE_ID");
+        throw new AppError(`Invalid vehicle ID: #${invalidId}.`, 422, "INVALID_VEHICLE_ID");
     }
 }
 
@@ -427,12 +427,12 @@ export async function getCouponDetailByAdmin(couponIdInput, auth) {
 
     const couponId = normalizeInt(couponIdInput, { fallback: null });
     if (!couponId || couponId < 1) {
-        throw new AppError("Mã coupon không hợp lệ.", 422, "INVALID_COUPON_ID");
+        throw new AppError("Invalid coupon ID.", 422, "INVALID_COUPON_ID");
     }
 
     const coupon = await findCouponById(couponId);
     if (!coupon) {
-        throw new AppError("Không tìm thấy mã giảm giá.", 404, "COUPON_NOT_FOUND");
+        throw new AppError("Coupon not found.", 404, "COUPON_NOT_FOUND");
     }
 
     return {
@@ -452,7 +452,7 @@ export async function createCouponByAdmin(payload, auth) {
 
     const isDuplicate = await couponCodeExistsInCity(normalized.coupon_code, normalized.city);
     if (isDuplicate) {
-        throw new AppError("Mã giảm giá đã tồn tại trong thành phố này.", 409, "COUPON_CODE_DUPLICATE");
+        throw new AppError("Coupon code already exists in this city.", 409, "COUPON_CODE_DUPLICATE");
     }
 
     const connection = await sqldb.getConnection();
@@ -475,12 +475,12 @@ export async function updateCouponByAdmin(couponIdInput, payload, auth) {
 
     const couponId = normalizeInt(couponIdInput, { fallback: null });
     if (!couponId || couponId < 1) {
-        throw new AppError("Mã coupon không hợp lệ.", 422, "INVALID_COUPON_ID");
+        throw new AppError("Invalid coupon ID.", 422, "INVALID_COUPON_ID");
     }
 
     const currentCoupon = await findCouponById(couponId);
     if (!currentCoupon) {
-        throw new AppError("Không tìm thấy mã giảm giá cần cập nhật.", 404, "COUPON_NOT_FOUND");
+        throw new AppError("Coupon not found.", 404, "COUPON_NOT_FOUND");
     }
 
     const normalized = normalizeUpdatePayload(payload, currentCoupon);
@@ -489,7 +489,7 @@ export async function updateCouponByAdmin(couponIdInput, payload, auth) {
 
     const isDuplicate = await couponCodeExistsInCity(normalized.coupon_code, normalized.city, couponId);
     if (isDuplicate) {
-        throw new AppError("Mã giảm giá đã tồn tại trong thành phố này.", 409, "COUPON_CODE_DUPLICATE");
+        throw new AppError("Coupon code already exists in this city.", 409, "COUPON_CODE_DUPLICATE");
     }
 
     const connection = await sqldb.getConnection();
@@ -512,17 +512,17 @@ export async function toggleCouponStatusByAdmin(couponIdInput, payload, auth) {
 
     const couponId = normalizeInt(couponIdInput, { fallback: null });
     if (!couponId || couponId < 1) {
-        throw new AppError("Mã coupon không hợp lệ.", 422, "INVALID_COUPON_ID");
+        throw new AppError("Invalid coupon ID.", 422, "INVALID_COUPON_ID");
     }
 
     const status = normalizeInt(payload?.status, { fallback: null });
     if (![0, 1].includes(status)) {
-        throw new AppError("Trạng thái cần là 0 hoặc 1.", 422, "INVALID_STATUS");
+        throw new AppError("Status must be 0 or 1.", 422, "INVALID_STATUS");
     }
 
     const currentCoupon = await findCouponById(couponId);
     if (!currentCoupon) {
-        throw new AppError("Không tìm thấy mã giảm giá cần cập nhật.", 404, "COUPON_NOT_FOUND");
+        throw new AppError("Coupon not found.", 404, "COUPON_NOT_FOUND");
     }
 
     await updateCouponStatus(couponId, status);
@@ -531,7 +531,7 @@ export async function toggleCouponStatusByAdmin(couponIdInput, payload, auth) {
 
 export async function getAvailableCouponsForUser(query, auth) {
     if (!auth?.userId) {
-        throw new AppError("Bạn chưa đăng nhập.", 401, "UNAUTHORIZED");
+        throw new AppError("Account is not logged in.", 401, "UNAUTHORIZED");
     }
 
     const cityId = normalizeInt(query.cityId, { fallback: null });
@@ -539,15 +539,15 @@ export async function getAvailableCouponsForUser(query, auth) {
     const vehicleId = resolveVehicleId(query.rideId, query.vehicleId);
 
     if (!cityId || cityId < 1) {
-        throw new AppError("Thiếu cityId hợp lệ.", 422, "INVALID_CITY_ID");
+        throw new AppError("Invalid city ID.", 422, "INVALID_CITY_ID");
     }
 
     if (fare === null) {
-        throw new AppError("Thiếu fare hợp lệ.", 422, "INVALID_FARE");
+        throw new AppError("Invalid fare.", 422, "INVALID_FARE");
     }
 
     if (!vehicleId) {
-        throw new AppError("Thiếu rideId hoặc vehicleId hợp lệ.", 422, "INVALID_VEHICLE_ID");
+        throw new AppError("Invalid ride ID or vehicle ID.", 422, "INVALID_VEHICLE_ID");
     }
 
     const coupons = await findAvailableCouponsForUser({
@@ -570,12 +570,12 @@ export async function getAvailableCouponsForUser(query, auth) {
                 vehicle_ids: parseCouponVehicles(coupon.vehicles),
                 discount_amount: evaluation.discountAmount,
                 final_fare: evaluation.finalFare,
-                rule_text: `Đơn tối thiểu ${Number(coupon.min_fare).toLocaleString("vi-VN")} • ${Number(coupon.discount_type) === 0
-                    ? `Giảm ${Number(coupon.discount_value)}%${Number(coupon.max_discount_amount) > 0
-                        ? ` (tối đa ${Number(coupon.max_discount_amount).toLocaleString("vi-VN")})`
+                rule_text: `Minimum order ${Number(coupon.min_fare).toLocaleString("vi-VN")} • ${Number(coupon.discount_type) === 0
+                    ? `Save ${Number(coupon.discount_value)}%${Number(coupon.max_discount_amount) > 0
+                        ? ` (maximum ${Number(coupon.max_discount_amount).toLocaleString("vi-VN")})`
                         : ""
                     }`
-                    : `Giảm ${Number(coupon.discount_value).toLocaleString("vi-VN")}`
+                    : `Save ${Number(coupon.discount_value).toLocaleString("vi-VN")}`
                     }`,
             };
         })
@@ -603,13 +603,13 @@ export async function validateCouponForUser(payload, auth) {
     const vehicleId = resolveVehicleId(payload.rideId, payload.vehicleId);
 
     if (!cityId || cityId < 1) {
-        throw new AppError("Thiếu cityId hợp lệ.", 422, "INVALID_CITY_ID");
+        throw new AppError("Invalid city ID.", 422, "INVALID_CITY_ID");
     }
     if (fare === null) {
-        throw new AppError("Thiếu fare hợp lệ.", 422, "INVALID_FARE");
+        throw new AppError("Invalid fare.", 422, "INVALID_FARE");
     }
     if (!vehicleId) {
-        throw new AppError("Thiếu rideId hoặc vehicleId hợp lệ.", 422, "INVALID_VEHICLE_ID");
+        throw new AppError("Invalid ride ID or vehicle ID.", 422, "INVALID_VEHICLE_ID");
     }
 
     const coupon = await findCouponByCodeAndCity(couponCode, cityId, Number(auth.userId));
@@ -662,7 +662,7 @@ export async function validateCouponForUser(payload, auth) {
 
 export async function applyCouponForUser(payload, auth) {
     if (!auth?.userId) {
-        throw new AppError("Bạn chưa đăng nhập.", 401, "UNAUTHORIZED");
+        throw new AppError("Account is not logged in.", 401, "UNAUTHORIZED");
     }
 
     const couponCode = normalizeCouponCode(payload.couponCode);
@@ -671,13 +671,13 @@ export async function applyCouponForUser(payload, auth) {
     const vehicleId = resolveVehicleId(payload.rideId, payload.vehicleId);
 
     if (!cityId || cityId < 1) {
-        throw new AppError("Thiếu cityId hợp lệ.", 422, "INVALID_CITY_ID");
+        throw new AppError("Invalid city ID.", 422, "INVALID_CITY_ID");
     }
     if (fare === null) {
-        throw new AppError("Thiếu fare hợp lệ.", 422, "INVALID_FARE");
+        throw new AppError("Invalid fare.", 422, "INVALID_FARE");
     }
     if (!vehicleId) {
-        throw new AppError("Thiếu rideId hoặc vehicleId hợp lệ.", 422, "INVALID_VEHICLE_ID");
+        throw new AppError("Invalid ride ID or vehicle ID.", 422, "INVALID_VEHICLE_ID");
     }
 
     const connection = await sqldb.getConnection();
@@ -688,7 +688,7 @@ export async function applyCouponForUser(payload, auth) {
 
         const coupon = await findCouponByCodeAndCityForUpdate(couponCode, cityId, connection);
         if (!coupon) {
-            throw new AppError("Không tìm thấy mã giảm giá.", 404, "COUPON_NOT_FOUND");
+            throw new AppError("Coupon not found.", 404, "COUPON_NOT_FOUND");
         }
 
         coupon.total_used = await getCouponTotalUsage(coupon.id, connection);
@@ -709,7 +709,7 @@ export async function applyCouponForUser(payload, auth) {
 
         return {
             applied: true,
-            message: "Áp dụng mã giảm giá thành công.",
+            message: "Coupon applied successfully.",
             discountAmount: evaluation.discountAmount,
             finalFare: evaluation.finalFare,
             coupon: {

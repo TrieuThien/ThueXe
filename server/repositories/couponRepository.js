@@ -18,7 +18,7 @@ function mapCoupon(row) {
         coupon_title: row.coupon_title,
         city: Number(row.city),
         city_name: row.city_name || null,
-        vehicles: row.vehicles,
+        vehicles: row.vehicles || null,
         visibility: Number(row.visibility || 0),
         discount_type: Number(row.discount_type || 0),
         discount_value: toNumber(row.discount_value, 0),
@@ -35,6 +35,56 @@ function mapCoupon(row) {
     };
 }
 
+const COUPON_SELECT_BASE = `
+    SELECT
+        c.id,
+        c.coupon_code,
+        c.coupon_title,
+        c.city,
+        c.visibility,
+        c.discount_type,
+        c.discount_value,
+        c.min_fare,
+        c.max_discount_amount,
+        c.limit_count,
+        c.user_limit_count,
+        c.status,
+        c.active_date,
+        c.expiry_date,
+        c.date_created,
+        r.r_title AS city_name,
+        COALESCE(cvt.vehicle_ids, NULL) AS vehicles,
+        COALESCE(usage_total.total_used, 0) AS total_used
+    FROM coupon_codes c
+    LEFT JOIN routes r ON r.id = c.city
+    LEFT JOIN (
+        SELECT coupon_id, GROUP_CONCAT(vehicle_type_id ORDER BY vehicle_type_id ASC SEPARATOR ',') AS vehicle_ids
+        FROM coupon_vehicle_types
+        GROUP BY coupon_id
+    ) cvt ON cvt.coupon_id = c.id
+    LEFT JOIN (
+        SELECT coupon_id, SUM(times_used) AS total_used
+        FROM coupons_used
+        GROUP BY coupon_id
+    ) AS usage_total ON usage_total.coupon_id = c.id
+`;
+
+async function replaceCouponVehicleTypes(couponId, vehicleTypeIds, conn) {
+    const db = dbConnection(conn);
+    await db.query(`DELETE FROM coupon_vehicle_types WHERE coupon_id = ?`, [couponId]);
+
+    if (!Array.isArray(vehicleTypeIds) || vehicleTypeIds.length === 0) {
+        return;
+    }
+
+    const values = vehicleTypeIds.map((typeId) => [couponId, Number(typeId)]);
+    await db.query(
+        `INSERT INTO coupon_vehicle_types (coupon_id, vehicle_type_id)
+         VALUES ?`,
+        [values]
+    );
+}
+
 export async function findCouponAdminMeta() {
     const [routes] = await sqldb.query(
         `SELECT id, r_title, c_name
@@ -42,11 +92,11 @@ export async function findCouponAdminMeta() {
          ORDER BY r_title ASC`
     );
 
-    const [rides] = await sqldb.query(
-        `SELECT id, ride_type, ride_desc, avail
-         FROM rides
-         WHERE avail = 1
-         ORDER BY id ASC`
+    const [vehicleTypes] = await sqldb.query(
+        `SELECT type_id, type_name, description, active
+         FROM vehicle_types
+         WHERE active = 1
+         ORDER BY type_id ASC`
     );
 
     return {
@@ -55,11 +105,11 @@ export async function findCouponAdminMeta() {
             r_title: row.r_title,
             c_name: row.c_name,
         })),
-        rides: rides.map((row) => ({
-            id: Number(row.id),
-            ride_type: row.ride_type,
-            ride_desc: row.ride_desc,
-            avail: Number(row.avail || 0),
+        rides: vehicleTypes.map((row) => ({
+            id: Number(row.type_id),
+            ride_type: row.type_name,
+            ride_desc: row.description,
+            avail: Number(row.active || 0),
         })),
     };
 }
@@ -102,32 +152,7 @@ export async function findAdminCoupons(filters) {
     const offset = (filters.page - 1) * filters.limit;
 
     const [rows] = await sqldb.query(
-        `SELECT
-            c.id,
-            c.coupon_code,
-            c.coupon_title,
-            c.city,
-            c.vehicles,
-            c.visibility,
-            c.discount_type,
-            c.discount_value,
-            c.min_fare,
-            c.max_discount_amount,
-            c.limit_count,
-            c.user_limit_count,
-            c.status,
-            c.active_date,
-            c.expiry_date,
-            c.date_created,
-            r.r_title AS city_name,
-            COALESCE(usage_total.total_used, 0) AS total_used
-         FROM coupon_codes c
-         LEFT JOIN routes r ON r.id = c.city
-         LEFT JOIN (
-            SELECT coupon_id, SUM(times_used) AS total_used
-            FROM coupons_used
-            GROUP BY coupon_id
-         ) AS usage_total ON usage_total.coupon_id = c.id
+        `${COUPON_SELECT_BASE}
          ${whereSql}
          ORDER BY c.id DESC
          LIMIT ? OFFSET ?`,
@@ -185,32 +210,7 @@ export async function countAdminCoupons(filters) {
 
 export async function findCouponById(couponId) {
     const [rows] = await sqldb.query(
-        `SELECT
-            c.id,
-            c.coupon_code,
-            c.coupon_title,
-            c.city,
-            c.vehicles,
-            c.visibility,
-            c.discount_type,
-            c.discount_value,
-            c.min_fare,
-            c.max_discount_amount,
-            c.limit_count,
-            c.user_limit_count,
-            c.status,
-            c.active_date,
-            c.expiry_date,
-            c.date_created,
-            r.r_title AS city_name,
-            COALESCE(usage_total.total_used, 0) AS total_used
-         FROM coupon_codes c
-         LEFT JOIN routes r ON r.id = c.city
-         LEFT JOIN (
-            SELECT coupon_id, SUM(times_used) AS total_used
-            FROM coupons_used
-            GROUP BY coupon_id
-         ) AS usage_total ON usage_total.coupon_id = c.id
+        `${COUPON_SELECT_BASE}
          WHERE c.id = ?
          LIMIT 1`,
         [couponId]
@@ -226,7 +226,6 @@ export async function findCouponByCodeAndCity(couponCode, cityId, userId = null)
             c.coupon_code,
             c.coupon_title,
             c.city,
-            c.vehicles,
             c.visibility,
             c.discount_type,
             c.discount_value,
@@ -239,10 +238,16 @@ export async function findCouponByCodeAndCity(couponCode, cityId, userId = null)
             c.expiry_date,
             c.date_created,
             r.r_title AS city_name,
+            COALESCE(cvt.vehicle_ids, NULL) AS vehicles,
             COALESCE(usage_total.total_used, 0) AS total_used,
             COALESCE(usage_user.user_used, 0) AS user_used
          FROM coupon_codes c
          LEFT JOIN routes r ON r.id = c.city
+         LEFT JOIN (
+            SELECT coupon_id, GROUP_CONCAT(vehicle_type_id ORDER BY vehicle_type_id ASC SEPARATOR ',') AS vehicle_ids
+            FROM coupon_vehicle_types
+            GROUP BY coupon_id
+         ) cvt ON cvt.coupon_id = c.id
          LEFT JOIN (
             SELECT coupon_id, SUM(times_used) AS total_used
             FROM coupons_used
@@ -266,24 +271,29 @@ export async function findCouponByCodeAndCityForUpdate(couponCode, cityId, conn)
     const db = dbConnection(conn);
     const [rows] = await db.query(
         `SELECT
-            id,
-            coupon_code,
-            coupon_title,
-            city,
-            vehicles,
-            visibility,
-            discount_type,
-            discount_value,
-            min_fare,
-            max_discount_amount,
-            limit_count,
-            user_limit_count,
-            status,
-            active_date,
-            expiry_date,
-            date_created
-         FROM coupon_codes
-         WHERE coupon_code = ? AND city = ?
+            c.id,
+            c.coupon_code,
+            c.coupon_title,
+            c.city,
+            c.visibility,
+            c.discount_type,
+            c.discount_value,
+            c.min_fare,
+            c.max_discount_amount,
+            c.limit_count,
+            c.user_limit_count,
+            c.status,
+            c.active_date,
+            c.expiry_date,
+            c.date_created,
+            COALESCE(cvt.vehicle_ids, NULL) AS vehicles
+         FROM coupon_codes c
+         LEFT JOIN (
+            SELECT coupon_id, GROUP_CONCAT(vehicle_type_id ORDER BY vehicle_type_id ASC SEPARATOR ',') AS vehicle_ids
+            FROM coupon_vehicle_types
+            GROUP BY coupon_id
+         ) cvt ON cvt.coupon_id = c.id
+         WHERE c.coupon_code = ? AND c.city = ?
          LIMIT 1
          FOR UPDATE`,
         [couponCode, cityId]
@@ -313,12 +323,12 @@ export async function routeExists(routeId) {
 
 export async function findActiveRideIds() {
     const [rows] = await sqldb.query(
-        `SELECT id
-         FROM rides
-         WHERE avail = 1`
+        `SELECT type_id
+         FROM vehicle_types
+         WHERE active = 1`
     );
 
-    return new Set(rows.map((row) => Number(row.id)));
+    return new Set(rows.map((row) => Number(row.type_id)));
 }
 
 export async function insertCoupon(payload, conn) {
@@ -328,7 +338,7 @@ export async function insertCoupon(payload, conn) {
             coupon_code,
             coupon_title,
             city,
-            vehicles,
+            service_type,
             visibility,
             discount_type,
             discount_value,
@@ -345,7 +355,7 @@ export async function insertCoupon(payload, conn) {
             payload.coupon_code,
             payload.coupon_title,
             payload.city,
-            payload.vehicles,
+            0,
             payload.visibility,
             payload.discount_type,
             payload.discount_value,
@@ -359,7 +369,10 @@ export async function insertCoupon(payload, conn) {
         ]
     );
 
-    return Number(result.insertId);
+    const couponId = Number(result.insertId);
+    await replaceCouponVehicleTypes(couponId, payload.vehicle_ids || [], db);
+
+    return couponId;
 }
 
 export async function updateCoupon(couponId, payload, conn) {
@@ -370,7 +383,7 @@ export async function updateCoupon(couponId, payload, conn) {
             coupon_code = ?,
             coupon_title = ?,
             city = ?,
-            vehicles = ?,
+            service_type = ?,
             visibility = ?,
             discount_type = ?,
             discount_value = ?,
@@ -387,7 +400,7 @@ export async function updateCoupon(couponId, payload, conn) {
             payload.coupon_code,
             payload.coupon_title,
             payload.city,
-            payload.vehicles,
+            0,
             payload.visibility,
             payload.discount_type,
             payload.discount_value,
@@ -401,6 +414,10 @@ export async function updateCoupon(couponId, payload, conn) {
             couponId,
         ]
     );
+
+    if (result.affectedRows > 0) {
+        await replaceCouponVehicleTypes(couponId, payload.vehicle_ids || [], db);
+    }
 
     return result.affectedRows > 0;
 }
@@ -425,7 +442,6 @@ export async function findAvailableCouponsForUser({ cityId, userId }) {
             c.coupon_code,
             c.coupon_title,
             c.city,
-            c.vehicles,
             c.visibility,
             c.discount_type,
             c.discount_value,
@@ -438,10 +454,16 @@ export async function findAvailableCouponsForUser({ cityId, userId }) {
             c.expiry_date,
             c.date_created,
             r.r_title AS city_name,
+            COALESCE(cvt.vehicle_ids, NULL) AS vehicles,
             COALESCE(usage_total.total_used, 0) AS total_used,
             COALESCE(usage_user.user_used, 0) AS user_used
          FROM coupon_codes c
          LEFT JOIN routes r ON r.id = c.city
+         LEFT JOIN (
+            SELECT coupon_id, GROUP_CONCAT(vehicle_type_id ORDER BY vehicle_type_id ASC SEPARATOR ',') AS vehicle_ids
+            FROM coupon_vehicle_types
+            GROUP BY coupon_id
+         ) cvt ON cvt.coupon_id = c.id
          LEFT JOIN (
             SELECT coupon_id, SUM(times_used) AS total_used
             FROM coupons_used
@@ -457,6 +479,7 @@ export async function findAvailableCouponsForUser({ cityId, userId }) {
             c.status = 1
             AND c.visibility = 1
             AND c.city = ?
+            AND c.service_type = 0
             AND NOW() >= c.active_date
             AND NOW() <= c.expiry_date
          ORDER BY c.expiry_date ASC, c.id DESC`,
@@ -538,4 +561,3 @@ export async function upsertCouponUsage(couponId, userId, conn) {
         times_used: Number(updatedRows[0]?.times_used || 0),
     };
 }
-

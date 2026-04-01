@@ -42,6 +42,7 @@ export function loadGoogleMaps({ apiKey, libraries = [] }) {
             const params = new URLSearchParams({
                 key: apiKey,
                 v: "weekly",
+                loading: "async",
                 callback: callbackName,
             });
 

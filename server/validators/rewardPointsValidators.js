@@ -5,19 +5,19 @@ export const getAdminRewardConfigValidator = [];
 export const updateAdminRewardConfigValidator = [
     body("cur_to_points_conv")
         .isFloat({ gt: 0 })
-        .withMessage("cur_to_points_conv ph?i là s? > 0")
+        .withMessage("cur_to_points_conv must be a number > 0")
         .toFloat(),
     body("points_to_cur_conv")
         .isFloat({ gt: 0 })
-        .withMessage("points_to_cur_conv ph?i là s? > 0")
+        .withMessage("points_to_cur_conv must be a number > 0")
         .toFloat(),
     body("status")
         .isInt({ min: 0, max: 1 })
-        .withMessage("status ch? ch?p nh?n 0 ho?c 1")
+        .withMessage("status must be either 0 or 1")
         .toInt(),
     body("min_points_redeemable")
         .isInt({ min: 1 })
-        .withMessage("min_points_redeemable ph?i là s? nguyên >= 1")
+        .withMessage("min_points_redeemable must be a positive integer")
         .toInt(),
 ];
 
@@ -25,55 +25,55 @@ export const getAdminRewardHistoryValidator = [
     query("page")
         .optional({ values: "falsy" })
         .isInt({ min: 1 })
-        .withMessage("page ph?i là s? nguyên duong")
+        .withMessage("page must be a positive integer")
         .toInt(),
     query("limit")
         .optional({ values: "falsy" })
         .isInt({ min: 1, max: 100 })
-        .withMessage("limit ph?i n?m trong kho?ng 1-100")
+        .withMessage("limit must be a number between 1 and 100")
         .toInt(),
     query("userId")
         .optional({ values: "falsy" })
         .isInt({ min: 1 })
-        .withMessage("userId ph?i là s? nguyên duong")
+        .withMessage("userId must be a positive integer")
         .toInt(),
     query("actionType")
         .optional({ values: "falsy" })
         .isInt({ min: 1, max: 6 })
-        .withMessage("actionType không h?p l?")
+        .withMessage("actionType must be a valid option")
         .toInt(),
     query("search")
         .optional({ values: "falsy" })
         .trim()
         .isLength({ max: 100 })
-        .withMessage("search không du?c quá 100 ký t?"),
+        .withMessage("search must not exceed 100 characters"),
     query("dateFrom")
         .optional({ values: "falsy" })
         .isISO8601()
-        .withMessage("dateFrom không h?p l?"),
+        .withMessage("dateFrom must be a valid date"),
     query("dateTo")
         .optional({ values: "falsy" })
         .isISO8601()
-        .withMessage("dateTo không h?p l?"),
+        .withMessage("dateTo must be a valid date"),
 ];
 
 export const adjustRewardPointsValidator = [
     body("user_id")
         .isInt({ min: 1 })
-        .withMessage("user_id ph?i là s? nguyên duong")
+        .withMessage("user_id must be a positive integer")
         .toInt(),
     body("points")
         .isFloat()
-        .withMessage("points ph?i là s?")
+        .withMessage("points must be a number")
         .toFloat(),
     body("note")
         .optional({ values: "falsy" })
         .trim()
         .isLength({ max: 255 })
-        .withMessage("note không du?c quá 255 ký t?"),
+        .withMessage("note must not exceed 255 characters"),
     body().custom((value, { req }) => {
         if (Number(req.body.points) === 0) {
-            throw new Error("points ph?i khác 0");
+            throw new Error("points must be a non-zero number");
         }
         return true;
     }),
@@ -82,23 +82,23 @@ export const adjustRewardPointsValidator = [
 export const redeemRewardPointsValidator = [
     body("user_id")
         .isInt({ min: 1 })
-        .withMessage("user_id ph?i là s? nguyên duong")
+        .withMessage("user_id must be a positive integer")
         .toInt(),
     body("redeem_points")
         .isFloat({ gt: 0 })
-        .withMessage("redeem_points ph?i là s? > 0")
+        .withMessage("redeem_points must be a number > 0")
         .toFloat(),
     body("note")
         .optional({ values: "falsy" })
         .trim()
         .isLength({ max: 255 })
-        .withMessage("note không du?c quá 255 ký t?"),
+        .withMessage("note must not exceed 255 characters"),
 ];
 
 export const processBookingRewardPointsValidator = [
     param("bookingId")
         .isInt({ min: 1 })
-        .withMessage("bookingId ph?i là s? nguyên duong")
+        .withMessage("bookingId must be a positive integer")
         .toInt(),
 ];
 
@@ -108,24 +108,24 @@ export const getMyRewardHistoryValidator = [
     query("page")
         .optional({ values: "falsy" })
         .isInt({ min: 1 })
-        .withMessage("page ph?i là s? nguyên duong")
+        .withMessage("page must be a positive integer")
         .toInt(),
     query("limit")
         .optional({ values: "falsy" })
         .isInt({ min: 1, max: 100 })
-        .withMessage("limit ph?i n?m trong kho?ng 1-100")
+        .withMessage("limit must be a number between 1 and 100")
         .toInt(),
     query("actionType")
         .optional({ values: "falsy" })
         .isInt({ min: 1, max: 6 })
-        .withMessage("actionType không h?p l?")
+        .withMessage("actionType must be a valid option")
         .toInt(),
     query("dateFrom")
         .optional({ values: "falsy" })
         .isISO8601()
-        .withMessage("dateFrom không h?p l?"),
+        .withMessage("dateFrom must be a valid date"),
     query("dateTo")
         .optional({ values: "falsy" })
         .isISO8601()
-        .withMessage("dateTo không h?p l?"),
+        .withMessage("dateTo must be a valid date"),
 ];

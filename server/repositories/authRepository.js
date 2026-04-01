@@ -5,6 +5,34 @@ function dbConnection(conn) {
     return conn || sqldb;
 }
 
+function resolveAccountCodeTable(userType) {
+    if (userType === USER_TYPE.DRIVER) {
+        return {
+            table: "driver_account_codes",
+            idColumn: "driver_id",
+        };
+    }
+
+    return {
+        table: "user_account_codes",
+        idColumn: "user_id",
+    };
+}
+
+function resolveSessionTable(userType) {
+    if (userType === USER_TYPE.DRIVER) {
+        return {
+            table: "driver_sessions",
+            idColumn: "driver_id",
+        };
+    }
+
+    return {
+        table: "user_sessions",
+        idColumn: "user_id",
+    };
+}
+
 function sanitizeRecord(record) {
     if (!record) return null;
 
@@ -271,28 +299,30 @@ export async function updateDriverLastLogin(driverId, conn) {
 
 export async function replaceAccountCode({ userId, userType, context, code }, conn) {
     const db = dbConnection(conn);
+    const { table, idColumn } = resolveAccountCodeTable(userType);
 
     await db.query(
-        `DELETE FROM account_codes
-     WHERE user_id = ? AND user_type = ? AND context = ?`,
-        [userId, userType, context]
+        `DELETE FROM ${table}
+     WHERE ${idColumn} = ? AND context = ?`,
+        [userId, context]
     );
 
     await db.query(
-        `INSERT INTO account_codes (code, user_id, user_type, context)
-     VALUES (?, ?, ?, ?)`,
-        [code, userId, userType, context]
+        `INSERT INTO ${table} (code, ${idColumn}, context)
+     VALUES (?, ?, ?)`,
+        [code, userId, context]
     );
 }
 
 export async function consumeAccountCode({ userId, userType, context, code }, conn) {
     const db = dbConnection(conn);
+    const { table, idColumn } = resolveAccountCodeTable(userType);
 
     const [result] = await db.query(
-        `DELETE FROM account_codes
-     WHERE user_id = ? AND user_type = ? AND context = ? AND code = ?
+        `DELETE FROM ${table}
+     WHERE ${idColumn} = ? AND context = ? AND code = ?
      LIMIT 1`,
-        [userId, userType, context, code]
+        [userId, context, code]
     );
 
     return result.affectedRows === 1;
@@ -300,20 +330,22 @@ export async function consumeAccountCode({ userId, userType, context, code }, co
 
 export async function createSessionToken({ token, userId, userType }, conn) {
     const db = dbConnection(conn);
+    const { table, idColumn } = resolveSessionTable(userType);
 
     await db.query(
-        `INSERT INTO sessions (token, user_id, user_type)
-     VALUES (?, ?, ?)`,
-        [token, userId, userType]
+        `INSERT INTO ${table} (token, ${idColumn})
+     VALUES (?, ?)`,
+        [token, userId]
     );
 }
 
 export async function deleteSessionToken({ token, userId, userType }, conn) {
     const db = dbConnection(conn);
+    const { table, idColumn } = resolveSessionTable(userType);
 
     const [result] = await db.query(
-        `DELETE FROM sessions WHERE token = ? AND user_id = ? AND user_type = ?`,
-        [token, userId, userType]
+        `DELETE FROM ${table} WHERE token = ? AND ${idColumn} = ?`,
+        [token, userId]
     );
 
     return result.affectedRows > 0;
@@ -321,23 +353,27 @@ export async function deleteSessionToken({ token, userId, userType }, conn) {
 
 export async function deleteAllUserSessions({ userId, userType }, conn) {
     const db = dbConnection(conn);
+    const { table, idColumn } = resolveSessionTable(userType);
 
-    await db.query(`DELETE FROM sessions WHERE user_id = ? AND user_type = ?`, [
-        userId,
-        userType,
-    ]);
+    await db.query(`DELETE FROM ${table} WHERE ${idColumn} = ?`, [userId]);
 }
 
 export async function findSessionToken({ token, userId, userType }) {
+    const { table, idColumn } = resolveSessionTable(userType);
     const [rows] = await sqldb.query(
-        `SELECT id, token, user_id, user_type
-     FROM sessions
-     WHERE token = ? AND user_id = ? AND user_type = ?
+        `SELECT id, token, ${idColumn} AS user_id
+     FROM ${table}
+     WHERE token = ? AND ${idColumn} = ?
      LIMIT 1`,
-        [token, userId, userType]
+        [token, userId]
     );
 
-    return rows[0] || null;
+    return rows[0]
+        ? {
+            ...rows[0],
+            user_type: userType,
+        }
+        : null;
 }
 
 export async function updateUserPassword(userId, passwordHash, conn) {

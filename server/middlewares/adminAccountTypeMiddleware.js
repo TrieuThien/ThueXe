@@ -4,7 +4,7 @@ export default function requireAdminAccountType(req, res, next) {
     const accountType = Number(req?.auth?.accountType);
 
     if (accountType !== 3) {
-        return next(new AppError("Bạn không có quyền thực hiện thao tác này.", 403, "FORBIDDEN"));
+        return next(new AppError("You are not have permission to perform this action.", 403, "FORBIDDEN"));
     }
 
     return next();

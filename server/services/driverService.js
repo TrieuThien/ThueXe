@@ -182,20 +182,20 @@ function buildDocumentSummary(documentCounts) {
 }
 
 function resolveBookingStatusLabel(status) {
-    return BOOKING_STATUS_LABELS[status] || "Không xác định";
+    return BOOKING_STATUS_LABELS[status] || "Unknown";
 }
 
 function resolvePaymentTypeLabel(paymentType) {
-    if (paymentType === null || paymentType === undefined) return "Chưa xác định";
-    return PAYMENT_TYPE_LABELS[paymentType] || "Khác";
+    if (paymentType === null || paymentType === undefined) return "Unknown";
+    return PAYMENT_TYPE_LABELS[paymentType] || "Other";
 }
 
 function resolveDocumentStatusLabel(status) {
-    return DOCUMENT_STATUS_LABELS[status] || "Không xác định";
+    return DOCUMENT_STATUS_LABELS[status] || "Unknown";
 }
 
 function resolveWithdrawalStatusLabel(status) {
-    return WITHDRAWAL_STATUS_LABELS[status] || "unknown";
+    return WITHDRAWAL_STATUS_LABELS[status] || "Unknown";
 }
 
 function resolveCarColorLabel(colorValue) {

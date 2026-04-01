@@ -65,7 +65,7 @@ function loadGoogleMapsScript(apiKey) {
         script.id = GOOGLE_MAPS_SCRIPT_ID;
         script.async = true;
         script.defer = true;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&callback=${callbackName}`;
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&callback=${callbackName}`;
         script.onerror = () => {
             delete window[callbackName];
             window.__googleMapsLoadingPromise = null;
@@ -95,6 +95,7 @@ export default function MapTrackingPage() {
     const mapContainerRef = useRef(null);
     const mapRef = useRef(null);
     const markersRef = useRef({});
+    const destroyedRef = useRef(false);
 
     const selectedDriver = useMemo(
         () => trackedDrivers.find((item) => item.driver_id === selectedDriverId) || null,
@@ -112,11 +113,15 @@ export default function MapTrackingPage() {
 
         try {
             await loadGoogleMapsScript(apiKey);
+            if (destroyedRef.current || !mapContainerRef.current) return;
 
             const buildMap = (resolvedMapId) =>
                 new window.google.maps.Map(mapContainerRef.current, {
                     center: DEFAULT_CENTER,
                     zoom: DEFAULT_ZOOM,
+                    ...(!resolvedMapId
+                        ? { renderingType: window.google?.maps?.RenderingType?.RASTER || "RASTER" }
+                        : {}),
                     mapId: resolvedMapId,
                     mapTypeControl: false,
                     streetViewControl: false,
@@ -126,27 +131,36 @@ export default function MapTrackingPage() {
 
             if (mapId) {
                 try {
+                    if (destroyedRef.current || !mapContainerRef.current) return;
                     mapRef.current = buildMap(mapId);
                 } catch (mapIdError) {
                     console.warn("Google Maps init with mapId failed, fallback to default map.", mapIdError);
+                    if (destroyedRef.current || !mapContainerRef.current) return;
                     mapRef.current = buildMap(undefined);
                     setMapWarning(
                         "Không thể áp dụng VITE_GOOGLE_MAP_ID hiện tại. Đang dùng bản đồ mặc định để đảm bảo hiển thị."
                     );
                 }
             } else {
+                if (destroyedRef.current || !mapContainerRef.current) return;
                 mapRef.current = buildMap(undefined);
             }
         } catch (error) {
+            if (destroyedRef.current) return;
             console.error("Google Maps init error:", error);
             setMapErrorMessage(error?.message || "Không thể khởi tạo Google Maps.");
         } finally {
-            setMapLoading(false);
+            if (!destroyedRef.current) setMapLoading(false);
         }
     }, [apiKey, mapId]);
 
     const clearMarkers = useCallback(() => {
-        Object.values(markersRef.current).forEach((marker) => marker.setMap(null));
+        Object.values(markersRef.current).forEach((marker) => {
+            if (window.google?.maps?.event?.clearInstanceListeners) {
+                window.google.maps.event.clearInstanceListeners(marker);
+            }
+            marker.setMap(null);
+        });
         markersRef.current = {};
     }, []);
 
@@ -266,8 +280,23 @@ export default function MapTrackingPage() {
     }, []);
 
     useEffect(() => {
+        destroyedRef.current = false;
         initMap();
-    }, [initMap]);
+
+        return () => {
+            destroyedRef.current = true;
+            clearMarkers();
+
+            if (mapRef.current && window.google?.maps?.event?.clearInstanceListeners) {
+                window.google.maps.event.clearInstanceListeners(mapRef.current);
+            }
+            mapRef.current = null;
+
+            if (mapContainerRef.current) {
+                mapContainerRef.current.innerHTML = "";
+            }
+        };
+    }, [clearMarkers, initMap]);
 
     useEffect(() => {
         if (!apiKey) {

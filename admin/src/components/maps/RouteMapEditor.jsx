@@ -209,11 +209,13 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
     useEffect(() => {
         if (!apiKey || !mapContainerRef.current || mapRef.current) return;
 
+        let cancelled = false;
         setLoading(true);
         setErrorMessage("");
 
         loadGoogleMaps({ apiKey })
             .then(() => {
+                if (cancelled) return;
                 const buildMap = (resolvedMapId) =>
                     new window.google.maps.Map(mapContainerRef.current, {
                         center: DEFAULT_CENTER,
@@ -221,6 +223,9 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
                         mapTypeControl: false,
                         streetViewControl: false,
                         fullscreenControl: false,
+                        ...(!resolvedMapId
+                            ? { renderingType: window.google?.maps?.RenderingType?.RASTER || "RASTER" }
+                            : {}),
                         mapId: resolvedMapId,
                         gestureHandling: "greedy",
                     });
@@ -259,9 +264,46 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
                 });
             })
             .catch((error) => {
+                if (cancelled) return;
                 setErrorMessage(error?.message || "Không thể khởi tạo Google Maps.");
             })
-            .finally(() => setLoading(false));
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+
+            if (polygonRef.current) {
+                const path = polygonRef.current.getPath?.();
+                if (path && window.google?.maps?.event?.clearInstanceListeners) {
+                    window.google.maps.event.clearInstanceListeners(path);
+                }
+                if (window.google?.maps?.event?.clearInstanceListeners) {
+                    window.google.maps.event.clearInstanceListeners(polygonRef.current);
+                }
+                polygonRef.current.setMap(null);
+                polygonRef.current = null;
+            }
+
+            [centerMarkerRef, pickupMarkerRef, dropMarkerRef].forEach((markerRef) => {
+                if (!markerRef.current) return;
+                if (window.google?.maps?.event?.clearInstanceListeners) {
+                    window.google.maps.event.clearInstanceListeners(markerRef.current);
+                }
+                markerRef.current.setMap(null);
+                markerRef.current = null;
+            });
+
+            if (mapRef.current && window.google?.maps?.event?.clearInstanceListeners) {
+                window.google.maps.event.clearInstanceListeners(mapRef.current);
+            }
+            mapRef.current = null;
+
+            if (mapContainerRef.current) {
+                mapContainerRef.current.innerHTML = "";
+            }
+        };
     }, [apiKey, mapId]);
 
     useEffect(() => {

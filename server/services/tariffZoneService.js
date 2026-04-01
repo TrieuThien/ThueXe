@@ -49,7 +49,7 @@ const TARIFF_NUMERIC_FIELDS = [
 
 function assertAdmin(auth) {
     if (!auth || auth.role !== "admin") {
-        throw new AppError("B?n không có quy?n truy c?p.", 403, "FORBIDDEN");
+        throw new AppError("You are not authorized to perform this action.", 403, "FORBIDDEN");
     }
 }
 
@@ -72,7 +72,7 @@ function normalizeNonNegativeNumber(value, { fallback = 0 } = {}) {
     if (value === undefined || value === null || value === "") return fallback;
     const num = Number(value);
     if (!Number.isFinite(num) || num < 0) {
-        throw new AppError("Giá tr? s? không h?p l?.", 422, "INVALID_NUMBER");
+        throw new AppError("Invalid number.", 422, "INVALID_NUMBER");
     }
     return num;
 }
@@ -102,13 +102,13 @@ function normalizePolygon(rawValue, fieldName) {
         try {
             payload = JSON.parse(rawValue);
         } catch {
-            throw new AppError(`${fieldName} không phải JSON hợp lệ.`, 422, "INVALID_POLYGON_JSON");
+            throw new AppError(`${fieldName} is not valid JSON.`, 422, "INVALID_POLYGON_JSON");
         }
     }
     const coords = Array.isArray(payload?.coords) ? payload.coords : null;
 
     if (!coords || coords.length < 3) {
-        throw new AppError(`${fieldName} không h?p l?. Polygon c?n ít nh?t 3 di?m.`, 422, "INVALID_POLYGON");
+        throw new AppError(`${fieldName} is not valid. A polygon requires at least 3 points.`, 422, "INVALID_POLYGON");
     }
 
     const normalizedCoords = coords.map((point) => {
@@ -116,7 +116,7 @@ function normalizePolygon(rawValue, fieldName) {
         const lng = Number(point?.lng);
 
         if (!isValidLatLng(lat, lng)) {
-            throw new AppError(`${fieldName} ch?a t?a d? không h?p l?.`, 422, "INVALID_COORDINATE");
+            throw new AppError(`${fieldName} contains invalid coordinates.`, 422, "INVALID_COORDINATE");
         }
 
         return { lat, lng };
@@ -192,22 +192,22 @@ function estimateRadiusKmFromPolygon(polygonJson) {
 function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
     const rTitle = normalizeText(rawRoute?.r_title, { maxLength: 255 });
     if (!rTitle) {
-        throw new AppError("Tên cu?c phí là b?t bu?c.", 422, "ROUTE_TITLE_REQUIRED");
+        throw new AppError("Service area title is required.", 422, "ROUTE_TITLE_REQUIRED");
     }
 
     const rScope = normalizeInt(rawRoute?.r_scope, { fallback: 0 });
     if (![0, 1].includes(rScope)) {
-        throw new AppError("Lo?i ph?m vi tuy?n không h?p l?.", 422, "INVALID_ROUTE_SCOPE");
+        throw new AppError("Invalid route scope.", 422, "INVALID_ROUTE_SCOPE");
     }
 
     const distUnit = normalizeInt(rawRoute?.dist_unit, { fallback: 0 });
     if (![0, 1].includes(distUnit)) {
-        throw new AppError("Ðon v? kho?ng cách không h?p l?.", 422, "INVALID_DIST_UNIT");
+        throw new AppError("Invalid distance unit.", 422, "INVALID_DIST_UNIT");
     }
 
     const cityCurrencyId = normalizeInt(rawRoute?.city_currency_id, { fallback: null });
     if (!cityCurrencyId || cityCurrencyId < 1) {
-        throw new AppError("Ti?n t? áp d?ng là b?t bu?c.", 422, "CURRENCY_REQUIRED");
+        throw new AppError("Currency is required.", 422, "CURRENCY_REQUIRED");
     }
 
     const payload = {
@@ -231,17 +231,17 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
 
     if (rScope === 0) {
         if (!payload.c_name) {
-            throw new AppError("Tên thành ph? là b?t bu?c cho tuy?n n?i thành.", 422, "CITY_NAME_REQUIRED");
+            throw new AppError("City name is required for intra-city routes.", 422, "CITY_NAME_REQUIRED");
         }
 
         if (!isValidLatLng(payload.lat, payload.lng)) {
-            throw new AppError("T?a d? trung tâm thành ph? không h?p l?.", 422, "INVALID_CITY_CENTER");
+            throw new AppError("Invalid city center coordinates.", 422, "INVALID_CITY_CENTER");
         }
 
-        payload.city_bound_coords = normalizePolygon(rawRoute?.city_bound_coords, "Khu v?c thành ph?");
+        payload.city_bound_coords = normalizePolygon(rawRoute?.city_bound_coords, "City boundary coordinates");
 
         if (!payload.city_bound_coords) {
-            throw new AppError("B?n c?n v? polygon khu v?c thành ph?.", 422, "CITY_POLYGON_REQUIRED");
+            throw new AppError("You should draw a polygon for the city boundary.", 422, "CITY_POLYGON_REQUIRED");
         }
 
         payload.city_radius = estimateRadiusKmFromPolygon(payload.city_bound_coords);
@@ -254,15 +254,15 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
         payload.drop_lat = "";
     } else {
         if (!payload.pick_name || !payload.drop_name) {
-            throw new AppError("Ði?m dón và di?m tr? là b?t bu?c cho tuy?n liên t?nh.", 422, "STATE_POINTS_REQUIRED");
+            throw new AppError("Pickup and drop-off points are required for inter-city routes.", 422, "STATE_POINTS_REQUIRED");
         }
 
         if (!payload.pickup_city_id || payload.pickup_city_id < 1) {
-            throw new AppError("Thành ph? dón là b?t bu?c cho tuy?n liên t?nh.", 422, "PICKUP_CITY_REQUIRED");
+            throw new AppError("Pickup city is required for inter-city routes.", 422, "PICKUP_CITY_REQUIRED");
         }
 
         if (!isValidLatLng(payload.pick_lat, payload.pick_lng) || !isValidLatLng(payload.drop_lat, payload.drop_lng)) {
-            throw new AppError("T?a d? di?m dón/tr? không h?p l?.", 422, "INVALID_PICK_DROP_COORDS");
+            throw new AppError("Invalid pickup or drop-off coordinates.", 422, "INVALID_PICK_DROP_COORDS");
         }
 
         payload.city_bound_coords = null;
@@ -279,7 +279,7 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
 function normalizeTariffItem(rawItem, routeId = null) {
     const rideId = normalizeInt(rawItem?.ride_id, { fallback: null });
     if (!rideId || rideId < 1) {
-        throw new AppError("Lo?i xe trong cu?c phí không h?p l?.", 422, "INVALID_RIDE_ID");
+        throw new AppError("Invalid ride in tariff.", 422, "INVALID_RIDE_ID");
     }
 
     const ppStartRaw = rawItem?.pp_start;
@@ -292,23 +292,23 @@ function normalizeTariffItem(rawItem, routeId = null) {
         : normalizeInt(ppEndRaw, { fallback: null });
 
     if (ppStart !== null && (ppStart < 0 || ppStart > 23)) {
-        throw new AppError("Gi? b?t d?u gi? cao di?m không h?p l?.", 422, "INVALID_PP_START");
+        throw new AppError("Invalid start time for peak hours.", 422, "INVALID_PP_START");
     }
 
     if (ppEnd !== null && (ppEnd < 0 || ppEnd > 23)) {
-        throw new AppError("Gi? k?t thúc gi? cao di?m không h?p l?.", 422, "INVALID_PP_END");
+        throw new AppError("Invalid end time for peak hours.", 422, "INVALID_PP_END");
     }
 
     const waitTime = normalizeInt(rawItem?.wait_time, { fallback: 0 });
     const nwaitTime = normalizeInt(rawItem?.nwait_time, { fallback: 0 });
 
     if (waitTime < 0 || nwaitTime < 0) {
-        throw new AppError("Th?i gian ch? không h?p l?.", 422, "INVALID_WAIT_TIME");
+        throw new AppError("Invalid wait time.", 422, "INVALID_WAIT_TIME");
     }
 
     const ppChargeType = normalizeInt(rawItem?.pp_charge_type, { fallback: 0 });
     if (![0, 1].includes(ppChargeType)) {
-        throw new AppError("Ki?u ph? phí gi? cao di?m không h?p l?.", 422, "INVALID_PP_CHARGE_TYPE");
+        throw new AppError("Invalid peak hour charge type.", 422, "INVALID_PP_CHARGE_TYPE");
     }
 
     const normalized = {
@@ -337,14 +337,14 @@ function normalizeTariffItem(rawItem, routeId = null) {
 
 function normalizeTariffPayload(rawTariffs, routeId = null) {
     if (!Array.isArray(rawTariffs) || rawTariffs.length === 0) {
-        throw new AppError("B?n ph?i c?u hình ít nh?t 1 lo?i xe cho cu?c phí.", 422, "TARIFFS_REQUIRED");
+        throw new AppError("You must configure at least 1 ride type for the tariff.", 422, "TARIFFS_REQUIRED");
     }
 
     const normalized = rawTariffs.map((item) => normalizeTariffItem(item, routeId));
 
     const rideIds = normalized.map((item) => item.ride_id);
     if (new Set(rideIds).size !== rideIds.length) {
-        throw new AppError("M?i lo?i xe ch? du?c c?u hình 1 l?n trong cùng tuy?n.", 422, "DUPLICATE_RIDE_TARIFF");
+        throw new AppError("Each ride type can only be configured once in the same route.", 422, "DUPLICATE_RIDE_TARIFF");
     }
 
     return normalized;
@@ -369,22 +369,22 @@ async function validateRouteAndTariffs(routePayload, tariffs, { excludeRouteId =
     ]);
 
     if (titleExists) {
-        throw new AppError("Tên cu?c phí dã t?n t?i.", 409, "ROUTE_TITLE_EXISTS");
+        throw new AppError("Service area name already exists.", 409, "ROUTE_TITLE_EXISTS");
     }
 
     if (!hasCurrency) {
-        throw new AppError("Ti?n t? không t?n t?i.", 422, "CURRENCY_NOT_FOUND");
+        throw new AppError("Selected currency does not exist.", 422, "CURRENCY_NOT_FOUND");
     }
 
     const invalidRideIndex = rideChecks.findIndex((found) => !found);
     if (invalidRideIndex !== -1) {
-        throw new AppError("Có lo?i xe không t?n t?i trong c?u hình cu?c phí.", 422, "RIDE_NOT_FOUND");
+        throw new AppError("Invalid ride type in tariff.", 422, "RIDE_NOT_FOUND");
     }
 
     if (routePayload.r_scope === 1) {
         const pickupCityFound = await cityRouteExists(routePayload.pickup_city_id);
         if (!pickupCityFound) {
-            throw new AppError("Thành ph? dón không h?p l?.", 422, "PICKUP_CITY_NOT_FOUND");
+            throw new AppError("Invalid pickup city.", 422, "PICKUP_CITY_NOT_FOUND");
         }
     }
 }
@@ -431,7 +431,7 @@ export async function getTariffDetailByAdmin(routeIdInput, auth) {
 
     const routeId = normalizeInt(routeIdInput, { fallback: null });
     if (!routeId || routeId < 1) {
-        throw new AppError("Mã cu?c phí không h?p l?.", 422, "INVALID_ROUTE_ID");
+        throw new AppError("Invalid route ID.", 422, "INVALID_ROUTE_ID");
     }
 
     const [route, tariffs, rides] = await Promise.all([
@@ -441,7 +441,7 @@ export async function getTariffDetailByAdmin(routeIdInput, auth) {
     ]);
 
     if (!route) {
-        throw new AppError("Không tìm th?y cu?c phí c?n xem.", 404, "ROUTE_NOT_FOUND");
+        throw new AppError("Route not found.", 404, "ROUTE_NOT_FOUND");
     }
 
     return { route, tariffs, rides };
@@ -488,12 +488,12 @@ export async function updateTariffByAdmin(routeIdInput, payload, auth) {
 
     const routeId = normalizeInt(routeIdInput, { fallback: null });
     if (!routeId || routeId < 1) {
-        throw new AppError("Mã cu?c phí không h?p l?.", 422, "INVALID_ROUTE_ID");
+        throw new AppError("Invalid route ID.", 422, "INVALID_ROUTE_ID");
     }
 
     const existingRoute = await findRouteById(routeId);
     if (!existingRoute) {
-        throw new AppError("Không tìm th?y cu?c phí c?n ch?nh s?a.", 404, "ROUTE_NOT_FOUND");
+        throw new AppError("Route not found.", 404, "ROUTE_NOT_FOUND");
     }
 
     const routePayload = normalizeRoutePayload(payload?.route || {}, { isUpdate: true });
@@ -539,24 +539,24 @@ export async function updateTariffByAdmin(routeIdInput, payload, auth) {
 function normalizeZonePayload(rawZone) {
     const title = normalizeText(rawZone?.title, { maxLength: 255 });
     if (!title) {
-        throw new AppError("Tên vùng là b?t bu?c.", 422, "ZONE_TITLE_REQUIRED");
+        throw new AppError("Zone name is required.", 422, "ZONE_TITLE_REQUIRED");
     }
 
     const cityId = normalizeInt(rawZone?.city_id, { fallback: null });
     if (!cityId || cityId < 1) {
-        throw new AppError("Thành ph? áp d?ng vùng không h?p l?.", 422, "INVALID_CITY_ID");
+        throw new AppError("Invalid city ID to apply zones.", 422, "INVALID_CITY_ID");
     }
 
     const zoneFareType = normalizeInt(rawZone?.zone_fare_type, { fallback: null });
     if (![1, 2].includes(zoneFareType)) {
-        throw new AppError("Ki?u tang giá vùng ch? ch?p nh?n 1 ho?c 2.", 422, "INVALID_ZONE_FARE_TYPE");
+        throw new AppError("Invalid zone fare type. Only 1 or 2 are allowed.", 422, "INVALID_ZONE_FARE_TYPE");
     }
 
     const zoneFareValue = normalizeNonNegativeNumber(rawZone?.zone_fare_value, { fallback: 0 });
 
-    const zoneBoundCoords = normalizePolygon(rawZone?.zone_bound_coords, "Polygon vùng");
+    const zoneBoundCoords = normalizePolygon(rawZone?.zone_bound_coords, "Polygon zone");
     if (!zoneBoundCoords) {
-        throw new AppError("B?n c?n v? polygon vùng.", 422, "ZONE_POLYGON_REQUIRED");
+        throw new AppError("You should draw a polygon for the zone.", 422, "ZONE_POLYGON_REQUIRED");
     }
 
     return {
@@ -604,12 +604,12 @@ export async function getZoneDetailByAdmin(zoneIdInput, auth) {
 
     const zoneId = normalizeInt(zoneIdInput, { fallback: null });
     if (!zoneId || zoneId < 1) {
-        throw new AppError("Mã vùng không h?p l?.", 422, "INVALID_ZONE_ID");
+        throw new AppError("Invalid zone ID.", 422, "INVALID_ZONE_ID");
     }
 
     const zone = await findZoneById(zoneId);
     if (!zone) {
-        throw new AppError("Không tìm th?y vùng c?n xem.", 404, "ZONE_NOT_FOUND");
+        throw new AppError("Zone not found.", 404, "ZONE_NOT_FOUND");
     }
 
     return { zone };
@@ -622,7 +622,7 @@ export async function createZoneByAdmin(payload, auth) {
     const cityExists = await cityRouteExists(zonePayload.city_id);
 
     if (!cityExists) {
-        throw new AppError("Thành ph? áp d?ng vùng không t?n t?i ho?c không ph?i n?i thành.", 422, "CITY_ROUTE_NOT_FOUND");
+        throw new AppError("Invalid city ID to apply zones or city not found.", 422, "CITY_ROUTE_NOT_FOUND");
     }
 
     const connection = await sqldb.getConnection();
@@ -648,19 +648,19 @@ export async function updateZoneByAdmin(zoneIdInput, payload, auth) {
 
     const zoneId = normalizeInt(zoneIdInput, { fallback: null });
     if (!zoneId || zoneId < 1) {
-        throw new AppError("Mã vùng không h?p l?.", 422, "INVALID_ZONE_ID");
+        throw new AppError("Invalid zone ID.", 422, "INVALID_ZONE_ID");
     }
 
     const existingZone = await findZoneById(zoneId);
     if (!existingZone) {
-        throw new AppError("Không tìm th?y vùng c?n ch?nh s?a.", 404, "ZONE_NOT_FOUND");
+        throw new AppError("Zone not found.", 404, "ZONE_NOT_FOUND");
     }
 
     const zonePayload = normalizeZonePayload(payload);
     const cityExists = await cityRouteExists(zonePayload.city_id);
 
     if (!cityExists) {
-        throw new AppError("Thành ph? áp d?ng vùng không t?n t?i ho?c không ph?i n?i thành.", 422, "CITY_ROUTE_NOT_FOUND");
+        throw new AppError("Invalid city ID to apply zones or city not found.", 422, "CITY_ROUTE_NOT_FOUND");
     }
 
     const connection = await sqldb.getConnection();

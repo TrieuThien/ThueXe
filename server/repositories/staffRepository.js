@@ -1,11 +1,22 @@
 import sqldb from "../config/sqldatabase.js";
 
 const STAFF_ACCOUNT_TYPES = [2, 3, 5];
+const STAFF_WALLET_ACTOR_TYPE = 3;
+
+const STAFF_WALLET_AGGREGATE_JOIN = `
+    LEFT JOIN (
+        SELECT actor_id, SUM(balance) AS wallet_amount
+        FROM wallet_accounts
+        WHERE actor_type = ${STAFF_WALLET_ACTOR_TYPE}
+        GROUP BY actor_id
+    ) wa ON wa.actor_id = u.user_id
+`;
+
 const SORT_COLUMN_MAP = {
     account_create_date: "u.account_create_date",
     firstname: "u.firstname",
     user_rating: "u.user_rating",
-    wallet_amount: "u.wallet_amount",
+    wallet_amount: "COALESCE(wa.wallet_amount, 0)",
     user_id: "u.user_id",
 };
 
@@ -107,7 +118,7 @@ function buildStaffFilterQueryParts(filters = {}) {
     }
 
     return {
-        joins: "LEFT JOIN routes r ON r.id = u.route_id",
+        joins: `LEFT JOIN routes r ON r.id = u.route_id ${STAFF_WALLET_AGGREGATE_JOIN}`,
         whereSql: `WHERE ${whereClauses.join(" AND ")}`,
         params,
     };
@@ -246,13 +257,14 @@ export async function findStaffById(userId) {
                 u.account_active,
                 u.is_activated,
                 u.account_deleted,
-                u.wallet_amount,
+                COALESCE(wa.wallet_amount, 0) AS wallet_amount,
                 u.photo_file,
                 u.account_create_date,
                 u.last_login_date,
                 u.account_type
             FROM users u
             LEFT JOIN routes r ON r.id = u.route_id
+            ${STAFF_WALLET_AGGREGATE_JOIN}
             WHERE u.user_id = ?
                 AND u.account_type IN (${STAFF_ACCOUNT_TYPES.map(() => "?").join(", ")})
                 AND u.account_deleted = 0
@@ -289,7 +301,7 @@ export async function findStaff(filters) {
                 u.account_active,
                 u.is_activated,
                 u.account_deleted,
-                u.wallet_amount,
+                COALESCE(wa.wallet_amount, 0) AS wallet_amount,
                 u.photo_file,
                 u.account_create_date,
                 u.last_login_date,
@@ -444,47 +456,22 @@ export async function findStaffTransactions(userId) {
     const [rows] = await sqldb.query(
         `
             SELECT
-                tx.row_key,
-                tx.source_id,
-                tx.reference_id,
-                tx.amount,
-                tx.wallet_balance,
-                tx.booking_id,
-                tx.type_code,
-                tx.description,
-                tx.transaction_date
-            FROM (
-                SELECT
-                    CONCAT('wallet-transaction-', wt.id) AS row_key,
-                    wt.id AS source_id,
-                    wt.transaction_id AS reference_id,
-                    wt.amount,
-                    wt.wallet_balance,
-                    wt.book_id AS booking_id,
-                    wt.type AS type_code,
-                    wt.desc AS description,
-                    wt.transaction_date
-                FROM wallet_transactions wt
-                WHERE wt.user_id = ? AND wt.user_type = 0
-
-                UNION ALL
-
-                SELECT
-                    CONCAT('wallet-fund-', wf.id) AS row_key,
-                    wf.id AS source_id,
-                    CONCAT('WF-', wf.id) AS reference_id,
-                    wf.fund_amount AS amount,
-                    wf.wallet_balance,
-                    0 AS booking_id,
-                    1 AS type_code,
-                    wf.fund_comment AS description,
-                    wf.date_fund AS transaction_date
-                FROM wallet_fund wf
-                WHERE wf.staff_id = ? AND wf.fund_type = 3
-            ) tx
-            ORDER BY tx.transaction_date DESC, tx.source_id DESC
+                CONCAT('wallet-ledger-', wl.ledger_id) AS row_key,
+                wl.ledger_id AS source_id,
+                COALESCE(p.payment_code, CAST(wl.payment_id AS CHAR)) AS reference_id,
+                wl.amount,
+                wl.balance_after AS wallet_balance,
+                COALESCE(p.booking_id, 0) AS booking_id,
+                CASE WHEN wl.direction = 'credit' THEN 2 ELSE 3 END AS type_code,
+                wl.description,
+                wl.created_at AS transaction_date
+            FROM wallet_accounts wa
+            INNER JOIN wallet_ledger wl ON wl.wallet_id = wa.wallet_id
+            LEFT JOIN payments p ON p.payment_id = wl.payment_id
+            WHERE wa.actor_id = ? AND wa.actor_type = ?
+            ORDER BY wl.created_at DESC, wl.ledger_id DESC
         `,
-        [userId, userId]
+        [userId, STAFF_WALLET_ACTOR_TYPE]
     );
 
     return rows.map((row) => ({
@@ -532,19 +519,23 @@ export async function findStaffDocuments(userId) {
         `
             SELECT
                 ud.id,
-                ud.doc_id,
-                COALESCE(NULLIF(ud.u_doc_title, ''), doc.title) AS document_title,
-                ud.u_doc_id_num_title,
-                ud.u_doc_id_num,
-                ud.u_doc_expiry_date,
-                ud.u_doc_img,
-                ud.u_doc_status,
-                ud.date_created,
-                ud.date_updated
-            FROM users_documents ud
-            LEFT JOIN documents doc ON doc.id = ud.doc_id
-            WHERE ud.u_id = ? AND ud.u_type = 0
-            ORDER BY ud.date_updated DESC, ud.id DESC
+                ud.document_id AS doc_id,
+                doc.title AS document_title,
+                doc.doc_id_num_title AS u_doc_id_num_title,
+                ud.doc_number AS u_doc_id_num,
+                ud.doc_expiry_date AS u_doc_expiry_date,
+                NULL AS u_doc_img,
+                CASE
+                    WHEN ud.doc_expiry_date IS NOT NULL AND ud.doc_expiry_date < CURDATE() THEN 2
+                    WHEN ud.verified = 1 THEN 3
+                    ELSE 0
+                END AS u_doc_status,
+                ud.date_submitted AS date_created,
+                ud.date_submitted AS date_updated
+            FROM user_documents ud
+            LEFT JOIN documents doc ON doc.id = ud.document_id
+            WHERE ud.user_id = ?
+            ORDER BY ud.date_submitted DESC, ud.id DESC
         `,
         [userId]
     );

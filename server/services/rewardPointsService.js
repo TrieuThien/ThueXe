@@ -25,7 +25,7 @@ const ACTION_TYPE = {
 
 function assertAdmin(auth) {
     if (!auth || Number(auth.accountType) !== 3 || auth.role !== "admin") {
-        throw new AppError("B?n kh�ng c� quy?n th?c hi?n thao t�c n�y.", 403, "FORBIDDEN");
+        throw new AppError("Bạn không có quyền thực hiện thao tác này.", 403, "FORBIDDEN");
     }
 }
 
@@ -34,15 +34,15 @@ function normalizeNumber(value, { fallback = null, min = null, allowZero = true 
     const parsed = Number(value);
 
     if (!Number.isFinite(parsed)) {
-        throw new AppError("Gi� tr? s? kh�ng h?p l?.", 422, "INVALID_NUMBER");
+        throw new AppError("Giá trị số không hợp lệ.", 422, "INVALID_NUMBER");
     }
 
     if (min !== null && parsed < min) {
-        throw new AppError("Gi� tr? s? kh�ng h?p l?.", 422, "INVALID_NUMBER");
+        throw new AppError("Giá trị số không hợp lệ.", 422, "INVALID_NUMBER");
     }
 
     if (!allowZero && parsed === 0) {
-        throw new AppError("Gi� tr? s? kh�ng h?p l?.", 422, "INVALID_NUMBER");
+        throw new AppError("Giá trị số không hợp lệ.", 422, "INVALID_NUMBER");
     }
 
     return parsed;
@@ -53,11 +53,11 @@ function normalizeInt(value, { fallback = null, min = null } = {}) {
     const parsed = Number(value);
 
     if (!Number.isInteger(parsed)) {
-        throw new AppError("Gi� tr? s? nguy�n kh�ng h?p l?.", 422, "INVALID_INTEGER");
+        throw new AppError("Giá trị số nguyên không hợp lệ.", 422, "INVALID_INTEGER");
     }
 
     if (min !== null && parsed < min) {
-        throw new AppError("Gi� tr? s? nguy�n kh�ng h?p l?.", 422, "INVALID_INTEGER");
+        throw new AppError("Giá trị số nguyên không hợp lệ.", 422, "INVALID_INTEGER");
     }
 
     return parsed;
@@ -78,14 +78,14 @@ function toDateTimeFromISO(value, endOfDay = false) {
         const normalized = text.replace("T", " ").slice(0, 19);
         const date = new Date(normalized.replace(" ", "T"));
         if (Number.isNaN(date.getTime())) {
-            throw new AppError("Th?i gian kh�ng h?p l?.", 422, "INVALID_DATE");
+            throw new AppError("Thời gian không hợp lệ.", 422, "INVALID_DATE");
         }
         return normalized;
     }
 
     const date = new Date(`${text}T00:00:00`);
     if (Number.isNaN(date.getTime())) {
-        throw new AppError("Th?i gian kh�ng h?p l?.", 422, "INVALID_DATE");
+        throw new AppError("Thời gian không hợp lệ.", 422, "INVALID_DATE");
     }
 
     return `${text} ${endOfDay ? "23:59:59" : "00:00:00"}`;
@@ -113,26 +113,26 @@ function composeWalletSummary(wallet) {
 
 function ensureCustomerAccount(wallet) {
     if (!wallet) {
-        throw new AppError("Kh�ng t�m th?y ngu?i d�ng.", 404, "USER_NOT_FOUND");
+        throw new AppError("Không tìm thấy người dùng.", 404, "USER_NOT_FOUND");
     }
 
     if (Number(wallet.account_type) !== 1) {
-        throw new AppError("Ch? h? tr? t�ch di?m cho kh�ch h�ng.", 422, "INVALID_USER_TYPE");
+        throw new AppError("Chỉ hỗ trợ tích điểm cho khách hàng.", 422, "INVALID_USER_TYPE");
     }
 }
 
 function mapActionTypeLabel(actionType) {
     switch (Number(actionType)) {
         case ACTION_TYPE.EARN:
-            return "C?ng di?m";
+            return "Cộng điểm";
         case ACTION_TYPE.REDEEM:
-            return "�?i di?m";
+            return "Đổi điểm";
         case ACTION_TYPE.ADJUST_ADD:
-            return "�i?u ch?nh tang";
+            return "Điều chỉnh tăng";
         case ACTION_TYPE.ADJUST_SUBTRACT:
-            return "�i?u ch?nh gi?m";
+            return "Điều chỉnh giảm";
         default:
-            return "Kh�c";
+            return "Khác";
     }
 }
 
@@ -154,7 +154,7 @@ function normalizeConfigPayload(payload = {}) {
     });
 
     if (![0, 1].includes(status)) {
-        throw new AppError("Tr?ng th�i t�ch di?m ph?i l� 0 ho?c 1.", 422, "INVALID_STATUS");
+        throw new AppError("Trạng thái tích điểm phải là 0 hoặc 1.", 422, "INVALID_STATUS");
     }
 
     return {
@@ -174,14 +174,14 @@ function normalizeHistoryFilters(query = {}) {
     const dateTo = toDateTimeFromISO(query.dateTo, true);
 
     if (actionType !== null && ![1, 2, 4, 5].includes(actionType)) {
-        throw new AppError("Lo?i h�nh d?ng kh�ng h?p l?.", 422, "INVALID_ACTION_TYPE");
+        throw new AppError("Loại hành động không hợp lệ.", 422, "INVALID_ACTION_TYPE");
     }
 
     if (dateFrom && dateTo) {
         const from = new Date(dateFrom.replace(" ", "T"));
         const to = new Date(dateTo.replace(" ", "T"));
         if (from.getTime() > to.getTime()) {
-            throw new AppError("Kho?ng th?i gian l?c kh�ng h?p l?.", 422, "INVALID_DATE_RANGE");
+            throw new AppError("Khoảng thời gian lọc không hợp lệ.", 422, "INVALID_DATE_RANGE");
         }
     }
 
@@ -228,7 +228,7 @@ function toHistoryResponse(items) {
 async function lockAndGetConfigOrThrow(connection) {
     const config = await findRewardConfig(connection);
     if (!config) {
-        throw new AppError("Chua c?u h�nh t�ch di?m.", 422, "REWARD_CONFIG_NOT_FOUND");
+        throw new AppError("Chưa cấu hình tích điểm.", 422, "REWARD_CONFIG_NOT_FOUND");
     }
 
     const curToPoints = Number(config.cur_to_points_conv);
@@ -236,15 +236,15 @@ async function lockAndGetConfigOrThrow(connection) {
     const minRedeem = Number(config.min_points_redeemable || 0);
 
     if (!Number.isFinite(curToPoints) || curToPoints <= 0) {
-        throw new AppError("C?u h�nh quy d?i ti?n sang di?m kh�ng h?p l?.", 422, "INVALID_CUR_TO_POINTS");
+        throw new AppError("Cấu hình quy đổi tiền sang điểm không hợp lệ.", 422, "INVALID_CUR_TO_POINTS");
     }
 
     if (!Number.isFinite(pointsToCur) || pointsToCur <= 0) {
-        throw new AppError("C?u h�nh quy d?i di?m sang ti?n kh�ng h?p l?.", 422, "INVALID_POINTS_TO_CUR");
+        throw new AppError("Cấu hình quy đổi điểm sang tiền không hợp lệ.", 422, "INVALID_POINTS_TO_CUR");
     }
 
     if (!Number.isInteger(minRedeem) || minRedeem < 1) {
-        throw new AppError("C?u h�nh di?m t?i thi?u d?i kh�ng h?p l?.", 422, "INVALID_MIN_REDEEM");
+        throw new AppError("Cấu hình điểm tối thiểu để đổi không hợp lệ.", 422, "INVALID_MIN_REDEEM");
     }
 
     return {
@@ -258,7 +258,7 @@ async function lockAndGetConfigOrThrow(connection) {
 async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId = null) {
     const bookingId = normalizeInt(bookingIdInput, { fallback: null, min: 1 });
     if (!bookingId) {
-        throw new AppError("booking_id kh�ng h?p l?.", 422, "INVALID_BOOKING_ID");
+        throw new AppError("Mã booking không hợp lệ.", 422, "INVALID_BOOKING_ID");
     }
 
     const connection = await sqldb.getConnection();
@@ -273,13 +273,13 @@ async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId =
                 processed: false,
                 reason: "REWARD_DISABLED",
                 booking_id: bookingId,
-                message: "T�ch di?m dang t?t n�n kh�ng c?ng di?m.",
+                message: "Tích điểm đang tắt nên không cộng điểm.",
             };
         }
 
         const booking = await findBookingForRewardByIdForUpdate(bookingId, connection);
         if (!booking) {
-            throw new AppError("Kh�ng t�m th?y booking.", 404, "BOOKING_NOT_FOUND");
+            throw new AppError("Không tìm thấy booking.", 404, "BOOKING_NOT_FOUND");
         }
 
         if (!(Number(booking.status) === 3 && Number(booking.haspaid) === 1)) {
@@ -288,7 +288,7 @@ async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId =
                 processed: false,
                 reason: "BOOKING_NOT_ELIGIBLE",
                 booking_id: bookingId,
-                message: "Booking chua d? di?u ki?n c?ng di?m (status=3 v� haspaid=1).",
+                message: "Booking chưa đạt điều kiện cộng điểm (status=3 và haspaid=1).",
             };
         }
 
@@ -304,7 +304,7 @@ async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId =
                 booking_id: booking.id,
                 user_id: wallet.user_id,
                 earned_points: roundPoint(existing.points),
-                message: "Booking d� du?c c?ng di?m tru?c d�.",
+                message: "Booking đã được cộng điểm trước đó.",
             };
         }
 
@@ -321,7 +321,7 @@ async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId =
                 booking_id: booking.id,
                 user_id: wallet.user_id,
                 eligible_amount: roundMoney(eligibleAmount),
-                message: "Gi� tr? booking chua d? d? nh?n di?m.",
+                message: "Giá trị booking chưa đủ để nhận điểm.",
             };
         }
 
@@ -352,7 +352,7 @@ async function processEarnPointsForBookingInternal(bookingIdInput, actorUserId =
                 balance_after: balanceAfter,
                 ref_table: "bookings",
                 ref_id: booking.id,
-                note: "C?ng di?m t? d?ng t? booking ho�n t?t v� d� thanh to�n",
+                note: "Cộng điểm từ booking hoàn tất và đã thanh toán",
                 created_by: actorUserId,
             },
             connection
@@ -468,11 +468,11 @@ export async function adjustRewardPointsByAdmin(payload, auth) {
     const note = normalizeText(payload.note, { maxLength: 255, fallback: null });
 
     if (!userId) {
-        throw new AppError("user_id kh�ng h?p l?.", 422, "INVALID_USER_ID");
+        throw new AppError("Mã người dùng không hợp lệ.", 422, "INVALID_USER_ID");
     }
 
     if (!Number.isFinite(points) || points === 0) {
-        throw new AppError("points ph?i kh�c 0.", 422, "INVALID_POINTS");
+        throw new AppError("Điểm phải khác 0.", 422, "INVALID_POINTS");
     }
 
     const connection = await sqldb.getConnection();
@@ -497,7 +497,7 @@ export async function adjustRewardPointsByAdmin(payload, auth) {
         } else {
             const subtractPoints = roundPoint(Math.abs(points));
             if (balanceBefore < subtractPoints) {
-                throw new AppError("Kh�ch h�ng kh�ng d? di?m d? tr?.", 422, "INSUFFICIENT_POINTS");
+                throw new AppError("Khách hàng không đủ điểm để trừ.", 422, "INSUFFICIENT_POINTS");
             }
 
             nextRedeemed = roundPoint(nextRedeemed + subtractPoints);
@@ -530,7 +530,7 @@ export async function adjustRewardPointsByAdmin(payload, auth) {
                 balance_after: balanceAfter,
                 ref_table: "admin",
                 ref_id: Number(auth.userId),
-                note: note || (actionType === ACTION_TYPE.ADJUST_ADD ? "�i?u ch?nh tang di?m th? c�ng" : "�i?u ch?nh gi?m di?m th? c�ng"),
+                note: note || (actionType === ACTION_TYPE.ADJUST_ADD ? "Điều chỉnh tăng điểm thủ công" : "Điều chỉnh giảm điểm thủ công"),
                 created_by: Number(auth.userId),
             },
             connection
@@ -568,7 +568,7 @@ export async function redeemRewardPointsByAdmin(payload, auth) {
     const note = normalizeText(payload.note, { maxLength: 255, fallback: null });
 
     if (!userId) {
-        throw new AppError("user_id kh�ng h?p l?.", 422, "INVALID_USER_ID");
+        throw new AppError("Mã người dùng không hợp lệ.", 422, "INVALID_USER_ID");
     }
 
     const pointsValue = roundPoint(redeemPoints);
@@ -582,7 +582,7 @@ export async function redeemRewardPointsByAdmin(payload, auth) {
 
         if (pointsValue < Number(config.min_points_redeemable)) {
             throw new AppError(
-                `�i?m d?i t?i thi?u l� ${config.min_points_redeemable}.`,
+                `Điểm đổi tối thiểu là ${config.min_points_redeemable}.`,
                 422,
                 "REDEEM_BELOW_MINIMUM"
             );
@@ -595,7 +595,7 @@ export async function redeemRewardPointsByAdmin(payload, auth) {
         const balanceBefore = walletSummary.available_points;
 
         if (balanceBefore < pointsValue) {
-            throw new AppError("Kh�ch h�ng kh�ng d? di?m d? d?i.", 422, "INSUFFICIENT_POINTS");
+            throw new AppError("Khách hàng không đủ điểm để đổi.", 422, "INSUFFICIENT_POINTS");
         }
 
         const nextTotal = walletSummary.total_points;
@@ -624,7 +624,7 @@ export async function redeemRewardPointsByAdmin(payload, auth) {
                 balance_after: balanceAfter,
                 ref_table: "admin",
                 ref_id: Number(auth.userId),
-                note: note || "�?i di?m thu?ng",
+                note: note || "Đổi điểm thưởng",
                 created_by: Number(auth.userId),
             },
             connection
@@ -657,7 +657,7 @@ export async function processBookingRewardPointsByAdmin(bookingId, auth) {
 
 export async function getMyRewardPoints(auth) {
     if (!auth?.userId) {
-        throw new AppError("B?n chua dang nh?p.", 401, "UNAUTHORIZED");
+        throw new AppError("Account is not logged in.", 401, "UNAUTHORIZED");
     }
 
     const userId = Number(auth.userId);
@@ -685,7 +685,7 @@ export async function getMyRewardPoints(auth) {
 
 export async function getMyRewardHistory(query, auth) {
     if (!auth?.userId) {
-        throw new AppError("B?n chua dang nh?p.", 401, "UNAUTHORIZED");
+        throw new AppError("Account is not logged in.", 401, "UNAUTHORIZED");
     }
 
     const userId = Number(auth.userId);
