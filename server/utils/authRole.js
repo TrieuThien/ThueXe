@@ -1,6 +1,7 @@
 export const USER_TYPE = {
     USER: 0,
     DRIVER: 1,
+    OWNER: 2,
 };
 
 export const CODE_CONTEXT = {
@@ -14,6 +15,7 @@ export const ROLES = {
     ADMIN: "admin",
     BILLER: "biller",
     DRIVER: "driver",
+    OWNER: "owner",
 };
 
 export function mapUserAccountTypeToRole(accountType) {

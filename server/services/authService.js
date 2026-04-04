@@ -269,21 +269,59 @@ export async function createStaffByAdmin(payload) {
 }
 
 export async function login(payload) {
-    const identifier = normalizeIdentifier(payload.identifier);
+    const loginIdentifierRaw =
+        payload.identifier ?? payload.email ?? payload.phone ?? payload.username;
+    const identifier = normalizeIdentifier(loginIdentifierRaw);
 
-    const [userAccount, driverAccount] = await Promise.all([
-        findUserByIdentifier(identifier),
-        findDriverByIdentifier(identifier),
-    ]);
+    if (!identifier) {
+        throw new AppError(
+            "Unable to authenticate with provided credentials.",
+            401,
+            "INVALID_CREDENTIALS"
+        );
+    }
+
+    let userAccount;
+    let driverAccount;
+    try {
+        [userAccount, driverAccount] = await Promise.all([
+            findUserByIdentifier(identifier),
+            findDriverByIdentifier(identifier),
+        ]);
+    } catch (error) {
+        console.error("Auth lookup failed:", {
+            identifier,
+            message: error?.message,
+            code: error?.code,
+            sqlState: error?.sqlState,
+        });
+        throw new AppError(
+            "Authentication service temporarily unavailable.",
+            500,
+            "AUTH_SERVICE_ERROR"
+        );
+    }
 
     const candidates = [userAccount, driverAccount].filter(Boolean);
     let matchedAccount = null;
-    for (const candidate of candidates) {
-        const passwordOk = await verifyPassword(payload.password, candidate.passwordHash);
-        if (passwordOk) {
-            matchedAccount = candidate;
-            break;
+    try {
+        for (const candidate of candidates) {
+            const passwordOk = await verifyPassword(payload.password, candidate.passwordHash);
+            if (passwordOk) {
+                matchedAccount = candidate;
+                break;
+            }
         }
+    } catch (error) {
+        console.error("Password verification failed:", {
+            identifier,
+            message: error?.message,
+        });
+        throw new AppError(
+            "Authentication service temporarily unavailable.",
+            500,
+            "AUTH_SERVICE_ERROR"
+        );
     }
 
     if (!matchedAccount) {

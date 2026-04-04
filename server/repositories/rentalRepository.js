@@ -1,0 +1,490 @@
+import sqldb from "../config/sqldatabase.js";
+
+function dbConnection(conn) {
+    return conn || sqldb;
+}
+
+export async function listRentalPackages(filters = {}) {
+    const whereClauses = [];
+    const params = [];
+    if (filters.serviceType !== undefined) {
+        whereClauses.push("service_type = ?");
+        params.push(filters.serviceType);
+    }
+    if (filters.active !== undefined) {
+        whereClauses.push("active = ?");
+        params.push(filters.active);
+    }
+    if (filters.search) {
+        whereClauses.push("(package_name LIKE ? OR description LIKE ?)");
+        const keyword = `%${filters.search}%`;
+        params.push(keyword, keyword);
+    }
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+
+    const [rows] = await sqldb.query(
+        `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active, date_created
+         FROM rental_packages
+         ${whereSql}
+         ORDER BY package_id DESC`,
+        params
+    );
+    return rows.map((row) => ({
+        package_id: Number(row.package_id),
+        type_id: row.type_id === null ? null : Number(row.type_id),
+        service_type: Number(row.service_type || 1),
+        package_name: row.package_name,
+        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
+        duration_days: row.duration_days === null ? null : Number(row.duration_days),
+        price: Number(row.price || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        extra_hour_fee: Number(row.extra_hour_fee || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        description: row.description,
+        active: Number(row.active || 0),
+        date_created: row.date_created,
+    }));
+}
+
+export async function findRentalPackageById(packageId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active, date_created
+         FROM rental_packages
+         WHERE package_id = ?
+         LIMIT 1`,
+        [packageId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        package_id: Number(row.package_id),
+        type_id: row.type_id === null ? null : Number(row.type_id),
+        service_type: Number(row.service_type || 1),
+        package_name: row.package_name,
+        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
+        duration_days: row.duration_days === null ? null : Number(row.duration_days),
+        price: Number(row.price || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        extra_hour_fee: Number(row.extra_hour_fee || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        description: row.description,
+        active: Number(row.active || 0),
+        date_created: row.date_created,
+    };
+}
+
+export async function createRentalPackage(payload, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `INSERT INTO rental_packages
+         (type_id, service_type, package_name, duration_hours, duration_days, price, distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            payload.type_id || null,
+            payload.service_type,
+            payload.package_name,
+            payload.duration_hours || null,
+            payload.duration_days || null,
+            payload.price,
+            payload.distance_limit_km,
+            payload.extra_km_fee,
+            payload.extra_hour_fee,
+            payload.deposit_amount,
+            payload.description || null,
+            payload.active,
+        ]
+    );
+    return Number(result.insertId);
+}
+
+export async function updateRentalPackage(packageId, payload, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE rental_packages
+         SET type_id = ?, service_type = ?, package_name = ?, duration_hours = ?, duration_days = ?,
+             price = ?, distance_limit_km = ?, extra_km_fee = ?, extra_hour_fee = ?, deposit_amount = ?,
+             description = ?, active = ?
+         WHERE package_id = ?
+         LIMIT 1`,
+        [
+            payload.type_id || null,
+            payload.service_type,
+            payload.package_name,
+            payload.duration_hours || null,
+            payload.duration_days || null,
+            payload.price,
+            payload.distance_limit_km,
+            payload.extra_km_fee,
+            payload.extra_hour_fee,
+            payload.deposit_amount,
+            payload.description || null,
+            payload.active,
+            packageId,
+        ]
+    );
+}
+
+export async function listRentalVehicles({ typeId, ownerId } = {}) {
+    const whereClauses = ["v.status = 'available'", "v.is_verified = 1"];
+    const params = [];
+    if (typeId) {
+        whereClauses.push("v.type_id = ?");
+        params.push(typeId);
+    }
+    if (ownerId) {
+        whereClauses.push("v.owner_id = ?");
+        params.push(ownerId);
+    }
+
+    const [rows] = await sqldb.query(
+        `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.seat_count,
+                v.transmission, v.fuel_type, v.status, v.is_verified, vt.type_name, vo.fullname AS owner_name
+         FROM vehicles v
+         LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = v.owner_id
+         WHERE ${whereClauses.join(" AND ")}
+         ORDER BY v.vehicle_id DESC`,
+        params
+    );
+    return rows.map((row) => ({
+        vehicle_id: Number(row.vehicle_id),
+        owner_id: Number(row.owner_id),
+        type_id: Number(row.type_id),
+        type_name: row.type_name,
+        owner_name: row.owner_name,
+        brand: row.brand,
+        model: row.model,
+        year: row.year,
+        color: row.color,
+        license_plate: row.license_plate,
+        seat_count: Number(row.seat_count || 0),
+        transmission: row.transmission,
+        fuel_type: row.fuel_type,
+        status: row.status,
+        is_verified: Number(row.is_verified || 0),
+    }));
+}
+
+export async function listRentalDrivers({ routeId, rideId } = {}) {
+    const whereClauses = [
+        "d.account_deleted = 0",
+        "d.account_active = 1",
+        "d.is_activated = 1",
+        "d.available_for_rental = 1",
+        "d.available = 1",
+    ];
+    const params = [];
+    if (routeId) {
+        whereClauses.push("(d.route_id = ? OR d.reg_route_id = ?)");
+        params.push(routeId, routeId);
+    }
+    if (rideId) {
+        whereClauses.push("d.ride_id = ?");
+        params.push(rideId);
+    }
+    const [rows] = await sqldb.query(
+        `SELECT driver_id, firstname, lastname, phone, ride_id, route_id, reg_route_id, hourly_rate, daily_rate
+         FROM drivers d
+         WHERE ${whereClauses.join(" AND ")}
+         ORDER BY driver_id DESC`,
+        params
+    );
+    return rows.map((row) => ({
+        driver_id: Number(row.driver_id),
+        firstname: row.firstname,
+        lastname: row.lastname,
+        full_name: `${row.firstname || ""} ${row.lastname || ""}`.trim(),
+        phone: row.phone,
+        ride_id: Number(row.ride_id || 0),
+        route_id: row.route_id === null ? null : Number(row.route_id),
+        reg_route_id: row.reg_route_id === null ? null : Number(row.reg_route_id),
+        hourly_rate: Number(row.hourly_rate || 0),
+        daily_rate: Number(row.daily_rate || 0),
+    }));
+}
+
+export async function createRentalBooking(payload, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `INSERT INTO rental_bookings
+         (rental_code, user_id, vehicle_id, driver_id, package_id, owner_id, service_type, start_datetime, end_datetime,
+          pickup_address, pickup_long, pickup_lat, dropoff_address, dropoff_long, dropoff_lat, distance_limit_km, distance_travelled_km,
+          base_price, extra_time_fee, extra_distance_fee, deposit_amount, total_price, payment_status, payment_type, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+            payload.rental_code,
+            payload.user_id,
+            payload.vehicle_id || null,
+            payload.driver_id || null,
+            payload.package_id || null,
+            payload.owner_id || null,
+            payload.service_type,
+            payload.start_datetime,
+            payload.end_datetime,
+            payload.pickup_address,
+            payload.pickup_long || null,
+            payload.pickup_lat || null,
+            payload.dropoff_address || null,
+            payload.dropoff_long || null,
+            payload.dropoff_lat || null,
+            payload.distance_limit_km,
+            payload.distance_travelled_km || 0,
+            payload.base_price,
+            payload.extra_time_fee || 0,
+            payload.extra_distance_fee || 0,
+            payload.deposit_amount || 0,
+            payload.total_price,
+            payload.payment_status || "pending",
+            payload.payment_type || null,
+            payload.status || "scheduled",
+        ]
+    );
+    return Number(result.insertId);
+}
+
+export async function findRentalBookingById(rentalId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT rb.rental_id, rb.rental_code, rb.user_id, rb.vehicle_id, rb.driver_id, rb.package_id, rb.owner_id, rb.service_type,
+                rb.start_datetime, rb.end_datetime, rb.actual_end_datetime, rb.pickup_address, rb.pickup_long, rb.pickup_lat,
+                rb.dropoff_address, rb.dropoff_long, rb.dropoff_lat, rb.distance_limit_km, rb.distance_travelled_km, rb.base_price,
+                rb.extra_time_fee, rb.extra_distance_fee, rb.deposit_amount, rb.total_price, rb.payment_status, rb.payment_type, rb.transaction_id,
+                rb.status, rb.cancel_reason, rb.created_at, rb.updated_at,
+                NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
+                NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name,
+                v.license_plate, v.brand, v.model, vo.fullname AS owner_name,
+                rp.package_name
+         FROM rental_bookings rb
+         LEFT JOIN users u ON u.user_id = rb.user_id
+         LEFT JOIN drivers d ON d.driver_id = rb.driver_id
+         LEFT JOIN vehicles v ON v.vehicle_id = rb.vehicle_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = rb.owner_id
+         LEFT JOIN rental_packages rp ON rp.package_id = rb.package_id
+         WHERE rb.rental_id = ?
+         LIMIT 1`,
+        [rentalId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        rental_id: Number(row.rental_id),
+        rental_code: row.rental_code,
+        user_id: Number(row.user_id),
+        vehicle_id: row.vehicle_id === null ? null : Number(row.vehicle_id),
+        driver_id: row.driver_id === null ? null : Number(row.driver_id),
+        package_id: row.package_id === null ? null : Number(row.package_id),
+        owner_id: row.owner_id === null ? null : Number(row.owner_id),
+        service_type: Number(row.service_type || 1),
+        start_datetime: row.start_datetime,
+        end_datetime: row.end_datetime,
+        actual_end_datetime: row.actual_end_datetime,
+        pickup_address: row.pickup_address,
+        pickup_long: row.pickup_long === null ? null : Number(row.pickup_long),
+        pickup_lat: row.pickup_lat === null ? null : Number(row.pickup_lat),
+        dropoff_address: row.dropoff_address,
+        dropoff_long: row.dropoff_long === null ? null : Number(row.dropoff_long),
+        dropoff_lat: row.dropoff_lat === null ? null : Number(row.dropoff_lat),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        distance_travelled_km: Number(row.distance_travelled_km || 0),
+        base_price: Number(row.base_price || 0),
+        extra_time_fee: Number(row.extra_time_fee || 0),
+        extra_distance_fee: Number(row.extra_distance_fee || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        total_price: Number(row.total_price || 0),
+        payment_status: row.payment_status,
+        payment_type: row.payment_type === null ? null : Number(row.payment_type),
+        transaction_id: row.transaction_id === null ? null : Number(row.transaction_id),
+        status: row.status,
+        cancel_reason: row.cancel_reason,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        user_name: row.user_name,
+        driver_name: row.driver_name,
+        license_plate: row.license_plate,
+        vehicle_name: [row.brand, row.model].filter(Boolean).join(" ").trim() || null,
+        owner_name: row.owner_name,
+        package_name: row.package_name,
+    };
+}
+
+export async function listRentalBookings(filters = {}) {
+    const whereClauses = [];
+    const params = [];
+    if (filters.userId !== undefined) {
+        whereClauses.push("rb.user_id = ?");
+        params.push(filters.userId);
+    }
+    if (filters.driverId !== undefined) {
+        whereClauses.push("rb.driver_id = ?");
+        params.push(filters.driverId);
+    }
+    if (filters.status) {
+        whereClauses.push("rb.status = ?");
+        params.push(filters.status);
+    }
+    if (filters.serviceType !== undefined) {
+        whereClauses.push("rb.service_type = ?");
+        params.push(filters.serviceType);
+    }
+    if (filters.search) {
+        const keyword = `%${filters.search}%`;
+        whereClauses.push("(rb.rental_code LIKE ? OR rb.pickup_address LIKE ? OR rb.dropoff_address LIKE ?)");
+        params.push(keyword, keyword, keyword);
+    }
+    const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
+    const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 100);
+    const page = Math.max(Number(filters.page) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    const [rows] = await sqldb.query(
+        `SELECT rb.rental_id, rb.rental_code, rb.user_id, rb.driver_id, rb.vehicle_id, rb.service_type,
+                rb.start_datetime, rb.end_datetime, rb.total_price, rb.payment_status, rb.status, rb.created_at,
+                NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
+                NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name
+         FROM rental_bookings rb
+         LEFT JOIN users u ON u.user_id = rb.user_id
+         LEFT JOIN drivers d ON d.driver_id = rb.driver_id
+         ${whereSql}
+         ORDER BY rb.rental_id DESC
+         LIMIT ? OFFSET ?`,
+        [...params, limit, offset]
+    );
+
+    const [countRows] = await sqldb.query(
+        `SELECT COUNT(*) AS total_items
+         FROM rental_bookings rb
+         ${whereSql}`,
+        params
+    );
+
+    return {
+        items: rows.map((row) => ({
+            rental_id: Number(row.rental_id),
+            rental_code: row.rental_code,
+            user_id: Number(row.user_id),
+            user_name: row.user_name,
+            driver_id: row.driver_id === null ? null : Number(row.driver_id),
+            driver_name: row.driver_name,
+            vehicle_id: row.vehicle_id === null ? null : Number(row.vehicle_id),
+            service_type: Number(row.service_type || 1),
+            start_datetime: row.start_datetime,
+            end_datetime: row.end_datetime,
+            total_price: Number(row.total_price || 0),
+            payment_status: row.payment_status,
+            status: row.status,
+            created_at: row.created_at,
+        })),
+        totalItems: Number(countRows[0]?.total_items || 0),
+        page,
+        limit,
+    };
+}
+
+export async function findRentalByIdForUpdate(rentalId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT rental_id, user_id, vehicle_id, driver_id, package_id, owner_id, service_type, status, payment_status, base_price, deposit_amount, total_price, distance_limit_km, distance_travelled_km, start_datetime, end_datetime
+         FROM rental_bookings
+         WHERE rental_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [rentalId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        rental_id: Number(row.rental_id),
+        user_id: Number(row.user_id),
+        vehicle_id: row.vehicle_id === null ? null : Number(row.vehicle_id),
+        driver_id: row.driver_id === null ? null : Number(row.driver_id),
+        package_id: row.package_id === null ? null : Number(row.package_id),
+        owner_id: row.owner_id === null ? null : Number(row.owner_id),
+        service_type: Number(row.service_type || 1),
+        status: row.status,
+        payment_status: row.payment_status,
+        base_price: Number(row.base_price || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        total_price: Number(row.total_price || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        distance_travelled_km: Number(row.distance_travelled_km || 0),
+        start_datetime: row.start_datetime,
+        end_datetime: row.end_datetime,
+    };
+}
+
+export async function updateRentalStatus(payload, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE rental_bookings
+         SET status = ?, cancel_reason = ?, actual_end_datetime = ?, extra_time_fee = ?, extra_distance_fee = ?, total_price = ?, updated_at = NOW()
+         WHERE rental_id = ?
+         LIMIT 1`,
+        [
+            payload.status,
+            payload.cancel_reason || null,
+            payload.actual_end_datetime || null,
+            payload.extra_time_fee || 0,
+            payload.extra_distance_fee || 0,
+            payload.total_price,
+            payload.rental_id,
+        ]
+    );
+}
+
+export async function assignRentalDriverVehicle(payload, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE rental_bookings
+         SET driver_id = ?, vehicle_id = ?, owner_id = ?, updated_at = NOW()
+         WHERE rental_id = ?
+         LIMIT 1`,
+        [payload.driver_id || null, payload.vehicle_id || null, payload.owner_id || null, payload.rental_id]
+    );
+}
+
+export async function findVehicleById(vehicleId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT vehicle_id, owner_id, type_id, status, is_verified, seat_count
+         FROM vehicles
+         WHERE vehicle_id = ?
+         LIMIT 1`,
+        [vehicleId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        vehicle_id: Number(row.vehicle_id),
+        owner_id: Number(row.owner_id),
+        type_id: Number(row.type_id),
+        status: row.status,
+        is_verified: Number(row.is_verified || 0),
+        seat_count: Number(row.seat_count || 0),
+    };
+}
+
+export async function findDriverById(driverId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT driver_id, available, available_for_rental, account_active, account_deleted, is_activated
+         FROM drivers
+         WHERE driver_id = ?
+         LIMIT 1`,
+        [driverId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        driver_id: Number(row.driver_id),
+        available: Number(row.available || 0),
+        available_for_rental: Number(row.available_for_rental || 0),
+        account_active: Number(row.account_active || 0),
+        account_deleted: Number(row.account_deleted || 0),
+        is_activated: Number(row.is_activated || 0),
+    };
+}

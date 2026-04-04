@@ -88,13 +88,35 @@ export const createStaffValidator = [
 
 export const loginValidator = [
     body("identifier")
+        .optional({ values: "falsy" })
         .trim()
         .isLength({ min: 3, max: 64 })
-        .withMessage("identifier is required"),
+        .withMessage("identifier must be between 3 and 64 characters"),
+    body("email")
+        .optional({ values: "falsy" })
+        .trim()
+        .isLength({ min: 3, max: 64 })
+        .withMessage("email must be between 3 and 64 characters"),
+    body("phone")
+        .optional({ values: "falsy" })
+        .trim()
+        .isLength({ min: 3, max: 64 })
+        .withMessage("phone must be between 3 and 64 characters"),
+    body("username")
+        .optional({ values: "falsy" })
+        .trim()
+        .isLength({ min: 3, max: 64 })
+        .withMessage("username must be between 3 and 64 characters"),
     body("password")
         .isString()
         .isLength({ min: 1, max: 128 })
         .withMessage("password is required"),
+    body().custom((value) => {
+        if (!value.identifier && !value.email && !value.phone && !value.username) {
+            throw new Error("identifier, email, phone or username is required");
+        }
+        return true;
+    }),
 ];
 
 export const forgotPasswordValidator = [
