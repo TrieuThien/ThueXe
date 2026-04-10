@@ -1,0 +1,86 @@
+﻿import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { OtpPurpose } from './auth';
+import type { TopupPaymentMethod, TopupResultStatus } from './wallet';
+
+export type AuthStackParamList = {
+  Login: undefined;
+  Register: undefined;
+  VerifyOtp: {
+    identifier: string;
+    otpRef: string;
+    purpose: OtpPurpose;
+  };
+  ForgotPassword: undefined;
+  ResetPassword: {
+    identifier: string;
+    resetToken: string;
+  };
+};
+
+export type DashboardStackParamList = {
+  DashboardHome: undefined;
+};
+
+export type WorkStackParamList = {
+  WorkingStatus: undefined;
+  DriverSchedule: undefined;
+  CurrentTrip: undefined;
+  TripCompletedSummary: {
+    tripId: string;
+  };
+  RentalBookingDetail: {
+    bookingId: string;
+  };
+};
+
+export type HistoryStackParamList = {
+  TripHistory: undefined;
+  TripHistoryDetail: {
+    tripId: string;
+  };
+};
+
+export type WalletStackParamList = {
+  WalletIncome: undefined;
+  WalletTopUp: undefined;
+  WalletTopUpPayment: {
+    paymentId: string;
+    amount: number;
+    paymentMethod: TopupPaymentMethod;
+    expiresAt: string;
+  };
+  WalletTopUpResult: {
+    paymentId: string;
+    status: TopupResultStatus;
+    amount: number;
+    message: string;
+  };
+  WalletWithdrawal: undefined;
+};
+
+export type AccountStackParamList = {
+  Profile: undefined;
+  Support: undefined;
+  SupportCreateTicket: undefined;
+  SupportChat: {
+    ticketId: string;
+  };
+  Notifications: undefined;
+  NotificationDetail: {
+    notificationId: string;
+  };
+};
+
+export type MainTabParamList = {
+  DashboardTab: NavigatorScreenParams<DashboardStackParamList>;
+  WorkTab: NavigatorScreenParams<WorkStackParamList>;
+  HistoryTab: NavigatorScreenParams<HistoryStackParamList>;
+  WalletTab: NavigatorScreenParams<WalletStackParamList>;
+  AccountTab: NavigatorScreenParams<AccountStackParamList>;
+};
+
+export type RootStackParamList = {
+  Splash: undefined;
+  Auth: NavigatorScreenParams<AuthStackParamList>;
+  Main: NavigatorScreenParams<MainTabParamList>;
+};
