@@ -28,7 +28,7 @@ import {
 function toActorType(auth) {
     if (auth.role === "driver") return 1;
     if (auth.role === "owner") return 2;
-    if (auth.role === "admin" || auth.role === "dispatcher" || auth.role === "biller") return 3;
+    if (auth.role === "admin" || auth.role === "dispatcher") return 3;
     return 0;
 }
 

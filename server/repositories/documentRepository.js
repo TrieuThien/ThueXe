@@ -20,6 +20,16 @@ function resolveSubmissionTable(actorType) {
 export async function listDocumentDefinitions(filters = {}) {
     const whereClauses = [];
     const params = [];
+    if (Array.isArray(filters.documentIds) && filters.documentIds.length > 0) {
+        if (filters.documentIds.length === 1) {
+            whereClauses.push("id = ?");
+            params.push(filters.documentIds[0]);
+        } else {
+            const placeholders = filters.documentIds.map(() => "?").join(", ");
+            whereClauses.push(`id IN (${placeholders})`);
+            params.push(...filters.documentIds);
+        }
+    }
     if (filters.status !== undefined) {
         whereClauses.push("status = ?");
         params.push(filters.status);
@@ -248,13 +258,21 @@ export async function listMySubmissions({ actorType, actorId }) {
     }));
 }
 
-export async function listAllSubmissions({ actorType, verified } = {}) {
+export async function listAllSubmissions({ actorType, verified, submissionId, documentId } = {}) {
     const chunks = [];
     const params = [];
 
     const buildQuery = (kind) => {
         const resolved = resolveSubmissionTable(kind);
         const where = [];
+        if (submissionId !== undefined) {
+            where.push("s.id = ?");
+            params.push(submissionId);
+        }
+        if (documentId !== undefined) {
+            where.push("s.document_id = ?");
+            params.push(documentId);
+        }
         if (verified !== undefined) {
             where.push("s.verified = ?");
             params.push(verified);
@@ -295,3 +313,145 @@ export async function listAllSubmissions({ actorType, verified } = {}) {
     }));
 }
 
+export async function listVehicleSubmissions({
+    submissionId,
+    documentId,
+    vehicleId,
+    ownerId,
+    verified,
+    status,
+    docCity,
+} = {}) {
+    const whereClauses = ["d.doc_user = 2", "d.doc_type = 1"];
+    const params = [];
+
+    if (submissionId !== undefined) {
+        whereClauses.push("vd.id = ?");
+        params.push(submissionId);
+    }
+    if (documentId !== undefined) {
+        whereClauses.push("vd.document_id = ?");
+        params.push(documentId);
+    }
+    if (vehicleId !== undefined) {
+        whereClauses.push("vd.vehicle_id = ?");
+        params.push(vehicleId);
+    }
+    if (ownerId !== undefined) {
+        whereClauses.push("v.owner_id = ?");
+        params.push(ownerId);
+    }
+    if (verified !== undefined) {
+        whereClauses.push("vd.verified = ?");
+        params.push(verified);
+    }
+    if (status !== undefined) {
+        whereClauses.push("vd.status = ?");
+        params.push(status);
+    }
+    if (docCity !== undefined) {
+        whereClauses.push("(d.doc_city = ? OR d.doc_city IS NULL)");
+        params.push(docCity);
+    }
+
+    const [rows] = await sqldb.query(
+        `SELECT
+            vd.id,
+            vd.vehicle_id,
+            v.owner_id,
+            vd.document_id,
+            d.title AS document_title,
+            d.doc_city,
+            vd.doc_number,
+            vd.doc_expiry_date,
+            vd.file_url,
+            vd.mime_type,
+            vd.file_size,
+            vd.verified,
+            vd.status,
+            vd.review_note,
+            vd.date_submitted,
+            vd.updated_at
+         FROM vehicle_documents vd
+         INNER JOIN documents d ON d.id = vd.document_id
+         INNER JOIN vehicles v ON v.vehicle_id = vd.vehicle_id
+         WHERE ${whereClauses.join(" AND ")}
+         ORDER BY vd.id DESC`,
+        params
+    );
+
+    return rows.map((row) => ({
+        id: Number(row.id),
+        vehicle_id: Number(row.vehicle_id),
+        owner_id: Number(row.owner_id),
+        document_id: Number(row.document_id),
+        document_title: row.document_title,
+        doc_city: row.doc_city === null ? null : Number(row.doc_city),
+        doc_number: row.doc_number,
+        doc_expiry_date: row.doc_expiry_date,
+        file_url: row.file_url,
+        mime_type: row.mime_type,
+        file_size: row.file_size === null ? null : Number(row.file_size),
+        verified: Number(row.verified || 0),
+        status: row.status,
+        review_note: row.review_note,
+        date_submitted: row.date_submitted,
+        updated_at: row.updated_at,
+    }));
+}
+
+export async function findVehicleSubmissionById(submissionId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT
+            vd.id,
+            vd.vehicle_id,
+            v.owner_id,
+            vd.document_id,
+            vd.doc_number,
+            vd.doc_expiry_date,
+            vd.file_url,
+            vd.mime_type,
+            vd.file_size,
+            vd.verified,
+            vd.status,
+            vd.review_note,
+            vd.date_submitted,
+            vd.updated_at
+         FROM vehicle_documents vd
+         INNER JOIN documents d ON d.id = vd.document_id
+         INNER JOIN vehicles v ON v.vehicle_id = vd.vehicle_id
+         WHERE vd.id = ? AND d.doc_user = 2 AND d.doc_type = 1
+         LIMIT 1`,
+        [submissionId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        id: Number(row.id),
+        vehicle_id: Number(row.vehicle_id),
+        owner_id: Number(row.owner_id),
+        document_id: Number(row.document_id),
+        doc_number: row.doc_number,
+        doc_expiry_date: row.doc_expiry_date,
+        file_url: row.file_url,
+        mime_type: row.mime_type,
+        file_size: row.file_size === null ? null : Number(row.file_size),
+        verified: Number(row.verified || 0),
+        status: row.status,
+        review_note: row.review_note,
+        date_submitted: row.date_submitted,
+        updated_at: row.updated_at,
+    };
+}
+
+export async function updateVehicleSubmissionReview({ submissionId, verified, status, reviewNote }, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE vehicle_documents
+         SET verified = ?, status = ?, review_note = ?, updated_at = NOW()
+         WHERE id = ?
+         LIMIT 1`,
+        [verified, status, reviewNote, submissionId]
+    );
+}

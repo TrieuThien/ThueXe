@@ -4,6 +4,7 @@ import {
     getCustomerDetailHandler,
     getCustomerListHandler,
     getCustomerSummaryHandler,
+    updateCustomerActivationStateHandler,
     updateCustomerAccountStateHandler,
     updateCustomerPersonalInformationHandler,
 } from "../controllers/customerController.mjs";
@@ -17,10 +18,30 @@ import {
     getCustomerListValidator,
     getCustomerSummaryValidator,
     updateCustomerAccountStateValidator,
+    updateCustomerActivationStateValidator,
     updateCustomerPersonalInfoValidator,
 } from "../validators/customerValidators.js";
+import customerAuthRoute from "./customer/authRoute.mjs";
+import customerChatRoute from "./customer/chatRoute.js";
+import customerCouponRoute from "./customer/couponRoute.js";
+import customerHomeRoute from "./customer/homeRoute.js";
+import customerRentalChatRoute from "./customer/rentalChatRoute.js";
+import customerRealtimeRoute from "./customer/realtimeRoute.js";
+import customerRideRoute from "./customer/rideRoute.js";
+import customerRentalRoute from "./customer/rentalRoute.js";
+import customerWalletRoute from "./customer/walletRoute.js";
 
 const router = Router();
+
+router.use("/api/customer/auth", customerAuthRoute);
+router.use("/api/customer", customerHomeRoute);
+router.use("/api/customer/chats", customerChatRoute);
+router.use("/api/customer/ride", customerRideRoute);
+router.use("/api/customer/rentals", customerRentalRoute);
+router.use("/api/customer/rental-chats", customerRentalChatRoute);
+router.use("/api/customer/coupons", customerCouponRoute);
+router.use("/api/customer", customerWalletRoute);
+router.use("/api/customer/realtime", customerRealtimeRoute);
 
 router.get(
     "/api/customers/summary",
@@ -66,6 +87,15 @@ router.patch(
     updateCustomerAccountStateValidator,
     validateRequest,
     updateCustomerAccountStateHandler
+);
+
+router.patch(
+    "/api/customers/:userId/activation-status",
+    requireAuth,
+    requireRole("admin"),
+    updateCustomerActivationStateValidator,
+    validateRequest,
+    updateCustomerActivationStateHandler
 );
 
 router.put(

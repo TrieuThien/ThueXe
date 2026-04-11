@@ -36,15 +36,13 @@ const SORT_BY_WHITELIST = new Set([
 const ROLE_TO_ACCOUNT_TYPE = {
     dispatcher: 2,
     admin: 3,
-    biller: 5,
 };
 
 const ACCOUNT_TYPE_TO_ROLE = {
     2: "dispatcher",
     3: "admin",
-    5: "biller",
 };
-const STAFF_ROLES = new Set(["admin", "dispatcher", "biller"]);
+const STAFF_ROLES = new Set(["admin", "dispatcher"]);
 const STAFF_DOCUMENT_STATUS_LABELS = {
     0: "Cho duyet",
     1: "Khong dat",
@@ -237,7 +235,7 @@ export async function createStaff(payload, file) {
     const accountType = ROLE_TO_ACCOUNT_TYPE[role];
 
     if (!accountType) {
-        throw new AppError("Role must be one of admin, dispatcher or biller.", 422, "INVALID_ROLE");
+        throw new AppError("Role must be one of admin or dispatcher.", 422, "INVALID_ROLE");
     }
 
     const email = normalizeEmail(payload.email);
@@ -415,7 +413,7 @@ export async function updateStaffPersonalInformation(userIdInput, payload, file)
     const accountType = ROLE_TO_ACCOUNT_TYPE[role];
 
     if (!accountType) {
-        throw new AppError("Role must be one of admin, dispatcher or biller.", 422, "INVALID_ROLE");
+        throw new AppError("Role must be one of admin or dispatcher.", 422, "INVALID_ROLE");
     }
 
     const email = normalizeEmail(payload.email);

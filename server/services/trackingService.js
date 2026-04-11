@@ -8,6 +8,7 @@ import {
     updateDriverTravelRouteRecord,
     upsertDriverCurrentLocation,
 } from "../repositories/trackingRepository.js";
+import { emitDriverLocationFromDriver } from "./customer/realtimeService.js";
 
 function ensureCoordinates(lat, long) {
     const latNum = Number(lat);
@@ -57,8 +58,14 @@ export async function updateMyDriverLocation({ auth, payload }) {
         loc_static_duration: Number.isFinite(staticDuration) ? staticDuration : null,
     });
 
+    const location = await getDriverCurrentLocation(Number(auth.userId));
+    await emitDriverLocationFromDriver({
+        driverId: Number(auth.userId),
+        location,
+    });
+
     return {
-        location: await getDriverCurrentLocation(Number(auth.userId)),
+        location,
     };
 }
 
@@ -191,4 +198,3 @@ export async function getDriverRouteService({ bookingId, auth }) {
         route,
     };
 }
-

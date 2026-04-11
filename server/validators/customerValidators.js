@@ -248,6 +248,34 @@ export const updateCustomerAccountStateValidator = [
     }),
 ];
 
+export const updateCustomerActivationStateValidator = [
+    param("userId")
+        .isInt({ min: 1 })
+        .withMessage("userId must be a positive integer")
+        .toInt(),
+    body("user_id")
+        .optional({ values: "falsy" })
+        .isInt({ min: 1 })
+        .withMessage("user_id must be a positive integer")
+        .toInt(),
+    body("is_activated")
+        .customSanitizer(normalizeBooleanLike)
+        .custom((value) => isBooleanFlag(value))
+        .withMessage("is_activated must be 0 or 1"),
+    body().custom((value, { req }) => {
+        if (
+            req.body.user_id !== undefined &&
+            req.body.user_id !== null &&
+            req.body.user_id !== "" &&
+            Number(req.body.user_id) !== Number(req.params.userId)
+        ) {
+            throw new Error("user_id must match the requested customer");
+        }
+
+        return true;
+    }),
+];
+
 export const updateCustomerPersonalInfoValidator = [
     param("userId")
         .isInt({ min: 1 })

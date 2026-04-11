@@ -8,7 +8,9 @@ import {
     listAllSubmissionsHandler,
     listDocumentDefinitionsHandler,
     listMySubmissionsHandler,
+    listVehicleSubmissionsHandler,
     reviewSubmissionHandler,
+    reviewVehicleSubmissionHandler,
     submitMyDocumentHandler,
     updateDocumentDefinitionHandler,
     updateMySubmissionHandler,
@@ -18,7 +20,9 @@ import {
     deleteDocumentDefinitionValidator,
     listAllSubmissionsValidator,
     listDocumentDefinitionsValidator,
+    listVehicleSubmissionsValidator,
     reviewSubmissionValidator,
+    reviewVehicleSubmissionValidator,
     submitMyDocumentValidator,
     updateDocumentDefinitionValidator,
     updateMySubmissionValidator,
@@ -91,5 +95,21 @@ router.patch(
     reviewSubmissionHandler
 );
 
-export default router;
+router.get(
+    "/api/documents/vehicle-submissions",
+    requireAuth,
+    requireRole("admin"),
+    listVehicleSubmissionsValidator,
+    validateRequest,
+    listVehicleSubmissionsHandler
+);
+router.patch(
+    "/api/documents/vehicle-submissions/:submissionId/review",
+    requireAuth,
+    requireRole("admin"),
+    reviewVehicleSubmissionValidator,
+    validateRequest,
+    reviewVehicleSubmissionHandler
+);
 
+export default router;

@@ -26,7 +26,7 @@ const router = Router();
 router.get(
     "/api/staff/me/detail",
     requireAuth,
-    requireRole("admin", "dispatcher", "biller"),
+    requireRole("admin", "dispatcher"),
     getMyStaffProfileDetailHandler
 );
 

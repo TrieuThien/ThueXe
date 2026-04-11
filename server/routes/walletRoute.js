@@ -81,13 +81,13 @@ router.post(
 router.get(
     "/api/wallets/admin/overview",
     requireAuth,
-    requireRole("admin", "biller"),
+    requireRole("admin"),
     adminWalletOverviewHandler
 );
 router.get(
     "/api/wallets/admin/accounts",
     requireAuth,
-    requireRole("admin", "biller"),
+    requireRole("admin"),
     adminWalletAccountsValidator,
     validateRequest,
     adminListWalletAccountsHandler
@@ -95,7 +95,7 @@ router.get(
 router.get(
     "/api/wallets/admin/transactions",
     requireAuth,
-    requireRole("admin", "biller"),
+    requireRole("admin"),
     adminWalletLedgerValidator,
     validateRequest,
     adminListWalletLedgerHandler
@@ -103,7 +103,7 @@ router.get(
 router.post(
     "/api/wallets/admin/adjustments",
     requireAuth,
-    requireRole("admin", "biller"),
+    requireRole("admin"),
     adminAdjustWalletValidator,
     validateRequest,
     adminAdjustWalletHandler
@@ -111,11 +111,10 @@ router.post(
 router.patch(
     "/api/wallets/admin/withdrawals/:withdrawalId",
     requireAuth,
-    requireRole("admin", "biller"),
+    requireRole("admin"),
     adminProcessWithdrawalValidator,
     validateRequest,
     adminProcessWithdrawalHandler
 );
 
 export default router;
-

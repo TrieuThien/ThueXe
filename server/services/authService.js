@@ -38,7 +38,6 @@ import { sendPasswordResetEmail } from "./emailService.js";
 const STAFF_ROLE_TO_ACCOUNT_TYPE = {
     [ROLES.DISPATCHER]: 2,
     [ROLES.ADMIN]: 3,
-    [ROLES.BILLER]: 5,
 };
 
 function normalizeEmail(email) {
@@ -204,7 +203,7 @@ export async function createStaffByAdmin(payload) {
 
     if (!accountType) {
         throw new AppError(
-            "Role must be one of admin, dispatcher or biller.",
+            "Role must be one of admin or dispatcher.",
             422,
             "INVALID_ROLE"
         );

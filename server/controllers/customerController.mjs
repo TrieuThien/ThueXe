@@ -3,6 +3,7 @@ import {
     getCustomerDetail,
     getCustomerList,
     getCustomerSummary,
+    updateCustomerActivationState,
     updateCustomerAccountState,
     updateCustomerPersonalInformation,
 } from "../services/customerService.js";
@@ -48,6 +49,15 @@ export async function updateCustomerAccountStateHandler(req, res, next) {
     try {
         const result = await updateCustomerAccountState(req.params.userId, req.body);
         return successResponse(res, result, "Customer account status updated successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function updateCustomerActivationStateHandler(req, res, next) {
+    try {
+        const result = await updateCustomerActivationState(req.params.userId, req.body);
+        return successResponse(res, result, "Customer account activation status updated successfully");
     } catch (error) {
         return next(error);
     }

@@ -4,8 +4,10 @@ import {
     deleteDocumentDefinitionService,
     getDocumentDefinitions,
     listAllDocumentSubmissionsService,
+    listVehicleDocumentSubmissionsService,
     listMyDocumentSubmissions,
     reviewDocumentSubmission,
+    reviewVehicleDocumentSubmissionService,
     submitMyDocument,
     updateDocumentDefinitionService,
     updateMySubmission,
@@ -103,3 +105,23 @@ export async function reviewSubmissionHandler(req, res, next) {
     }
 }
 
+export async function listVehicleSubmissionsHandler(req, res, next) {
+    try {
+        const result = await listVehicleDocumentSubmissionsService({ query: req.query });
+        return successResponse(res, result, "Vehicle document submissions fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function reviewVehicleSubmissionHandler(req, res, next) {
+    try {
+        const result = await reviewVehicleDocumentSubmissionService({
+            submissionId: req.params.submissionId,
+            payload: req.body,
+        });
+        return successResponse(res, result, "Vehicle document submission reviewed successfully");
+    } catch (error) {
+        return next(error);
+    }
+}

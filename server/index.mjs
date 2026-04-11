@@ -36,6 +36,7 @@ const allowedOrigins = [
   "http://localhost:8081", // iOS simulator
   "http://10.0.2.2:8081", // Android emulator
   "http://10.0.2.2:8000", // Android emulator direct access
+  "http://0.0.0.0:8000", // Android emulator alternative
 ].filter(Boolean); // Remove any undefined values
 
 const allowedOriginSet = new Set(allowedOrigins);
@@ -70,7 +71,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const routesPath = path.resolve(__dirname, "./routes");
-const routeFiles = readdirSync(routesPath);
+const routeFiles = readdirSync(routesPath, { withFileTypes: true })
+  .filter((entry) => entry.isFile() && [".js", ".mjs"].includes(path.extname(entry.name)))
+  .map((entry) => entry.name);
+
 for (const file of routeFiles) {
   const routeModule = await import(`./routes/${file}`);
   app.use("/", routeModule.default);

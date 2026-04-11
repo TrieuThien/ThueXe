@@ -90,6 +90,7 @@ function mapCustomerAccountRow(row) {
         email: row.email,
         phone: row.phone,
         account_active: Number(row.account_active || 0),
+        is_activated: Number(row.is_activated || 0),
         photo_file: row.photo_file || null,
     };
 }
@@ -436,7 +437,7 @@ export async function summarizeCustomers(filters) {
 export async function findCustomerAccountById(userId) {
     const [rows] = await sqldb.query(
         `
-            SELECT user_id, email, phone, account_active, photo_file
+            SELECT user_id, email, phone, account_active, is_activated, photo_file
             FROM users
             WHERE user_id = ? AND account_type = ?
             LIMIT 1
@@ -457,6 +458,21 @@ export async function updateCustomerAccountStatus({ userId, accountActive }, con
             LIMIT 1
         `,
         [accountActive, userId, CUSTOMER_ACCOUNT_TYPE]
+    );
+
+    return result.affectedRows === 1;
+}
+
+export async function updateCustomerActivationStatus({ userId, isActivated }, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `
+            UPDATE users
+            SET is_activated = ?
+            WHERE user_id = ? AND account_type = ?
+            LIMIT 1
+        `,
+        [isActivated, userId, CUSTOMER_ACCOUNT_TYPE]
     );
 
     return result.affectedRows === 1;

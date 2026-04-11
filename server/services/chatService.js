@@ -32,7 +32,7 @@ export async function getBookingChatsService({ bookingId, auth, query }) {
         throw new AppError("Booking not found.", 404, "BOOKING_NOT_FOUND");
     }
 
-    const isAdminStaff = ["admin", "dispatcher", "biller"].includes(auth.role);
+    const isAdminStaff = ["admin", "dispatcher"].includes(auth.role);
     const isPassenger = auth.role === "passenger" && Number(auth.userId) === booking.user_id;
     const isDriver = auth.role === "driver" && Number(auth.userId) === booking.driver_id;
 
@@ -161,4 +161,3 @@ export async function sendSupportChatService({ auth, payload }) {
         chat: messages.find((item) => item.id === chatId) || null,
     };
 }
-

@@ -4,12 +4,15 @@ import {
     createSubmission,
     deleteDocumentDefinition,
     findDocumentDefinitionById,
+    findVehicleSubmissionById,
     findSubmissionByActorAndDocument,
     findSubmissionById,
     listAllSubmissions,
     listDocumentDefinitions,
     listMySubmissions,
+    listVehicleSubmissions,
     setSubmissionVerification,
+    updateVehicleSubmissionReview,
     updateDocumentDefinition,
     updateSubmission,
 } from "../repositories/documentRepository.js";
@@ -62,13 +65,31 @@ function validateSubmissionByDefinition(definition, data) {
     }
 }
 
+function parsePositiveIntQuery(value, { fieldName, errorCode }) {
+    if (value === undefined || value === null || value === "") {
+        return undefined;
+    }
+    const numeric = Number(value);
+    if (!Number.isInteger(numeric) || numeric < 1) {
+        throw new AppError(`${fieldName} must be a positive integer.`, 422, errorCode);
+    }
+    return numeric;
+}
+
 export async function getDocumentDefinitions({ query }) {
+    const id = parsePositiveIntQuery(query.id, { fieldName: "id", errorCode: "INVALID_DOCUMENT_ID_QUERY" });
+    const aliasDocumentId = parsePositiveIntQuery(query.document_id, {
+        fieldName: "document_id",
+        errorCode: "INVALID_DOCUMENT_ID_QUERY",
+    });
     const status = query.status === undefined || query.status === "" ? undefined : Number(query.status);
     const docUser = query.doc_user === undefined || query.doc_user === "" ? undefined : Number(query.doc_user);
     const docType = query.doc_type === undefined || query.doc_type === "" ? undefined : Number(query.doc_type);
     const docCity = query.doc_city === undefined || query.doc_city === "" ? undefined : Number(query.doc_city);
+    // Backward compatibility: id and document_id are aliases for the same document key, so combine with OR.
+    const documentIds = Array.from(new Set([id, aliasDocumentId].filter((item) => item !== undefined)));
     return {
-        items: await listDocumentDefinitions({ status, docUser, docType, docCity }),
+        items: await listDocumentDefinitions({ status, docUser, docType, docCity, documentIds }),
     };
 }
 
@@ -190,11 +211,19 @@ export async function updateMySubmission({ auth, submissionId, payload }) {
 export async function listAllDocumentSubmissionsService({ query }) {
     const actorType = query.actor_type ? String(query.actor_type).trim() : undefined;
     const verified = query.verified === undefined || query.verified === "" ? undefined : Number(query.verified);
+    const submissionId = parsePositiveIntQuery(query.id, {
+        fieldName: "id",
+        errorCode: "INVALID_SUBMISSION_ID_QUERY",
+    });
+    const documentId = parsePositiveIntQuery(query.document_id, {
+        fieldName: "document_id",
+        errorCode: "INVALID_DOCUMENT_ID_QUERY",
+    });
     if (actorType && !["user", "driver"].includes(actorType)) {
         throw new AppError("actor_type must be user or driver.", 422, "INVALID_ACTOR_TYPE");
     }
     return {
-        items: await listAllSubmissions({ actorType, verified }),
+        items: await listAllSubmissions({ actorType, verified, submissionId, documentId }),
     };
 }
 
@@ -238,3 +267,86 @@ export async function reviewDocumentSubmission({ actorType, submissionId, payloa
     };
 }
 
+export async function listVehicleDocumentSubmissionsService({ query }) {
+    const submissionId = parsePositiveIntQuery(query.id, {
+        fieldName: "id",
+        errorCode: "INVALID_VEHICLE_SUBMISSION_ID_QUERY",
+    });
+    const documentId = parsePositiveIntQuery(query.document_id, {
+        fieldName: "document_id",
+        errorCode: "INVALID_DOCUMENT_ID_QUERY",
+    });
+    const vehicleId = parsePositiveIntQuery(query.vehicle_id, {
+        fieldName: "vehicle_id",
+        errorCode: "INVALID_VEHICLE_ID_QUERY",
+    });
+    const ownerId = parsePositiveIntQuery(query.owner_id, {
+        fieldName: "owner_id",
+        errorCode: "INVALID_OWNER_ID_QUERY",
+    });
+    const verified = query.verified === undefined || query.verified === "" ? undefined : Number(query.verified);
+    const status = query.status === undefined || query.status === "" ? undefined : String(query.status).trim().toLowerCase();
+    const docCity = parsePositiveIntQuery(query.doc_city, {
+        fieldName: "doc_city",
+        errorCode: "INVALID_DOC_CITY_QUERY",
+    });
+
+    if (verified !== undefined && ![0, 1].includes(verified)) {
+        throw new AppError("verified must be 0 or 1.", 422, "INVALID_VERIFIED_QUERY");
+    }
+
+    const allowedStatuses = ["missing", "pending", "verified", "rejected", "expired"];
+    if (status !== undefined && !allowedStatuses.includes(status)) {
+        throw new AppError(
+            `status must be one of ${allowedStatuses.join("|")}.`,
+            422,
+            "INVALID_VEHICLE_SUBMISSION_STATUS"
+        );
+    }
+
+    return {
+        items: await listVehicleSubmissions({
+            submissionId,
+            documentId,
+            vehicleId,
+            ownerId,
+            verified,
+            status,
+            docCity,
+        }),
+    };
+}
+
+export async function reviewVehicleDocumentSubmissionService({ submissionId, payload }) {
+    const numericSubmissionId = Number(submissionId);
+    if (!Number.isInteger(numericSubmissionId) || numericSubmissionId < 1) {
+        throw new AppError("Invalid submission id.", 422, "INVALID_VEHICLE_SUBMISSION_ID");
+    }
+
+    const reviewStatus = String(payload.status || "").trim().toLowerCase();
+    if (!["approved", "rejected", "expired"].includes(reviewStatus)) {
+        throw new AppError("status must be approved/rejected/expired.", 422, "INVALID_REVIEW_STATUS");
+    }
+
+    const existing = await findVehicleSubmissionById(numericSubmissionId);
+    if (!existing) {
+        throw new AppError("Vehicle submission not found.", 404, "VEHICLE_SUBMISSION_NOT_FOUND");
+    }
+
+    const mappedStatus = reviewStatus === "approved" ? "verified" : reviewStatus;
+    const mappedVerified = reviewStatus === "approved" ? 1 : 0;
+    const reviewNote =
+        payload.review_note === undefined || payload.review_note === null ? null : String(payload.review_note).trim();
+
+    await updateVehicleSubmissionReview({
+        submissionId: numericSubmissionId,
+        verified: mappedVerified,
+        status: mappedStatus,
+        reviewNote,
+    });
+
+    return {
+        submission: await findVehicleSubmissionById(numericSubmissionId),
+        review_status: reviewStatus,
+    };
+}

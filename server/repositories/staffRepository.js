@@ -1,6 +1,6 @@
 import sqldb from "../config/sqldatabase.js";
 
-const STAFF_ACCOUNT_TYPES = [2, 3, 5];
+const STAFF_ACCOUNT_TYPES = [2, 3];
 const STAFF_WALLET_ACTOR_TYPE = 3;
 
 const STAFF_WALLET_AGGREGATE_JOIN = `
@@ -341,8 +341,7 @@ export async function summarizeStaff(filters) {
                 COUNT(*) AS total_staff,
                 SUM(CASE WHEN DATE(base.last_login_date) = CURDATE() THEN 1 ELSE 0 END) AS active_today_staff,
                 SUM(CASE WHEN base.account_type = 2 THEN 1 ELSE 0 END) AS dispatcher_count,
-                SUM(CASE WHEN base.account_type = 3 THEN 1 ELSE 0 END) AS admin_count,
-                SUM(CASE WHEN base.account_type = 5 THEN 1 ELSE 0 END) AS biller_count
+                SUM(CASE WHEN base.account_type = 3 THEN 1 ELSE 0 END) AS admin_count
             FROM (
                 SELECT u.user_id, u.account_type, u.last_login_date
                 FROM users u
@@ -361,7 +360,6 @@ export async function summarizeStaff(filters) {
         roleSummary: {
             dispatcher: Number(row.dispatcher_count || 0),
             admin: Number(row.admin_count || 0),
-            biller: Number(row.biller_count || 0),
         },
     };
 }

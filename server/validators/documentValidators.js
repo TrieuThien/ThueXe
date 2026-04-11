@@ -1,6 +1,8 @@
 import { body, param, query } from "express-validator";
 
 export const listDocumentDefinitionsValidator = [
+    query("id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("id must be a positive integer").toInt(),
+    query("document_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("document_id must be a positive integer").toInt(),
     query("status").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("status must be 0 or 1").toInt(),
     query("doc_user").optional({ values: "falsy" }).isIn([0, 1, 2, "0", "1", "2"]).withMessage("doc_user must be 0,1,2").toInt(),
     query("doc_type").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("doc_type must be 0 or 1").toInt(),
@@ -42,6 +44,8 @@ export const updateMySubmissionValidator = [
 ];
 
 export const listAllSubmissionsValidator = [
+    query("id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("id must be a positive integer").toInt(),
+    query("document_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("document_id must be a positive integer").toInt(),
     query("actor_type").optional({ values: "falsy" }).isIn(["user", "driver"]).withMessage("actor_type must be user or driver"),
     query("verified").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("verified must be 0 or 1").toInt(),
 ];
@@ -52,3 +56,26 @@ export const reviewSubmissionValidator = [
     body("status").isIn(["approved", "rejected", "expired"]).withMessage("status must be approved/rejected/expired"),
 ];
 
+export const listVehicleSubmissionsValidator = [
+    query("id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("id must be a positive integer").toInt(),
+    query("document_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("document_id must be a positive integer").toInt(),
+    query("vehicle_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("vehicle_id must be a positive integer").toInt(),
+    query("owner_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("owner_id must be a positive integer").toInt(),
+    query("verified").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("verified must be 0 or 1").toInt(),
+    query("status")
+        .optional({ values: "falsy" })
+        .isIn(["missing", "pending", "verified", "rejected", "expired"])
+        .withMessage("status must be missing|pending|verified|rejected|expired"),
+    query("doc_city").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("doc_city must be a positive integer").toInt(),
+];
+
+export const reviewVehicleSubmissionValidator = [
+    param("submissionId").isInt({ min: 1 }).withMessage("submissionId must be a positive integer").toInt(),
+    body("status").isIn(["approved", "rejected", "expired"]).withMessage("status must be approved/rejected/expired"),
+    body("review_note")
+        .optional({ values: "falsy" })
+        .isString()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("review_note must not exceed 255 characters"),
+];

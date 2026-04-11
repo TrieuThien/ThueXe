@@ -250,7 +250,7 @@ export async function listOwnerRequiredDocuments() {
     const [rows] = await sqldb.query(
         `SELECT id, title, doc_desc, doc_expiry, doc_id_num, doc_id_num_title
          FROM documents
-         WHERE status = 1 AND doc_user = 2
+         WHERE status = 1 AND doc_user = 2 AND doc_type = 0
          ORDER BY id ASC`
     );
     return rows;

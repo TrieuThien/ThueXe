@@ -33,11 +33,10 @@ router.get(
 router.get(
     "/api/reports/operations",
     requireAuth,
-    requireRole("admin", "dispatcher", "biller"),
+    requireRole("admin", "dispatcher"),
     operationsReportValidator,
     validateRequest,
     operationsReportHandler
 );
 
 export default router;
-

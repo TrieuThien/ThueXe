@@ -8,7 +8,7 @@ const ACTOR_TYPE_TO_TABLE = {
     0: { table: "users", idColumn: "user_id", nameExpr: "CONCAT(COALESCE(firstname,''), ' ', COALESCE(lastname,''))" },
     1: { table: "drivers", idColumn: "driver_id", nameExpr: "CONCAT(COALESCE(firstname,''), ' ', COALESCE(lastname,''))" },
     2: { table: "vehicle_owners", idColumn: "owner_id", nameExpr: "fullname" },
-    3: { table: "staffs", idColumn: "id", nameExpr: "fullname" },
+    3: { table: "users", idColumn: "user_id", nameExpr: "CONCAT(COALESCE(firstname,''), ' ', COALESCE(lastname,''))" },
 };
 
 export async function findDefaultCurrencyId() {
@@ -322,9 +322,9 @@ export async function listWalletAccounts(filters = {}) {
     if (filters.search) {
         const keyword = `%${filters.search}%`;
         whereClauses.push(
-            `(CAST(wa.actor_id AS CHAR) LIKE ? OR CAST(wa.wallet_id AS CHAR) LIKE ? OR u.phone LIKE ? OR d.phone LIKE ? OR vo.phone LIKE ?)`
+            `(CAST(wa.actor_id AS CHAR) LIKE ? OR CAST(wa.wallet_id AS CHAR) LIKE ? OR u.phone LIKE ? OR d.phone LIKE ? OR vo.phone LIKE ? OR su.phone LIKE ?)`
         );
-        params.push(keyword, keyword, keyword, keyword, keyword);
+        params.push(keyword, keyword, keyword, keyword, keyword, keyword);
     }
 
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
@@ -342,13 +342,14 @@ export async function listWalletAccounts(filters = {}) {
             d.phone AS driver_phone,
             vo.fullname AS owner_name,
             vo.phone AS owner_phone,
-            st.fullname AS staff_name
+            NULLIF(TRIM(CONCAT(COALESCE(su.firstname,''), ' ', COALESCE(su.lastname,''))), '') AS staff_name,
+            su.phone AS staff_phone
          FROM wallet_accounts wa
          LEFT JOIN currencies c ON c.id = wa.currency_id
          LEFT JOIN users u ON wa.actor_type = 0 AND u.user_id = wa.actor_id
          LEFT JOIN drivers d ON wa.actor_type = 1 AND d.driver_id = wa.actor_id
          LEFT JOIN vehicle_owners vo ON wa.actor_type = 2 AND vo.owner_id = wa.actor_id
-         LEFT JOIN staffs st ON wa.actor_type = 3 AND st.id = wa.actor_id
+         LEFT JOIN users su ON wa.actor_type = 3 AND su.user_id = wa.actor_id AND su.account_type IN (2, 3)
          ${whereSql}
          ORDER BY wa.wallet_id DESC
          LIMIT ? OFFSET ?`,
@@ -361,6 +362,7 @@ export async function listWalletAccounts(filters = {}) {
          LEFT JOIN users u ON wa.actor_type = 0 AND u.user_id = wa.actor_id
          LEFT JOIN drivers d ON wa.actor_type = 1 AND d.driver_id = wa.actor_id
          LEFT JOIN vehicle_owners vo ON wa.actor_type = 2 AND vo.owner_id = wa.actor_id
+         LEFT JOIN users su ON wa.actor_type = 3 AND su.user_id = wa.actor_id AND su.account_type IN (2, 3)
          ${whereSql}`,
         params
     );
@@ -377,7 +379,7 @@ export async function listWalletAccounts(filters = {}) {
             status: Number(row.status || 0),
             created_at: row.created_at,
             actor_name: row.user_name || row.driver_name || row.owner_name || row.staff_name || null,
-            actor_phone: row.user_phone || row.driver_phone || row.owner_phone || null,
+            actor_phone: row.user_phone || row.driver_phone || row.owner_phone || row.staff_phone || null,
         })),
         totalItems: Number(countRows[0]?.total_items || 0),
         page,

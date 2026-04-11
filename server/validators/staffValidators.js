@@ -3,7 +3,7 @@ import { body, param, query } from "express-validator";
 const internationalPhoneRegex = /^\+\d{8,15}$/;
 const countryCodeRegex = /^[a-z]{2}$/i;
 const countryDialCodeRegex = /^\+\d{1,4}$/;
-const allowedRoles = ["admin", "dispatcher", "biller"];
+const allowedRoles = ["admin", "dispatcher"];
 const allowedSortBy = [
     "account_create_date",
     "firstname",

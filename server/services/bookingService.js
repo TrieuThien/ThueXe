@@ -36,6 +36,7 @@ import {
     rememberIdempotentResponse,
     rememberInflightPromise,
 } from "../utils/idempotencyCache.js";
+import { emitBookingStatusUpdated } from "./customer/realtimeService.js";
 
 const BOOKING_STATUS = {
     PENDING: 0,
@@ -729,6 +730,12 @@ export function createBookingService(overrides = {}) {
                 });
 
                 return detailAfterUpdate;
+            });
+
+            await emitBookingStatusUpdated({
+                bookingId: numericBookingId,
+                status: numericStatus,
+                userId: Number(detail.booking.user_id),
             });
 
             return { booking: serializeBooking(detail.booking) };

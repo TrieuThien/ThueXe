@@ -16,6 +16,7 @@ import {
     referalCodeExists,
     routeExists,
     summarizeCustomers,
+    updateCustomerActivationStatus as persistCustomerActivationStatus,
     updateCustomerAccountStatus as persistCustomerAccountStatus,
     updateCustomerPersonalInfo as persistCustomerPersonalInfo,
 } from "../repositories/customerRepository.js";
@@ -579,6 +580,48 @@ export async function updateCustomerAccountState(userIdInput, payload) {
     return {
         customer: serializeCustomer(updatedCustomer),
         action: accountActive === 1 ? "unlocked" : "locked",
+    };
+}
+
+export async function updateCustomerActivationState(userIdInput, payload) {
+    const userId = normalizeCustomerIdOrThrow(userIdInput);
+    const payloadUserId =
+        payload.user_id === undefined || payload.user_id === null || payload.user_id === ""
+            ? null
+            : normalizeCustomerIdOrThrow(payload.user_id);
+    const isActivated = normalizeStrictBooleanFlag(payload.is_activated);
+
+    if (payloadUserId !== null && payloadUserId !== userId) {
+        throw new AppError("user_id does not match the requested customer.", 422, "CUSTOMER_ID_MISMATCH");
+    }
+
+    if (![0, 1].includes(isActivated)) {
+        throw new AppError("is_activated must be 0 or 1.", 422, "INVALID_ACTIVATION_STATUS");
+    }
+
+    const customerAccount = await findCustomerAccountById(userId);
+
+    if (!customerAccount) {
+        throw new AppError("Customer not found.", 404, "CUSTOMER_NOT_FOUND");
+    }
+
+    if (customerAccount.is_activated === isActivated) {
+        throw new AppError(
+            isActivated === 1
+                ? "Customer account is already activated."
+                : "Customer account is already not activated.",
+            409,
+            "INVALID_ACTIVATION_STATE_CHANGE"
+        );
+    }
+
+    await persistCustomerActivationStatus({ userId, isActivated });
+
+    const updatedCustomer = await findCustomerById(userId);
+
+    return {
+        customer: serializeCustomer(updatedCustomer),
+        action: isActivated === 1 ? "activated" : "deactivated",
     };
 }
 
