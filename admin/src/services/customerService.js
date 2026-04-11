@@ -84,8 +84,18 @@ export async function updateCustomerAccountStatus(userId, payload) {
         throw new Error(`Invalid customer userId: ${userId}`);
     }
 
-    console.log("Updating account status for userId:", normalizedUserId, "with payload:", payload);
     const response = await apiClient.patch(`/api/customers/${normalizedUserId}/account-status`, payload);
+    return extractPayload(response);
+}
+
+export async function updateCustomerActivationStatus(userId, payload) {
+    const normalizedUserId = Number(userId);
+
+    if (!Number.isInteger(normalizedUserId) || normalizedUserId < 1) {
+        throw new Error(`Invalid customer userId: ${userId}`);
+    }
+
+    const response = await apiClient.patch(`/api/customers/${normalizedUserId}/activation-status`, payload);
     return extractPayload(response);
 }
 

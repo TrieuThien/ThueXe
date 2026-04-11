@@ -16,8 +16,28 @@ const apiClient = axios.create({
     },
 });
 
+let isRedirectingToLogin = false;
+
+function handleUnauthorizedAccess() {
+    clearAccessToken();
+
+    if (typeof window === "undefined" || isRedirectingToLogin) {
+        return;
+    }
+
+    const pathname = window.location.pathname || "";
+    const isProtectedRoute =
+        pathname.startsWith("/admin") || pathname.startsWith("/dispatcher");
+
+    if (!isProtectedRoute) {
+        return;
+    }
+
+    isRedirectingToLogin = true;
+    window.location.replace("/login");
+}
+
 // Auto add Authorization header to requests if access token is available
-// Tự động thêm header Authorization vào các request nếu access token có sẵn
 apiClient.interceptors.request.use((config) => {
     const token = getAccessToken();
 
@@ -29,7 +49,6 @@ apiClient.interceptors.request.use((config) => {
 });
 
 // Auto refresh access token on 401 responses and retry the original request
-// Tự động refresh access token khi nhận được response 401 và thử lại request ban đầu
 apiClient.interceptors.response.use(
     (response) => response,
     async (error) => {
@@ -39,8 +58,8 @@ apiClient.interceptors.response.use(
         const isRefreshRequest = requestUrl.includes("/api/auth/refresh-token");
         const isLoginRequest = requestUrl.includes("/api/auth/login");
 
-        // Only attempt refresh if we get a 401, haven't already tried to refresh, and it's not an auth-related request
-        // Chỉ cố gắng refresh nếu nhận được 401, chưa thử refresh trước đó, và không phải là request liên quan đến auth
+        // Only attempt refresh if we get a 401, haven't already tried to refresh,
+        // and it's not an auth-related request.
         if (
             status === 401 &&
             originalRequest &&
@@ -54,9 +73,13 @@ apiClient.interceptors.response.use(
                 await refreshAccessToken();
                 return apiClient(originalRequest);
             } catch (refreshError) {
-                clearAccessToken();
+                handleUnauthorizedAccess();
                 throw refreshError;
             }
+        }
+
+        if (status === 401 && !isLoginRequest) {
+            handleUnauthorizedAccess();
         }
 
         throw error;

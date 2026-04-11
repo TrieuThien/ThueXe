@@ -5,6 +5,7 @@ import { COUNTRIES, DEFAULT_COUNTRY_CODE, findCountryByCode } from "../../data/c
 import {
     getCustomerDetail,
     getRoutes,
+    updateCustomerActivationStatus,
     updateCustomerPersonalInfo,
 } from "../../services/customerService";
 import {
@@ -20,6 +21,7 @@ const initialForm = {
     lastname: "",
     route_id: "",
     account_active: "1",
+    is_activated: "0",
     country_code: DEFAULT_COUNTRY_CODE,
     phone: "",
     email: "",
@@ -107,6 +109,7 @@ export default function EditCustomer() {
                 lastname: nextCustomer?.lastname || "",
                 route_id: nextCustomer?.route_id ? String(nextCustomer.route_id) : "",
                 account_active: String(Number(nextCustomer?.account_active) === 1 ? 1 : 0),
+                is_activated: String(Number(nextCustomer?.is_activated) === 1 ? 1 : 0),
                 country_code: nextCountry.code,
                 phone: normalizeNationalPhoneNumber(nextCustomer?.phone, nextCountry),
                 email: nextCustomer?.email || "",
@@ -153,7 +156,15 @@ export default function EditCustomer() {
 
         try {
             const response = await updateCustomerPersonalInfo(userId, buildPersonalInfoFormData(form));
-            const updatedCustomer = response?.customer || null;
+            const shouldUpdateActivation =
+                Number(customer?.is_activated) !== Number(form.is_activated);
+            const activationResponse = shouldUpdateActivation
+                ? await updateCustomerActivationStatus(userId, {
+                    user_id: Number(userId),
+                    is_activated: Number(form.is_activated) === 1 ? 1 : 0,
+                })
+                : null;
+            const updatedCustomer = activationResponse?.customer || response?.customer || null;
             const updatedCountry = findCountryByCode(
                 updatedCustomer?.country_code || form.country_code || DEFAULT_COUNTRY_CODE
             );
@@ -165,6 +176,7 @@ export default function EditCustomer() {
                 lastname: updatedCustomer?.lastname || prev.lastname,
                 route_id: updatedCustomer?.route_id ? String(updatedCustomer.route_id) : "",
                 account_active: String(Number(updatedCustomer?.account_active) === 1 ? 1 : 0),
+                is_activated: String(Number(updatedCustomer?.is_activated) === 1 ? 1 : 0),
                 country_code: updatedCountry.code,
                 phone: normalizeNationalPhoneNumber(updatedCustomer?.phone, updatedCountry),
                 email: updatedCustomer?.email || prev.email,
@@ -315,6 +327,23 @@ export default function EditCustomer() {
                                 </select>
                                 {errors.account_active ? (
                                     <p className="mt-2 text-sm text-red-600">{errors.account_active}</p>
+                                ) : null}
+                            </div>
+
+                            <div>
+                                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                                    Trang thai kich hoat
+                                </label>
+                                <select
+                                    value={form.is_activated}
+                                    onChange={(event) => updateField("is_activated", event.target.value)}
+                                    className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-cyan-500"
+                                >
+                                    <option value="1">Da kich hoat</option>
+                                    <option value="0">Chua kich hoat</option>
+                                </select>
+                                {errors.is_activated ? (
+                                    <p className="mt-2 text-sm text-red-600">{errors.is_activated}</p>
                                 ) : null}
                             </div>
                         </div>

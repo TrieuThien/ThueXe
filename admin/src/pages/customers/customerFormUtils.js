@@ -55,6 +55,7 @@ export function validateCustomerPersonalForm(form, options = {}) {
     const lastname = form.lastname.trim();
     const routeId = String(form.route_id || "").trim();
     const accountActive = String(form.account_active ?? "").trim();
+    const isActivated = String(form.is_activated ?? "").trim();
     const selectedCountry = findCountryByCode(form.country_code);
     const phone = normalizeNationalPhoneNumber(form.phone, selectedCountry);
     const fullPhone = buildInternationalPhoneNumber(form.phone, selectedCountry);
@@ -75,6 +76,10 @@ export function validateCustomerPersonalForm(form, options = {}) {
 
     if (!["0", "1"].includes(accountActive)) {
         errors.account_active = "Vui lòng chọn trạng thái tài khoản hợp lệ.";
+    }
+
+    if (!["0", "1"].includes(isActivated)) {
+        errors.is_activated = "Vui lòng chọn trạng thái kích hoạt hợp lệ.";
     }
 
     if (!selectedCountry) {
@@ -116,3 +121,5 @@ export function mapApiValidationErrors(details = []) {
 
     return mappedErrors;
 }
+
+

@@ -1,72 +1,119 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BadgeCheck, UserPlus, Users } from "lucide-react";
+import { Car, CircleCheckBig, RefreshCw, UserRound, Wallet } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import PageHeader from "../components/common/PageHeader";
+import StatCard from "../components/common/StatCard";
+import { getDashboardSummary } from "../services/adminService";
 
-const stats = [
-    {
-        label: "Nhân viên đang hoạt động",
-        value: "128",
-        note: "Tăng 12% so với tháng trước",
-        icon: Users,
-    },
-    {
-        label: "Yêu cầu đang xử lý",
-        value: "16",
-        note: "4 yêu cầu cần ưu tiên trong hôm nay",
-        icon: BadgeCheck,
-    },
-];
+function BarChart({ items = [] }) {
+    const maxValue = Math.max(...items.map((item) => item.value || 0), 1);
+
+    return (
+        <div className="space-y-3">
+            {items.map((item) => (
+                <div key={item.label}>
+                    <div className="mb-1 flex justify-between text-xs text-slate-500"><span>{item.label}</span><span>{item.value}</span></div>
+                    <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${Math.max(5, (item.value / maxValue) * 100)}%` }} />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+}
 
 export default function AdminDashboardPage() {
+    const { t } = useTranslation();
+    const [summary, setSummary] = useState({
+        bookings: { total: 0, completed: 0, cancelled: 0, active: 0, revenue: 0 },
+        drivers: { total: 0, online: 0 },
+        users: { total: 0, active: 0 },
+        rentals: { total: 0, completed: 0, active: 0, revenue: 0 },
+        wallets: { total_balance: 0 },
+        operations: { cancellation_rate_percent: 0 },
+        revenueSeries: [],
+        serviceBreakdown: [],
+    });
+
+    async function loadSummary() {
+        try {
+            const response = await getDashboardSummary();
+            setSummary((prev) => ({
+                ...prev,
+                ...response,
+                revenueSeries: [
+                    { label: "Booking", value: Number(response?.bookings?.revenue || 0) },
+                    { label: "Rental", value: Number(response?.rentals?.revenue || 0) },
+                    { label: "Wallet", value: Number(response?.wallets?.total_balance || 0) },
+                ],
+                serviceBreakdown: [
+                    { label: "Total", value: Number(response?.bookings?.total || 0) },
+                    { label: "Completed", value: Number(response?.bookings?.completed || 0) },
+                    { label: "Cancelled", value: Number(response?.bookings?.cancelled || 0) },
+                ],
+            }));
+        } catch {
+            setSummary((prev) => prev);
+        }
+    }
+
+    useEffect(() => {
+        loadSummary();
+    }, []);
+
+    const quickLinks = useMemo(
+        () => [
+            { to: "/admin/bookings", label: "Booking list" },
+            { to: "/admin/drivers", label: "Driver list" },
+            { to: "/admin/customers", label: "Customer list" },
+        ],
+        []
+    );
+
     return (
         <div className="space-y-6">
-            <section className="overflow-hidden rounded-[28px] bg-gradient-to-br from-slate-950 via-slate-900 to-blue-900 px-6 py-8 text-white">
-                <p className="text-sm uppercase tracking-[0.35em] text-blue-200">
-                    Admin dashboard
-                </p>
-                <h1 className="mt-3 text-3xl font-bold sm:text-4xl">
-                    Trung tâm điều phối dành cho quản trị viên
-                </h1>
-                <p className="mt-3 max-w-2xl text-sm text-slate-200 sm:text-base">
-                    Theo dõi vận hành, quản lý tài khoản nội bộ và truy cập nhanh tới
-                    các tác vụ quản trị quan trọng.
-                </p>
+            <PageHeader
+                badge={t("adminModules.dashboard.badge")}
+                title={t("adminModules.dashboard.title")}
+                description={t("adminModules.dashboard.desc")}
+                actions={
+                    <button type="button" onClick={loadSummary} className="rounded-2xl border border-white/30 px-4 py-2.5 text-sm font-semibold hover:bg-white/10">
+                        <span className="inline-flex items-center gap-2"><RefreshCw className="h-4 w-4" />{t("adminModules.refresh")}</span>
+                    </button>
+                }
+            />
 
-                <div className="mt-6 flex flex-wrap gap-3">
-                    <Link
-                        to="/admin/staff/create"
-                        className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
-                    >
-                        <UserPlus className="h-4 w-4" />
-                        Tạo tài khoản nhân viên
-                    </Link>
-                    <Link
-                        to="/admin/profile"
-                        className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
-                    >
-                        Xem hồ sơ
-                        <ArrowRight className="h-4 w-4" />
-                    </Link>
-                </div>
+            <section className="grid gap-4 xl:grid-cols-3">
+                <StatCard label="Total bookings" value={summary.bookings?.total || 0} tone="blue" icon={Car} />
+                <StatCard label="Completed trips" value={summary.bookings?.completed || 0} tone="emerald" icon={CircleCheckBig} />
+                <StatCard label="Booking revenue" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.bookings?.revenue || 0))} VND`} tone="amber" icon={Wallet} />
+                <StatCard label="Drivers online/total" value={`${summary.drivers?.online || 0}/${summary.drivers?.total || 0}`} tone="cyan" icon={UserRound} />
+                <StatCard label="Users active/total" value={`${summary.users?.active || 0}/${summary.users?.total || 0}`} tone="blue" icon={UserRound} />
+                <StatCard label="Cancel rate" value={`${Number(summary.operations?.cancellation_rate_percent || 0).toFixed(2)}%`} tone="amber" icon={CircleCheckBig} />
             </section>
 
             <section className="grid gap-4 xl:grid-cols-2">
-                {stats.map(({ icon: Icon, label, note, value }) => (
-                    <article
-                        key={label}
-                        className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
-                    >
-                        <div className="flex items-start justify-between gap-4">
-                            <div>
-                                <p className="text-sm font-medium text-slate-500">{label}</p>
-                                <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
-                            </div>
-                            <div className="rounded-2xl bg-blue-100 p-3 text-blue-700">
-                                <Icon className="h-5 w-5" />
-                            </div>
-                        </div>
-                        <p className="mt-4 text-sm text-slate-600">{note}</p>
-                    </article>
-                ))}
+                <article className="rounded-[28px] border border-slate-200 bg-white p-5">
+                    <h2 className="text-lg font-bold text-slate-900">Revenue by day/month</h2>
+                    <div className="mt-4">
+                        <BarChart items={(summary.revenueSeries || []).map((item) => ({ label: item.label || item.date || "-", value: Number(item.value || item.amount || 0) }))} />
+                    </div>
+                </article>
+
+                <article className="rounded-[28px] border border-slate-200 bg-white p-5">
+                    <h2 className="text-lg font-bold text-slate-900">Bookings by service type</h2>
+                    <div className="mt-4">
+                        <BarChart items={(summary.serviceBreakdown || []).map((item) => ({ label: item.label || item.service_type || "-", value: Number(item.value || item.count || 0) }))} />
+                    </div>
+                </article>
+            </section>
+
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5">
+                <h2 className="text-lg font-bold text-slate-900">Quick links</h2>
+                <div className="mt-3 flex flex-wrap gap-3">
+                    {quickLinks.map((item) => <Link key={item.to} to={item.to} className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">{item.label}</Link>)}
+                </div>
             </section>
         </div>
     );

@@ -70,12 +70,12 @@ export default function useGoogleRoute({
 
     const setOriginMarker = useCallback((position) => {
         const normalized = normalizeLatLng(position);
-        setMarkerPosition(originMarkerRef, normalized, "Diem don");
+        setMarkerPosition(originMarkerRef, normalized, "Điểm đón");
     }, [setMarkerPosition]);
 
     const setDestinationMarker = useCallback((position) => {
         const normalized = normalizeLatLng(position);
-        setMarkerPosition(destinationMarkerRef, normalized, "Diem den");
+        setMarkerPosition(destinationMarkerRef, normalized, "Điểm đến");
     }, [setMarkerPosition]);
 
     const drawRoute = useCallback(async (originOverride, destinationOverride) => {
@@ -264,11 +264,11 @@ export default function useGoogleRoute({
                 if (cancelled) return;
 
                 if (markerClassRef.current) {
-                    originMarkerRef.current = new markerClassRef.current({ map: mapRef.current, title: "Diem don" });
-                    destinationMarkerRef.current = new markerClassRef.current({ map: mapRef.current, title: "Diem den" });
+                    originMarkerRef.current = new markerClassRef.current({ map: mapRef.current, title: "Điểm đón" });
+                    destinationMarkerRef.current = new markerClassRef.current({ map: mapRef.current, title: "Điểm đến" });
                 } else {
-                    originMarkerRef.current = new window.google.maps.Marker({ map: mapRef.current, title: "Diem don" });
-                    destinationMarkerRef.current = new window.google.maps.Marker({ map: mapRef.current, title: "Diem den" });
+                    originMarkerRef.current = new window.google.maps.Marker({ map: mapRef.current, title: "Điểm đón" });
+                    destinationMarkerRef.current = new window.google.maps.Marker({ map: mapRef.current, title: "Điểm đến" });
                 }
 
                 setIsReady(true);

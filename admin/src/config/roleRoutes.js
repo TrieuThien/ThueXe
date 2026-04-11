@@ -1,30 +1,28 @@
-import {
-    ChevronDown,
-    FileUser,
-    LayoutDashboard,
-    MapPinned,
-    Megaphone,
-    Receipt,
-    Settings,
-    ShieldCheck,
-    TicketPercent,
-    UserRoundCog,
-    UserPlus,
-    UsersRound,
-    Wallet,
+﻿import {
+    CalendarCheck2,
     Car,
     CircleDollarSign,
-    LandPlot,
-    BookmarkCheck,
-    User,
-    CircleUserRound,
-    ScrollText,
-    MessageCircleMore,
-    SquareCheckBig,
     CirclePlus,
+    CircleUserRound,
+    FileUser,
+    LandPlot,
+    LayoutDashboard,
     List,
+    MapPinned,
+    Megaphone,
+    MessageCircleMore,
+    Receipt,
+    ScrollText,
+    Settings,
+    ShieldCheck,
+    SquareCheckBig,
+    TicketPercent,
+    User,
+    UserPlus,
+    UserRoundCog,
+    UsersRound,
+    Wallet,
     Waypoints,
-    CalendarCheck2
 } from "lucide-react";
 
 export const ROLE_BASE_PATHS = {
@@ -35,50 +33,121 @@ export const ROLE_BASE_PATHS = {
 export const DEFAULT_ROLE = "dispatcher";
 
 const SHARED_PROFILE_ITEM = {
-    label: "Thông tin cá nhân",
+    label: "Profile",
     path: "profile",
     icon: FileUser,
 };
 
 export const MENU_BY_ROLE = {
     admin: [
+        { label: "Tổng quan", path: "dashboard", icon: LayoutDashboard },
         {
-            label: "Dashboard",
-            path: "dashboard",
-            icon: LayoutDashboard,
-        },
-        {
-            label: "Quản lý xe",
+            label: "Loại xe",
             icon: Car,
             subItems: [
-                { label: "Thêm xe mới", path: "vehicle/create", icon: CirclePlus },
-                { label: "Danh sách xe", path: "vehicles", icon: List },
+                { label: "Tạo loại xe", path: "vehicle/create", icon: CirclePlus },
+                { label: "Danh sách loại xe", path: "vehicles", icon: List },
             ],
         },
         {
-            label: "Thành phố | Giá dịch vụ",
+            label: "Phí gọi xe",
             icon: CircleDollarSign,
             subItems: [
-                { label: "Thêm giá dịch vụ", path: "tariff/create", icon: CirclePlus },
-                { label: "Danh sách giá dịch vụ", path: "tariffs", icon: List },
+                { label: "Tạo phí gọi xe", path: "tariff/create", icon: CirclePlus },
+                { label: "Danh sách phí gọi xe", path: "tariffs", icon: List },
             ],
         },
         {
-            label: "Khu vực hoạt động",
+            label: "Phí gọi xe theo khu vực",
             icon: LandPlot,
             subItems: [
-                { label: "Thêm khu vực", path: "area/create", icon: CirclePlus },
-                { label: "Danh sách khu vực", path: "areas", icon: List },
+                { label: "Tạo vùng", path: "area/create", icon: CirclePlus },
+                { label: "Danh sách vùng", path: "areas", icon: List },
             ],
         },
         {
-            label: "Đặt xe",
-            icon: BookmarkCheck,
+            label: "Tạo đơn gọi xe",
+            icon: ShieldCheck,
             subItems: [
-                { label: "Tạo mới yêu cầu", path: "booking/create", icon: CirclePlus },
+                { label: "Tạo đơn gọi xe", path: "booking/create", icon: CirclePlus },
                 { label: "Điều phối", path: "booking/dispatch", icon: Waypoints },
-                { label: "Danh sách đặt xe", path: "bookings", icon: List },
-                { label: "Danh sách hẹn đặt xe", path: "scheduled-bookings", icon: CalendarCheck2 },
+                { label: "Danh sách đơn gọi xe", path: "bookings", icon: List },
+                { label: "Lên lịch", path: "scheduled-bookings", icon: CalendarCheck2 },
+            ],
+        },
+        {
+            label: "Khách hàng",
+            icon: User,
+            subItems: [
+                { label: "Thêm khách hàng", path: "customer/create", icon: CirclePlus },
+                { label: "Danh sách khách hàng", path: "customers", icon: List },
+            ],
+        },
+        {
+            label: "Chủ xe",
+            icon: UsersRound,
+            subItems: [
+                { label: "Thêm chủ xe", path: "vehicle-owner/create", icon: CirclePlus },
+                { label: "Danh sách chủ xe", path: "vehicle-owners", icon: List },
+            ],
+        },
+        {
+            label: "Tài xế",
+            icon: CircleUserRound,
+            subItems: [
+                { label: "Thêm tài xế", path: "driver/create", icon: CirclePlus },
+                { label: "Danh sách tài xế", path: "drivers", icon: List },
+            ],
+        },
+        {
+            label: "Nhân viên",
+            icon: UsersRound,
+            subItems: [
+                { label: "Thêm nhân viên", path: "staff/create", icon: UserPlus },
+                { label: "Danh sách nhân viên", path: "staff", icon: UserRoundCog },
+                { ...SHARED_PROFILE_ITEM },
+            ],
+        },
+        {
+            label: "Hồ sơ",
+            icon: ScrollText,
+            subItems: [
+                { label: "Tạo mới hồ sơ", path: "documents/definitions", icon: CirclePlus },
+                { label: "Hồ sơ khách hàng", path: "documents/users", icon: User },
+                { label: "Hồ sơ tài xế", path: "documents/drivers", icon: CircleUserRound },
+                { label: "Hồ sơ chủ xe", path: "documents/vehicle-owners", icon: UsersRound },
+                { label: "Hồ sơ phương tiện", path: "documents/vehicles", icon: Car },
+            ],
+        },
+        { label: "Theo dõi vị trí", path: "map-tracking", icon: MapPinned },
+        // { label: "Gửi thông báo", path: "send-broadcast", icon: Megaphone },
+        { label: "Mã giảm giá", path: "coupons", icon: TicketPercent },
+        { label: "Chương trình tích điểm", path: "reward-points", icon: ShieldCheck },
+        { label: "Giao dịch", path: "transactions", icon: Receipt },
+        { label: "Ví", path: "wallets", icon: Wallet },
+        { label: "Thanh toán", path: "payouts", icon: Receipt },
+        { label: "Hỗ trợ", path: "chat-support", icon: MessageCircleMore },
+        // { label: "Cài đặt", path: "settings", icon: Settings },
+        {
+            label: "Báo cáo",
+            icon: SquareCheckBig,
+            subItems: [
+                { label: "Báo cáo tài xế", path: "reports/drivers", icon: CircleUserRound },
+                { label: "Báo cáo hoạt động", path: "reports/customers", icon: User },
+                { label: "Báo cáo thanh toán", path: "reports/payments", icon: Receipt },
+            ],
+        },
+    ],
+    dispatcher: [
+        { label: "Tổng quan", path: "dashboard", icon: LayoutDashboard },
+        {
+            label: "Điều phối",
+            icon: ShieldCheck,
+            subItems: [
+                { label: "Tạo đơn gọi xe", path: "booking/create", icon: CirclePlus },
+                { label: "Điều phối", path: "booking/dispatch", icon: Waypoints },
+                { label: "Danh sách đơn gọi xe", path: "bookings", icon: List },
+                { label: "Lên lịch", path: "scheduled-bookings", icon: CalendarCheck2 },
             ],
         },
         {
@@ -92,84 +161,20 @@ export const MENU_BY_ROLE = {
         {
             label: "Tài xế",
             icon: CircleUserRound,
-            subItems: [
-                { label: "Thêm tài xế", path: "driver/create", icon: CirclePlus },
-                { label: "Danh sách tài xế", path: "drivers", icon: List },
-            ],
+            subItems: [{ label: "Danh sách tài xế", path: "drivers", icon: List }],
         },
         {
-            label: "Tài khoản nhân viên",
-            icon: UsersRound,
-            subItems: [
-                { label: "Thêm nhân viên", path: "staff/create", icon: UserPlus },
-                { label: "Quản lý nhân viên", path: "staff", icon: UserRoundCog },
-                { ...SHARED_PROFILE_ITEM },
-            ],
+            label: "Theo dõi vị trí",
+            icon: MapPinned,
+            path: "map-tracking"
         },
         {
-            label: "Quản lý hồ sơ",
-            icon: ScrollText,
-            subItems: [
-                { label: "Hồ sơ khách hàng", path: "documents/users", icon: User },
-                { label: "Hồ sơ tài xế", path: "documents/drivers", icon: CircleUserRound },
-            ],
-        },
-        { label: "Bản đồ theo dõi", path: "map-tracking", icon: MapPinned },
-        { label: "Gửi thông báo", path: "send-broadcast", icon: Megaphone },
-        { label: "Phiếu giảm giá", path: "coupons", icon: TicketPercent },
-        { label: "Chương trình tích điểm", path: "reward-points", icon: ShieldCheck },
-        { label: "Giao dịch", path: "transactions", icon: Receipt },
-        { label: "Quản lý ví", path: "wallets", icon: Wallet },
-        { label: "Quản lý thanh toán", path: "payouts", icon: Receipt },
-        { label: "Tin nhắn hỗ trợ", path: "chat-support", icon: MessageCircleMore },
-        { label: "Cài đặt hệ thống", path: "settings", icon: Settings },
-        {
-            label: "Báo cáo",
-            icon: SquareCheckBig,
-            subItems: [
-                { label: "Báo cáo tài xế", path: "reports/drivers", icon: CircleUserRound },
-                { label: "Báo cáo khách hàng", path: "reports/customers", icon: User },
-                { label: "Báo cáo thanh toán", path: "reports/payments", icon: Receipt },
-            ],
-        },
-    ],
-    dispatcher: [
-        {
-            label: "Dashboard",
-            path: "dashboard",
-            icon: LayoutDashboard,
+            label: "Support Chat",
+            path: "chat-support",
+            icon: MessageCircleMore
         },
         {
-            label: "Điều phối đặt xe",
-            subItems: [
-                { label: "Tạo mới yêu cầu", path: "booking/create" },
-                { label: "Điều phối", path: "booking/dispatch" },
-                { label: "Danh sách đặt xe", path: "bookings" },
-                { label: "Danh sách hẹn đặt xe", path: "scheduled-bookings" },
-            ],
-        },
-        {
-            label: "Khách hàng",
-            subItems: [
-                { label: "Thêm khách hàng", path: "customer/create" },
-                { label: "Danh sách khách hàng", path: "customers" },
-            ],
-        },
-        {
-            label: "Tài xế",
-            subItems: [
-                { label: "Danh sách tài xế", path: "drivers" },
-            ],
-        },
-        {
-            label: "Theo dõi và hỗ trợ",
-            subItems: [
-                { label: "Bản đồ theo dõi", path: "map-tracking" },
-                { label: "Tin nhắn hỗ trợ", path: "chat-support" },
-            ],
-        },
-        {
-            label: "Tài khoản",
+            label: "Account",
             icon: FileUser,
             subItems: [{ ...SHARED_PROFILE_ITEM }],
         },
@@ -207,3 +212,4 @@ export function getDefaultPathForRole(role = DEFAULT_ROLE) {
     const [firstRoute] = getRoleLeafRoutes(role);
     return buildRolePath(role, firstRoute?.path || "dashboard");
 }
+

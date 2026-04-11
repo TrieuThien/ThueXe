@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import { getMe } from "../../services/authService";
 import { getDefaultPathForRole } from "../../config/roleRoutes";
 
 export default function Layout({ allowedRole }) {
+    const { t } = useTranslation();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -63,7 +65,7 @@ export default function Layout({ allowedRole }) {
             <div className="flex min-h-screen items-center justify-center bg-slate-100 text-slate-600">
                 <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Loading admin workspace...</span>
+                    <span>{t("layout.loadingWorkspace")}</span>
                 </div>
             </div>
         );

@@ -16,7 +16,7 @@ export default function HomePage() {
                 <StatsSection />
                 <FeaturesSection />
                 <WorkflowSection />
-                <PricingSection />
+                {/* <PricingSection /> */}
                 <FAQSection />
             </main>
             <Footer />

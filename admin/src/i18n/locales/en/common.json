@@ -9,7 +9,7 @@
         "cta": "Get Started"
     },
     "hero": {
-        "badge": "#1 Vehicle Rental Management Platform in Vietnam",
+        "badge": "A platform for managing ride-hailing, car rentals, and drivers in Vietnam.",
         "title_pre": "Smart ",
         "title_highlight": "vehicle rental management",
         "title_post": " for enterprises",
@@ -194,5 +194,97 @@
         "success": "You have successfully logged in as {{role}}.",
         "back_home": "Back to Home",
         "logout": "Logout"
+    },
+    "adminModules": {
+        "refresh": "Refresh",
+        "search": "Search",
+        "loadFailed": "Unable to load data from server.",
+        "dashboard": {
+            "badge": "Admin Dashboard",
+            "title": "Operations Control Center",
+            "desc": "Overview KPI, booking performance, drivers, customers and revenue."
+        },
+        "dispatcher": {
+            "badge": "Dispatcher Dashboard",
+            "title": "Dispatch Operation Workspace",
+            "desc": "Manage incoming requests, assign drivers and monitor incidents."
+        },
+        "documents": {
+            "badge": "Document Review",
+            "desc": "Review KYC and legal documents with approve/reject workflow.",
+            "userTitle": "Customer Documents",
+            "driverTitle": "Driver Documents"
+        },
+        "transactions": {
+            "badge": "Financial Transactions",
+            "title": "Transaction Monitoring",
+            "desc": "Track topups, booking payments, commissions and withdrawals.",
+            "searchPlaceholder": "Search by booking id, transaction id or note"
+        },
+        "wallets": {
+            "badge": "Wallet Management",
+            "title": "Wallet Balances",
+            "desc": "Review wallet balances and lock/unlock wallets when needed."
+        },
+        "payouts": {
+            "badge": "Payout Processing",
+            "title": "Driver and Owner Payouts",
+            "desc": "Approve or reject payout requests from drivers and vehicle owners."
+        },
+        "broadcast": {
+            "badge": "Broadcast",
+            "title": "Send Notifications",
+            "desc": "Create instant or scheduled notifications to customer/driver segments.",
+            "sent": "Broadcast request has been submitted."
+        },
+        "chat": {
+            "badge": "Support Chat",
+            "title": "Support Conversations",
+            "desc": "Read and respond to support chats in realtime."
+        },
+        "settings": {
+            "badge": "System Settings",
+            "title": "Operations Configuration",
+            "desc": "Update commission, cancellation, waiting and third-party API settings.",
+            "saved": "Settings have been saved successfully."
+        },
+        "reports": {
+            "badge": "Reports",
+            "desc": "Review KPI by period, region and service type.",
+            "driverTitle": "Driver Report",
+            "customerTitle": "Customer Report",
+            "paymentTitle": "Payment Report"
+        },
+        "vehicleOwners": {
+            "badge": "Vehicle Owners",
+            "title": "Vehicle Owner Directory",
+            "desc": "Track owner identity verification and linked vehicle inventory."
+        }
+    },
+    "layout": {
+        "loadingWorkspace": "Loading admin workspace...",
+        "openSidebar": "Open sidebar",
+        "collapseSidebar": "Collapse sidebar",
+        "brandTitle": "ThueXe Admin",
+        "brandSubtitle": "Control center",
+        "authenticated": "Authenticated",
+        "profile": "Profile",
+        "logout": "Logout",
+        "defaultUser": "Admin User",
+        "roleMenu": "{{role}} menu",
+        "footerText": "ThueXe administration panel. Copyright 2026 ThueXe.",
+        "footerAuthor": "Author: Trieu Thien"
+    },
+    "placeholder": {
+        "module": "{{role}} module",
+        "desc": "This route is not fully implemented yet. Navigation context is preserved for incremental delivery.",
+        "bookingCreate": "Context passed from customer to booking create screen",
+        "bookingHistory": "Filters passed to booking history screen",
+        "customer": "Customer",
+        "phone": "Phone",
+        "email": "Email",
+        "route": "Route",
+        "backDashboard": "Back to dashboard",
+        "viewProfile": "View profile"
     }
 }

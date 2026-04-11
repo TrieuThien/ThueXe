@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { buildRolePath, getBasePathByRole, getRoleLeafRoutes } from "../config/roleRoutes";
@@ -11,6 +12,7 @@ function formatTitle(pathname, role) {
 }
 
 export default function ModulePlaceholderPage({ role }) {
+    const { t } = useTranslation();
     const location = useLocation();
     const { pathname, search, state } = location;
     const title = useMemo(() => formatTitle(pathname, role), [pathname, role]);
@@ -45,26 +47,22 @@ export default function ModulePlaceholderPage({ role }) {
     return (
         <div className="flex min-h-[360px] items-center justify-center">
             <div className="max-w-2xl rounded-[28px] border border-slate-200 bg-slate-50 p-8 text-center shadow-sm">
-                <p className="text-sm uppercase tracking-[0.35em] text-slate-400">{role} module</p>
+                <p className="text-sm uppercase tracking-[0.35em] text-slate-400">{t("placeholder.module", { role })}</p>
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">{title}</h1>
-                <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
-                    Chức năng này hiện chưa có màn riêng trong codebase. Dữ liệu điều hướng vẫn được giữ lại để bạn tiếp tục hoàn thiện module mà không mất context.
-                </p>
+                <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">{t("placeholder.desc")}</p>
 
                 {contextData ? (
                     <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4 text-left text-sm text-slate-700">
                         <p className="font-semibold text-slate-900">
-                            {contextData.type === "booking_create"
-                                ? "Dữ liệu đã truyền sang màn tạo booking"
-                                : "Bộ lọc đã truyền sang màn lịch sử booking"}
+                            {contextData.type === "booking_create" ? t("placeholder.bookingCreate") : t("placeholder.bookingHistory")}
                         </p>
                         <div className="mt-3 space-y-2">
-                            <p>Khách hàng: <span className="font-medium">{contextData.customerName || "--"}</span></p>
-                            <p>Số điện thoại: <span className="font-medium">{contextData.customerPhone || "--"}</span></p>
+                            <p>{t("placeholder.customer")}: <span className="font-medium">{contextData.customerName || "--"}</span></p>
+                            <p>{t("placeholder.phone")}: <span className="font-medium">{contextData.customerPhone || "--"}</span></p>
                             {contextData.type === "booking_create" ? (
                                 <>
-                                    <p>Email: <span className="font-medium">{contextData.customerEmail || "--"}</span></p>
-                                    <p>Khu vực: <span className="font-medium">{contextData.routeName || "--"}</span></p>
+                                    <p>{t("placeholder.email")}: <span className="font-medium">{contextData.customerEmail || "--"}</span></p>
+                                    <p>{t("placeholder.route")}: <span className="font-medium">{contextData.routeName || "--"}</span></p>
                                 </>
                             ) : null}
                         </div>
@@ -72,17 +70,11 @@ export default function ModulePlaceholderPage({ role }) {
                 ) : null}
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                    <Link
-                        to={buildRolePath(role, "dashboard")}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-                    >
-                        Về dashboard
+                    <Link to={buildRolePath(role, "dashboard")} className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                        {t("placeholder.backDashboard")}
                     </Link>
-                    <Link
-                        to={buildRolePath(role, "profile")}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white"
-                    >
-                        Xem hồ sơ
+                    <Link to={buildRolePath(role, "profile")} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-white">
+                        {t("placeholder.viewProfile")}
                         <ArrowRight className="h-4 w-4" />
                     </Link>
                 </div>

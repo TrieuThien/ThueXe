@@ -18,6 +18,10 @@ import NewDriver from "../pages/drivers/NewDriver";
 import DriverList from "../pages/drivers/DriverList";
 import DriverDetail from "../pages/drivers/DriverDetail";
 import EditDriver from "../pages/drivers/EditDriver";
+import VehicleOwnerList from "../pages/vehicle-owners/VehicleOwnerList";
+import NewVehicleOwner from "../pages/vehicle-owners/NewVehicleOwner";
+import VehicleOwnerDetail from "../pages/vehicle-owners/VehicleOwnerDetail";
+import EditVehicleOwner from "../pages/vehicle-owners/EditVehicleOwner";
 import NewStaff from "../pages/staff/NewStaff";
 import StaffList from "../pages/staff/StaffList";
 import StaffDetail from "../pages/staff/StaffDetail";
@@ -37,90 +41,81 @@ import BookingDispatchPage from "../pages/bookings/BookingDispatchPage";
 import BookingListPage from "../pages/bookings/BookingListPage";
 import ScheduledBookingListPage from "../pages/bookings/ScheduledBookingListPage";
 import BookingDetailPage from "../pages/bookings/BookingDetailPage";
+import TransactionsPage from "../pages/finance/TransactionsPage";
+import WalletsPage from "../pages/finance/WalletsPage";
+import PayoutsPage from "../pages/finance/PayoutsPage";
+import DocumentReviewPage from "../pages/documents/DocumentReviewPage";
+import DocumentDefinitionsPage from "../pages/documents/DocumentDefinitionsPage";
+import VehicleDocumentReviewPage from "../pages/documents/VehicleDocumentReviewPage";
+import SupportChatPage from "../pages/chat/SupportChatPage";
+import DriverReportPage from "../pages/reports/DriverReportPage";
+import CustomerReportPage from "../pages/reports/CustomerReportPage";
+import PaymentReportPage from "../pages/reports/PaymentReportPage";
 
 function getElementByRoleAndPath(role, path) {
+    const sharedMap = {
+        "profile": <AdminProfilePage />,
+        "drivers": <DriverList />,
+        "map-tracking": <MapTrackingPage />,
+        "booking/create": <BookingCreatePage />,
+        "booking/dispatch": <BookingDispatchPage />,
+        "bookings": <BookingListPage />,
+        "scheduled-bookings": <ScheduledBookingListPage />,
+        "chat-support": <SupportChatPage />,
+    };
+
     if (path === "dashboard") {
         return role === "admin" ? <AdminDashboardPage /> : <DispatcherDashboardPage />;
     }
 
-    if (path === "profile") {
-        return <AdminProfilePage />;
+    if (sharedMap[path]) {
+        return sharedMap[path];
     }
 
-    if (role === "admin" && path === "staff/create") {
-        return <NewStaff />;
+    if (role === "admin") {
+        const adminMap = {
+            "staff/create": <NewStaff />,
+            "staff": <StaffList />,
+            "vehicle/create": <NewCar />,
+            "vehicles": <CarList />,
+            "tariff/create": <TariffCreatePage />,
+            "tariffs": <TariffListPage />,
+            "area/create": <ZoneCreatePage />,
+            "areas": <ZoneListPage />,
+            "coupons": <CouponListPage />,
+            "reward-points": <RewardPointsPage />,
+            "customer/create": <NewCustomer />,
+            "customers": <CustomerList />,
+            "driver/create": <NewDriver />,
+            "vehicle-owner/create": <NewVehicleOwner />,
+            "vehicle-owners": <VehicleOwnerList />,
+            "documents/users": <DocumentReviewPage subject="users" />,
+            "documents/drivers": <DocumentReviewPage subject="drivers" />,
+            "documents/vehicle-owners": <DocumentReviewPage subject="vehicle-owners" />,
+            "documents/vehicles": <VehicleDocumentReviewPage />,
+            "documents/definitions": <DocumentDefinitionsPage />,
+            "transactions": <TransactionsPage />,
+            "wallets": <WalletsPage />,
+            "payouts": <PayoutsPage />,
+            "reports/drivers": <DriverReportPage />,
+            "reports/customers": <CustomerReportPage />,
+            "reports/payments": <PaymentReportPage />,
+        };
+
+        if (adminMap[path]) {
+            return adminMap[path];
+        }
     }
 
-    if (role === "admin" && path === "staff") {
-        return <StaffList />;
-    }
+    if (role === "dispatcher") {
+        const dispatcherMap = {
+            "customer/create": <NewCustomer />,
+            "customers": <CustomerList />,
+        };
 
-    if (role === "admin" && path === "vehicle/create") {
-        return <NewCar />;
-    }
-
-    if (role === "admin" && path === "vehicles") {
-        return <CarList />;
-    }
-
-    if (role === "admin" && path === "tariff/create") {
-        return <TariffCreatePage />;
-    }
-
-    if (role === "admin" && path === "tariffs") {
-        return <TariffListPage />;
-    }
-
-    if (role === "admin" && path === "area/create") {
-        return <ZoneCreatePage />;
-    }
-
-    if (role === "admin" && path === "areas") {
-        return <ZoneListPage />;
-    }
-
-    if (role === "admin" && path === "coupons") {
-        return <CouponListPage />;
-    }
-
-    if (role === "admin" && path === "reward-points") {
-        return <RewardPointsPage />;
-    }
-
-    if (role === "admin" && path === "customer/create") {
-        return <NewCustomer />;
-    }
-
-    if (role === "admin" && path === "customers") {
-        return <CustomerList />;
-    }
-
-    if (role === "admin" && path === "driver/create") {
-        return <NewDriver />;
-    }
-
-    if (path === "drivers") {
-        return <DriverList />;
-    }
-
-    if (path === "map-tracking") {
-        return <MapTrackingPage />;
-    }
-
-    if (path === "booking/create") {
-        return <BookingCreatePage />;
-    }
-
-    if (path === "booking/dispatch") {
-        return <BookingDispatchPage />;
-    }
-
-    if (path === "bookings") {
-        return <BookingListPage />;
-    }
-
-    if (path === "scheduled-bookings") {
-        return <ScheduledBookingListPage />;
+        if (dispatcherMap[path]) {
+            return dispatcherMap[path];
+        }
     }
 
     return <ModulePlaceholderPage role={role} />;
@@ -145,6 +140,8 @@ export default function AppRoutes() {
                 <Route path="customers/:userId/edit" element={<EditCustomer />} />
                 <Route path="drivers/:driverId" element={<DriverDetail />} />
                 <Route path="drivers/:driverId/edit" element={<EditDriver />} />
+                <Route path="vehicle-owners/:ownerId" element={<VehicleOwnerDetail />} />
+                <Route path="vehicle-owners/:ownerId/edit" element={<EditVehicleOwner />} />
                 <Route path="staff/:userId" element={<StaffDetail />} />
                 <Route path="staff/:userId/edit" element={<EditStaff />} />
                 <Route path="tariffs/:id/edit" element={<TariffEditPage />} />
@@ -161,10 +158,7 @@ export default function AppRoutes() {
                 <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
             </Route>
 
-            <Route
-                path="*"
-                element={<Navigate to={getDefaultPathForRole()} replace />}
-            />
+            <Route path="*" element={<Navigate to={getDefaultPathForRole()} replace />} />
         </Routes>
     );
 }
