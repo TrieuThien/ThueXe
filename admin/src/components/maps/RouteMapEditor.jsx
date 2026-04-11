@@ -73,6 +73,7 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
     const scopeRef = useRef(scope);
     const cityDrawModeRef = useRef(false);
 
+    const [mapReady, setMapReady] = useState(false);
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [cityDrawMode, setCityDrawMode] = useState(false);
@@ -232,6 +233,8 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
 
                 mapRef.current = mapId ? buildMap(mapId) : buildMap(undefined);
 
+                setMapReady(true);
+
                 mapRef.current.addListener("click", (event) => {
                     const point = {
                         lat: event.latLng.lat(),
@@ -303,6 +306,8 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
             if (mapContainerRef.current) {
                 mapContainerRef.current.innerHTML = "";
             }
+
+            setMapReady(false);
         };
     }, [apiKey, mapId]);
 
@@ -365,6 +370,7 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
             mapRef.current.setZoom(11);
         }
     }, [
+        mapReady,
         centerPosition,
         scope,
         value?.city_bound_coords,
@@ -378,7 +384,7 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
         <div className={`rounded-3xl border border-slate-200 bg-white p-4 ${className}`}>
             <div className="mb-3 flex items-center justify-between gap-3">
                 <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                    <MapPinned className="h-4 w-4 text-blue-600" />
+                    <MapPinned className="h-8 w-4 text-blue-600" />
                     Bản đồ cấu hình tuyến
                 </h3>
                 {scope === "state" ? (
@@ -413,14 +419,14 @@ export default function RouteMapEditor({ scope, value, onChange, className = "" 
                                     : "border-blue-300 bg-blue-50 text-blue-700"
                             }`}
                         >
-                            {cityDrawMode ? "Đang vẽ polygon" : "Bắt đầu vẽ polygon"}
+                            {cityDrawMode ? "Xác nhận khu vực" : "Bắt đầu vẽ khu vực"}
                         </button>
                         <button
                             type="button"
                             onClick={clearCityPolygon}
                             className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 font-semibold text-rose-700"
                         >
-                            Xóa polygon
+                            Xóa khu vực
                         </button>
                     </div>
                 )}

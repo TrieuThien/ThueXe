@@ -73,7 +73,7 @@ export function validateCouponForm(form) {
     }
 
     if (!form.city) {
-        errors.city = "Vui lòng chọn thành phố áp dụng.";
+        errors.city = "Vui lòng chọn khu vực áp dụng.";
     }
 
     const discountValue = Number(form.discount_value);

@@ -246,14 +246,14 @@ export default function ZonePolygonEditor({ value, onChange }) {
                                 : "border-cyan-300 bg-cyan-50 text-cyan-700"
                         }`}
                     >
-                        {drawMode ? "Đang vẽ polygon" : "Bắt đầu vẽ polygon"}
+                        {drawMode ? "Xác nhận khu vực" : "Bắt đầu vẽ khu vực"}
                     </button>
                     <button
                         type="button"
                         onClick={clearPolygon}
                         className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-1.5 font-semibold text-rose-700"
                     >
-                        Xóa polygon
+                        Xóa khu vực
                     </button>
                 </div>
             </div>

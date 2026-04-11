@@ -25,6 +25,7 @@ export default function ZoneForm({
                         <label className="mb-2 block text-sm font-semibold text-slate-700">Tên vùng</label>
                         <input
                             type="text"
+                            placeholder="Ví dụ: Trung tâm TP. HCM"
                             value={form.title}
                             onChange={(event) => onChange("title", event.target.value)}
                             className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-cyan-500"
@@ -33,7 +34,7 @@ export default function ZoneForm({
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Thành phố áp dụng</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Khu vực áp dụng</label>
                         <select
                             value={form.city_id}
                             onChange={(event) => onChange("city_id", event.target.value)}

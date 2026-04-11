@@ -65,3 +65,33 @@ export async function getOperationsReport(params = {}) {
     const response = await apiClient.get("/api/reports/operations", { params });
     return payload(response);
 }
+
+export async function getSystemSettings() {
+    const response = await apiClient.get("/api/admin/settings/system");
+    return payload(response);
+}
+
+export async function updateSystemSettings(payloadData) {
+    const response = await apiClient.patch("/api/admin/settings/system", payloadData);
+    return payload(response);
+}
+
+export async function getCurrencies() {
+    const response = await apiClient.get("/api/admin/settings/currencies");
+    return payload(response);
+}
+
+export async function createCurrency(payloadData) {
+    const response = await apiClient.post("/api/admin/settings/currencies", payloadData);
+    return payload(response);
+}
+
+export async function updateCurrency(id, payloadData) {
+    const response = await apiClient.put(`/api/admin/settings/currencies/${id}`, payloadData);
+    return payload(response);
+}
+
+export async function setDefaultCurrency(id) {
+    const response = await apiClient.patch(`/api/admin/settings/currencies/${id}/default`);
+    return payload(response);
+}

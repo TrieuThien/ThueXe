@@ -48,6 +48,7 @@ import DocumentReviewPage from "../pages/documents/DocumentReviewPage";
 import DocumentDefinitionsPage from "../pages/documents/DocumentDefinitionsPage";
 import VehicleDocumentReviewPage from "../pages/documents/VehicleDocumentReviewPage";
 import SupportChatPage from "../pages/chat/SupportChatPage";
+import SystemSettingsPage from "../pages/settings/SystemSettingsPage";
 import DriverReportPage from "../pages/reports/DriverReportPage";
 import CustomerReportPage from "../pages/reports/CustomerReportPage";
 import PaymentReportPage from "../pages/reports/PaymentReportPage";
@@ -97,6 +98,7 @@ function getElementByRoleAndPath(role, path) {
             "transactions": <TransactionsPage />,
             "wallets": <WalletsPage />,
             "payouts": <PayoutsPage />,
+            "settings": <SystemSettingsPage />,
             "reports/drivers": <DriverReportPage />,
             "reports/customers": <CustomerReportPage />,
             "reports/payments": <PaymentReportPage />,

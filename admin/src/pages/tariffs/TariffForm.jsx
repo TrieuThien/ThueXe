@@ -306,6 +306,19 @@ export default function TariffForm({
                                     />
                                 ))}
 
+                                <div>
+                                    <label className="mb-2 block text-sm font-semibold text-slate-700">Kiểu phụ phí cao điểm</label>
+                                    <select
+                                        value={row.pp_charge_type}
+                                        onChange={(event) => onTariffChange(ride.id, "pp_charge_type", event.target.value)}
+                                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                                    >
+                                        <option value="0">Cộng thêm tiền</option>
+                                        <option value="1">Nhân hệ số</option>
+                                    </select>
+                                    <FieldError error={rowErrors.pp_charge_type} />
+                                </div>
+                                
                                 <NumericField
                                     label="Giờ bắt đầu cao điểm (0-23)"
                                     value={row.pp_start}
@@ -324,18 +337,7 @@ export default function TariffForm({
                                     error={rowErrors.pp_end}
                                 />
 
-                                <div>
-                                    <label className="mb-2 block text-sm font-semibold text-slate-700">Kiểu phụ phí cao điểm</label>
-                                    <select
-                                        value={row.pp_charge_type}
-                                        onChange={(event) => onTariffChange(ride.id, "pp_charge_type", event.target.value)}
-                                        className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
-                                    >
-                                        <option value="0">Cộng thêm tiền</option>
-                                        <option value="1">Nhân hệ số</option>
-                                    </select>
-                                    <FieldError error={rowErrors.pp_charge_type} />
-                                </div>
+                                
                             </div>
 
                             <div className="mt-4">
@@ -410,23 +412,6 @@ export default function TariffForm({
                                         <span className="block font-semibold text-slate-900">Bật tính năng đi chung xe</span>
                                         <span className="mt-1 block text-xs text-slate-600">
                                             Dịch vụ đi chung xe cho phép nhiều người đi từ các địa điểm khác nhau đến các điểm đến khác nhau cùng chia sẻ một chuyến đi và tiết kiệm chi phí.
-                                        </span>
-                                    </span>
-                                </span>
-                            </label>
-
-                            <label className="block rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                                <span className="flex items-start gap-3">
-                                    <input
-                                        type="checkbox"
-                                        checked={row.hr_enabled}
-                                        onChange={(event) => onTariffChange(ride.id, "hr_enabled", event.target.checked)}
-                                        className="mt-1 h-4 w-4"
-                                    />
-                                    <span>
-                                        <span className="block font-semibold text-slate-900">Bật giá theo giờ / khoảng cách</span>
-                                        <span className="mt-1 block text-xs text-slate-600">
-                                            Việc kích hoạt mức giá theo giờ cho phép khách hàng được thanh toán theo giờ trên Quick-Rides cho phương tiện này. Đặt chi phí mỗi giờ và cũng đặt khoảng cách tính bằng KM. Khi khách hàng di chuyển trong một khoảng thời gian hoặc quãng đường nhỏ hơn giá trị bạn đặt, họ sẽ bị tính phí theo số tiền bạn đặt; đây là mức tối thiểu. Nếu họ di chuyển với thời gian hoặc khoảng cách lớn hơn thì họ sẽ bị tính phí theo giá trị này với chi phí tương đương bổ sung theo phân số của một giờ (phút) nếu không tăng thêm cả giờ.
                                         </span>
                                     </span>
                                 </span>

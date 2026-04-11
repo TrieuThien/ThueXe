@@ -109,7 +109,7 @@ export default function EditStaff() {
                 photo_file: null,
             });
         } catch (error) {
-            setPageError(error?.response?.data?.message || "Khong tai duoc thong tin nhan vien.");
+            setPageError(error?.response?.data?.message || "Không tải được thông tin nhân viên.");
         } finally {
             setLoading(false);
             setRoutesLoading(false);
@@ -219,19 +219,19 @@ export default function EditStaff() {
                     <section className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
-                                <label className="mb-2 block text-sm font-semibold text-slate-700">Ho</label>
+                                <label className="mb-2 block text-sm font-semibold text-slate-700">Họ</label>
                                 <input type="text" value={form.firstname} onChange={(event) => updateField("firstname", event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500" maxLength={64} />
                                 {errors.firstname ? <p className="mt-2 text-sm text-red-600">{errors.firstname}</p> : null}
                             </div>
                             <div>
-                                <label className="mb-2 block text-sm font-semibold text-slate-700">Ten</label>
+                                <label className="mb-2 block text-sm font-semibold text-slate-700">Tên</label>
                                 <input type="text" value={form.lastname} onChange={(event) => updateField("lastname", event.target.value)} className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-indigo-500" maxLength={64} />
                                 {errors.lastname ? <p className="mt-2 text-sm text-red-600">{errors.lastname}</p> : null}
                             </div>
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">Vai tro</label>
+                            <label className="mb-2 block text-sm font-semibold text-slate-700">Vai trò</label>
                             <div className="grid gap-3 sm:grid-cols-3">
                                 {STAFF_ROLES.map((item) => (
                                     <label key={item.value} className={`flex cursor-pointer items-center justify-center rounded-2xl border px-4 py-3 text-sm font-semibold transition ${form.role === item.value ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`}>

@@ -142,13 +142,20 @@ export async function createStaffAccount(payload) {
     return extractAuthPayload(response.data);
 }
 
-export async function initializeAuth() {
-    try {
-        return await refreshAccessToken();
-    } catch {
-        clearAccessToken();
-        return null;
+let _initPromise = null;
+
+export function initializeAuth() {
+    if (!_initPromise) {
+        _initPromise = refreshAccessToken()
+            .catch(() => {
+                clearAccessToken();
+                return null;
+            })
+            .finally(() => {
+                _initPromise = null;
+            });
     }
+    return _initPromise;
 }
 
 export { apiClient };

@@ -33,7 +33,7 @@ export const ROLE_BASE_PATHS = {
 export const DEFAULT_ROLE = "dispatcher";
 
 const SHARED_PROFILE_ITEM = {
-    label: "Profile",
+    label: "Thông tin của tôi",
     path: "profile",
     icon: FileUser,
 };
@@ -127,7 +127,7 @@ export const MENU_BY_ROLE = {
         { label: "Ví", path: "wallets", icon: Wallet },
         { label: "Thanh toán", path: "payouts", icon: Receipt },
         { label: "Hỗ trợ", path: "chat-support", icon: MessageCircleMore },
-        // { label: "Cài đặt", path: "settings", icon: Settings },
+        { label: "Cài đặt", path: "settings", icon: Settings },
         {
             label: "Báo cáo",
             icon: SquareCheckBig,

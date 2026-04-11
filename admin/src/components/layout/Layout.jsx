@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import { getMe } from "../../services/authService";
+import { getMe, initializeAuth } from "../../services/authService";
 import { getDefaultPathForRole } from "../../config/roleRoutes";
 
 export default function Layout({ allowedRole }) {
@@ -37,20 +37,15 @@ export default function Layout({ allowedRole }) {
     useEffect(() => {
         let mounted = true;
 
-        getMe()
+        initializeAuth()
+            .then(() => getMe())
             .then((response) => {
-                if (!mounted) {
-                    return;
-                }
-
+                if (!mounted) return;
                 setCurrentUser(response?.user || null);
                 setAuthLoading(false);
             })
             .catch(() => {
-                if (!mounted) {
-                    return;
-                }
-
+                if (!mounted) return;
                 setAuthError(true);
                 setAuthLoading(false);
             });
