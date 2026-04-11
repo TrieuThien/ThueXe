@@ -12,7 +12,7 @@ export function globalErrorHandler(err, req, res, next) {
     const requestId = req?.headers?.["x-request-id"] || "";
 
     if (statusCode >= 500) {
-        console.error("Unhandled error:", err.message);
+        console.error("Unhandled error:", err.message, err.stack || "");
     }
 
     return res.status(statusCode).json({

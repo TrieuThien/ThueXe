@@ -40,10 +40,6 @@ const TARIFF_NUMERIC_FIELDS = [
     "npickup_cost",
     "ndrop_off_cost",
     "ncancel_cost",
-    "hr_cph",
-    "hr_dist",
-    "nhr_cph",
-    "nhr_dist",
     "pp_charge_value",
 ];
 
@@ -84,6 +80,12 @@ function normalizeBooleanFlag(value, defaultValue = 0) {
     if (["1", "true", "yes", "on"].includes(normalized)) return 1;
     if (["0", "false", "no", "off"].includes(normalized)) return 0;
     return defaultValue;
+}
+
+function normalizeCoord(value) {
+    if (value === undefined || value === null || value === "") return null;
+    const num = Number(value);
+    return Number.isFinite(num) ? num : null;
 }
 
 function isValidLatLng(lat, lng) {
@@ -217,12 +219,12 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
         pick_name: normalizeText(rawRoute?.pick_name, { maxLength: 255, fallback: "" }),
         drop_name: normalizeText(rawRoute?.drop_name, { maxLength: 255, fallback: "" }),
         r_scope: rScope,
-        lng: normalizeText(rawRoute?.lng, { maxLength: 30, fallback: "" }),
-        lat: normalizeText(rawRoute?.lat, { maxLength: 30, fallback: "" }),
-        pick_lng: normalizeText(rawRoute?.pick_lng, { maxLength: 30, fallback: "" }),
-        pick_lat: normalizeText(rawRoute?.pick_lat, { maxLength: 30, fallback: "" }),
-        drop_lng: normalizeText(rawRoute?.drop_lng, { maxLength: 30, fallback: "" }),
-        drop_lat: normalizeText(rawRoute?.drop_lat, { maxLength: 30, fallback: "" }),
+        lng: normalizeCoord(rawRoute?.lng),
+        lat: normalizeCoord(rawRoute?.lat),
+        pick_lng: normalizeCoord(rawRoute?.pick_lng),
+        pick_lat: normalizeCoord(rawRoute?.pick_lat),
+        drop_lng: normalizeCoord(rawRoute?.drop_lng),
+        drop_lat: normalizeCoord(rawRoute?.drop_lat),
         city_bound_coords: null,
         dist_unit: distUnit,
         city_radius: 0,
@@ -248,10 +250,10 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
         payload.pickup_city_id = 0;
         payload.pick_name = "";
         payload.drop_name = "";
-        payload.pick_lng = "";
-        payload.pick_lat = "";
-        payload.drop_lng = "";
-        payload.drop_lat = "";
+        payload.pick_lng = null;
+        payload.pick_lat = null;
+        payload.drop_lng = null;
+        payload.drop_lat = null;
     } else {
         if (!payload.pick_name || !payload.drop_name) {
             throw new AppError("Pickup and drop-off points are required for inter-city routes.", 422, "STATE_POINTS_REQUIRED");
@@ -267,6 +269,8 @@ function normalizeRoutePayload(rawRoute, { isUpdate = false } = {}) {
 
         payload.city_bound_coords = null;
         payload.city_radius = normalizeNonNegativeNumber(rawRoute?.city_radius, { fallback: 0 });
+        payload.lng = null;
+        payload.lat = null;
     }
 
     if (isUpdate && rawRoute?.id !== undefined) {
@@ -319,12 +323,11 @@ function normalizeTariffItem(rawItem, routeId = null) {
         nwait_time: nwaitTime,
         cfare_enabled: normalizeBooleanFlag(rawItem?.cfare_enabled, 0),
         rshare_enabled: normalizeBooleanFlag(rawItem?.rshare_enabled, 0),
-        hr_enabled: normalizeBooleanFlag(rawItem?.hr_enabled, 0),
         pp_enabled: normalizeBooleanFlag(rawItem?.pp_enabled, 0),
         pp_start: ppStart,
         pp_end: ppEnd,
         pp_charge_type: ppChargeType,
-        pp_active_days: normalizeText(rawItem?.pp_active_days, { maxLength: 50, fallback: "" }) || "",
+        pp_active_days: normalizeText(rawItem?.pp_active_days, { maxLength: 50, fallback: "[]" }) || "[]",
         alt_cars: normalizeText(rawItem?.alt_cars, { maxLength: 50, fallback: null }),
     };
 
@@ -456,31 +459,32 @@ export async function createTariffByAdmin(payload, auth) {
     await validateRouteAndTariffs(routePayload, tariffsPayload);
 
     const connection = await sqldb.getConnection();
+    let newRouteId;
 
     try {
         await connection.beginTransaction();
 
-        const routeId = await insertRoute(routePayload, connection);
+        newRouteId = await insertRoute(routePayload, connection);
 
         for (const item of tariffsPayload) {
             await insertRideTariff(
                 {
                     ...item,
-                    routes_id: routeId,
+                    routes_id: newRouteId,
                 },
                 connection
             );
         }
 
         await connection.commit();
-
-        return getTariffDetailByAdmin(routeId, { role: "admin" });
     } catch (error) {
         await connection.rollback();
         throw error;
     } finally {
         connection.release();
     }
+
+    return getTariffDetailByAdmin(newRouteId, { role: "admin" });
 }
 
 export async function updateTariffByAdmin(routeIdInput, payload, auth) {
@@ -526,14 +530,14 @@ export async function updateTariffByAdmin(routeIdInput, payload, auth) {
         }
 
         await connection.commit();
-
-        return getTariffDetailByAdmin(routeId, { role: "admin" });
     } catch (error) {
         await connection.rollback();
         throw error;
     } finally {
         connection.release();
     }
+
+    return getTariffDetailByAdmin(routeId, { role: "admin" });
 }
 
 function normalizeZonePayload(rawZone) {
@@ -680,4 +684,3 @@ export async function updateZoneByAdmin(zoneIdInput, payload, auth) {
         connection.release();
     }
 }
-
