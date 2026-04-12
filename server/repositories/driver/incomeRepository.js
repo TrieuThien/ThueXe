@@ -21,7 +21,7 @@ const EARNINGS_EXPR = `ROUND(
  */
 function buildIncomeWhere(driverId, filters = {}) {
     const clauses = ["b.driver_id = ?", "b.status = 3"];
-    const params  = [driverId];
+    const params = [driverId];
 
     if (filters.fromDate) {
         clauses.push("b.date_completed >= ?");
@@ -71,12 +71,12 @@ export async function getIncomeSummaryStats(driverId, conn = null) {
 
     const r = rows[0] || {};
     return {
-        total_trips:        Number(r.total_trips   || 0),
-        today_trips:        Number(r.today_trips   || 0),
-        month_trips:        Number(r.month_trips   || 0),
-        total_earnings:     Number(r.total_earnings    || 0),
-        today_earnings:     Number(r.today_earnings    || 0),
-        month_earnings:     Number(r.month_earnings    || 0),
+        total_trips: Number(r.total_trips || 0),
+        today_trips: Number(r.today_trips || 0),
+        month_trips: Number(r.month_trips || 0),
+        total_earnings: Number(r.total_earnings || 0),
+        today_earnings: Number(r.today_earnings || 0),
+        month_earnings: Number(r.month_earnings || 0),
         unsettled_earnings: Number(r.unsettled_earnings || 0),
     };
 }
@@ -85,9 +85,31 @@ export async function getIncomeSummaryStats(driverId, conn = null) {
 
 /**
  * Income chart data grouped by day for the last `days` days.
+ * Optionally filtered by date range (fromDate, toDate).
  * Returns array of { label: 'YYYY-MM-DD', trips, earnings }.
  */
-export async function getIncomeChartByDay(driverId, days = 30, conn = null) {
+export async function getIncomeChartByDay(driverId, days = 30, fromDate = null, toDate = null, conn = null) {
+    // Build date condition
+    let dateCondition = "b.date_completed >= DATE_SUB(CURDATE(), INTERVAL ? DAY)";
+    const params = [driverId, days];
+
+    if (fromDate || toDate) {
+        const conditions = [];
+        if (fromDate) {
+            conditions.push("b.date_completed >= ?");
+            params.push(`${fromDate} 00:00:00`);
+        }
+        if (toDate) {
+            conditions.push("b.date_completed <= ?");
+            params.push(`${toDate} 23:59:59`);
+        }
+        if (conditions.length > 0) {
+            dateCondition = conditions.join(" AND ");
+            // Remove the default date interval parameter if we have custom dates
+            params.splice(1, 1); // Remove the 'days' parameter
+        }
+    }
+
     const [rows] = await db(conn).query(
         `SELECT
             DATE(b.date_completed)  AS label,
@@ -96,26 +118,48 @@ export async function getIncomeChartByDay(driverId, days = 30, conn = null) {
          FROM bookings b
          WHERE b.driver_id = ?
            AND b.status    = 3
-           AND b.date_completed >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+           AND ${dateCondition}
          GROUP BY DATE(b.date_completed)
          ORDER BY label ASC`,
-        [driverId, days]
+        params
     );
 
     return rows.map((r) => ({
-        label:    r.label instanceof Date
+        label: r.label instanceof Date
             ? r.label.toISOString().slice(0, 10)
             : String(r.label),
-        trips:    Number(r.trips    || 0),
+        trips: Number(r.trips || 0),
         earnings: Number(r.earnings || 0),
     }));
 }
 
 /**
  * Income chart data grouped by month for the last `months` months.
+ * Optionally filtered by date range (fromDate, toDate).
  * Returns array of { label: 'YYYY-MM', trips, earnings }.
  */
-export async function getIncomeChartByMonth(driverId, months = 12, conn = null) {
+export async function getIncomeChartByMonth(driverId, months = 12, fromDate = null, toDate = null, conn = null) {
+    // Build date condition
+    let dateCondition = "b.date_completed >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)";
+    const params = [driverId, months];
+
+    if (fromDate || toDate) {
+        const conditions = [];
+        if (fromDate) {
+            conditions.push("b.date_completed >= ?");
+            params.push(`${fromDate} 00:00:00`);
+        }
+        if (toDate) {
+            conditions.push("b.date_completed <= ?");
+            params.push(`${toDate} 23:59:59`);
+        }
+        if (conditions.length > 0) {
+            dateCondition = conditions.join(" AND ");
+            // Remove the default date interval parameter if we have custom dates
+            params.splice(1, 1); // Remove the 'months' parameter
+        }
+    }
+
     const [rows] = await db(conn).query(
         `SELECT
             DATE_FORMAT(b.date_completed, '%Y-%m') AS label,
@@ -124,15 +168,15 @@ export async function getIncomeChartByMonth(driverId, months = 12, conn = null) 
          FROM bookings b
          WHERE b.driver_id = ?
            AND b.status    = 3
-           AND b.date_completed >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+           AND ${dateCondition}
          GROUP BY DATE_FORMAT(b.date_completed, '%Y-%m')
          ORDER BY label ASC`,
-        [driverId, months]
+        params
     );
 
     return rows.map((r) => ({
-        label:    String(r.label || ""),
-        trips:    Number(r.trips    || 0),
+        label: String(r.label || ""),
+        trips: Number(r.trips || 0),
         earnings: Number(r.earnings || 0),
     }));
 }
@@ -175,23 +219,23 @@ export async function listIncomeHistory(driverId, filters = {}, { limit, offset 
     );
 
     return rows.map((row) => ({
-        id:               Number(row.id),
-        b_uuid:           row.b_uuid,
-        user_name:        [row.user_firstname, row.user_lastname].filter(Boolean).join(" ") || null,
-        user_phone:       row.user_phone,
-        pickup_address:   row.pickup_address,
-        dropoff_address:  row.dropoff_address,
-        estimated_cost:   Number(row.estimated_cost || 0),
-        actual_cost:      Number(row.actual_cost    || 0),
-        cur_symbol:       row.cur_symbol,
-        cur_code:         row.cur_code,
+        id: Number(row.id),
+        b_uuid: row.b_uuid,
+        user_name: [row.user_firstname, row.user_lastname].filter(Boolean).join(" ") || null,
+        user_phone: row.user_phone,
+        pickup_address: row.pickup_address,
+        dropoff_address: row.dropoff_address,
+        estimated_cost: Number(row.estimated_cost || 0),
+        actual_cost: Number(row.actual_cost || 0),
+        cur_symbol: row.cur_symbol,
+        cur_code: row.cur_code,
         driver_commision: Number(row.driver_commision || 0),
-        driver_settled:   Number(row.driver_settled   || 0),
-        driver_earnings:  Number(row.driver_earnings  || 0),
-        payment_type:     row.payment_type !== null ? Number(row.payment_type) : null,
-        service_type:     Number(row.service_type || 0),
-        date_completed:   row.date_completed,
-        date_created:     row.date_created,
+        driver_settled: Number(row.driver_settled || 0),
+        driver_earnings: Number(row.driver_earnings || 0),
+        payment_type: row.payment_type !== null ? Number(row.payment_type) : null,
+        service_type: Number(row.service_type || 0),
+        date_completed: row.date_completed,
+        date_created: row.date_created,
     }));
 }
 

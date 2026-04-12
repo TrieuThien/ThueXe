@@ -89,13 +89,15 @@ export async function patchMyProfile(auth, payload) {
 
     const fields = {};
 
-    // Always-editable personal fields
-    if (payload.firstname !== undefined) {
-        fields.firstname = normalizeCapitalizedText(payload.firstname) ?? driver.firstname;
+    // Personal information — read-only, drivers cannot change these fields
+    if (payload.firstname !== undefined || payload.lastname !== undefined || payload.email !== undefined) {
+        throw new AppError(
+            "Personal information (name and email) cannot be changed. Please contact support for modifications.",
+            403,
+            "PERSONAL_INFO_IMMUTABLE"
+        );
     }
-    if (payload.lastname !== undefined) {
-        fields.lastname = normalizeCapitalizedText(payload.lastname) ?? driver.lastname;
-    }
+
     if (payload.drv_address !== undefined) {
         fields.drv_address = normalizeText(payload.drv_address);
     }
@@ -213,44 +215,13 @@ export async function patchMyBankAccount(auth, payload) {
     const driver = await findDriverOwnProfile(driverId);
     assertDriverActive(driver);
 
-    const bankName = normalizeBankName(payload);
-    if (!bankName) {
-        throw new AppError("bank_name is required.", 422, "BANK_NAME_REQUIRED");
-    }
-
-    const bankAccHolderName = normalizeUppercaseText(payload.bank_acc_holder_name);
-
-    // Bank account holder name must match the driver's registered full name.
-    // Mirrors the same check enforced by the admin-side driver service.
-    const fullNameNormalized = normalizeNameForComparison(
-        [driver.firstname, driver.lastname].filter(Boolean).join(" ")
+    // Bank account information is read-only and cannot be changed by drivers
+    // Drivers must contact support to modify bank account details
+    throw new AppError(
+        "Bank account information cannot be changed. Please contact support for modifications.",
+        403,
+        "BANK_ACCOUNT_IMMUTABLE"
     );
-    if (fullNameNormalized !== normalizeNameForComparison(bankAccHolderName)) {
-        throw new AppError(
-            "Bank account holder name must match the driver's full name.",
-            422,
-            "BANK_ACCOUNT_HOLDER_NAME_MISMATCH"
-        );
-    }
-
-    await updateDriverOwnBankAccount(driverId, {
-        bankName,
-        bankAccHolderName,
-        bankAccNum: normalizeText(payload.bank_acc_num),
-        bankCode: normalizeText(payload.bank_code),
-        bankSwiftCode: normalizeText(payload.bank_swift_code),
-    });
-
-    const updated = await findDriverOwnProfile(driverId);
-    return {
-        bank_account: {
-            bank_name: updated.bank_name,
-            bank_acc_holder_name: updated.bank_acc_holder_name,
-            bank_acc_num: updated.bank_acc_num,
-            bank_code: updated.bank_code,
-            bank_swift_code: updated.bank_swift_code,
-        },
-    };
 }
 
 // ─── GET /me/documents-required ───────────────────────────────────────────────
@@ -388,14 +359,14 @@ export async function patchMyPhoto(auth, file) {
         await updateDriverOwnPhoto(driverId, uploadedUrl);
     } catch (error) {
         // Rollback: delete freshly uploaded image so storage stays clean
-        try { await deleteCloudinaryImage(uploadedUrl); } catch {}
+        try { await deleteCloudinaryImage(uploadedUrl); } catch { }
         throw error;
     }
 
     // Non-fatal: clean up the old photo after a successful DB update
     const previousPhoto = driver.photo_file;
     if (previousPhoto && previousPhoto !== uploadedUrl) {
-        try { await deleteCloudinaryImage(previousPhoto); } catch {}
+        try { await deleteCloudinaryImage(previousPhoto); } catch { }
     }
 
     const updated = await findDriverOwnProfile(driverId);

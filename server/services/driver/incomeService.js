@@ -16,7 +16,7 @@ function assertDriver(auth) {
 }
 
 function normalizePagination(query = {}) {
-    const page  = Math.max(Number(query.page  || 1),   1);
+    const page = Math.max(Number(query.page || 1), 1);
     const limit = Math.min(Math.max(Number(query.limit || 20), 1), 100);
     return { page, limit, offset: (page - 1) * limit };
 }
@@ -40,8 +40,10 @@ export async function getIncomeSummary(auth) {
  * Income chart: time-series data for frontend chart rendering.
  *
  * Query params:
- *   mode   — 'day' (default) | 'month'
- *   period — number of days (mode=day, default 30) or months (mode=month, default 12), max 365/60
+ *   mode     — 'day' (default) | 'month'
+ *   period   — number of days (mode=day, default 30) or months (mode=month, default 12), max 365/60
+ *   fromDate — optional start date (YYYY-MM-DD) to filter data
+ *   toDate   — optional end date (YYYY-MM-DD) to filter data
  */
 export async function getIncomeChart(auth, query = {}) {
     const driverId = assertDriver(auth);
@@ -55,9 +57,13 @@ export async function getIncomeChart(auth, query = {}) {
         period = Math.min(Math.max(Number(query.period || 12), 1), 60);
     }
 
+    // Support date filtering
+    const fromDate = query.fromDate ? String(query.fromDate).trim() : undefined;
+    const toDate = query.toDate ? String(query.toDate).trim() : undefined;
+
     const data = mode === "day"
-        ? await getIncomeChartByDay(driverId, period)
-        : await getIncomeChartByMonth(driverId, period);
+        ? await getIncomeChartByDay(driverId, period, fromDate, toDate)
+        : await getIncomeChartByMonth(driverId, period, fromDate, toDate);
 
     return {
         mode,
@@ -76,8 +82,8 @@ export async function getIncomeHistory(auth, query = {}) {
     const { page, limit, offset } = normalizePagination(query);
 
     const filters = {
-        fromDate:    query.fromDate    || undefined,
-        toDate:      query.toDate      || undefined,
+        fromDate: query.fromDate || undefined,
+        toDate: query.toDate || undefined,
         serviceType: query.service_type !== undefined ? Number(query.service_type) : undefined,
     };
 
@@ -91,8 +97,8 @@ export async function getIncomeHistory(auth, query = {}) {
         pagination: {
             page,
             limit,
-            total_items:  total,
-            total_pages:  Math.ceil(total / limit),
+            total_items: total,
+            total_pages: Math.ceil(total / limit),
         },
     };
 }

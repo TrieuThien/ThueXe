@@ -7,10 +7,10 @@ function dbConnection(conn) {
 export async function upsertDriverCurrentLocation(payload, conn) {
     const db = dbConnection(conn);
     await db.query(
-        `INSERT INTO driver_current_locations (driver_id, long, lat, b_angle, loc_static_status, loc_static_duration)
+        `INSERT INTO driver_current_locations (driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration)
          VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
-            long = VALUES(long),
+            \`long\` = VALUES(\`long\`),
             lat = VALUES(lat),
             b_angle = VALUES(b_angle),
             loc_static_status = VALUES(loc_static_status),
@@ -29,7 +29,7 @@ export async function upsertDriverCurrentLocation(payload, conn) {
 
 export async function getDriverCurrentLocation(driverId) {
     const [rows] = await sqldb.query(
-        `SELECT driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+        `SELECT driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration, updated_at
          FROM driver_current_locations
          WHERE driver_id = ?
          LIMIT 1`,

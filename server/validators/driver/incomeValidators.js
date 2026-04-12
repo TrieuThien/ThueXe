@@ -38,6 +38,14 @@ export const incomeChartValidator = [
         .isInt({ min: 1 })
         .withMessage("period must be a positive integer")
         .toInt(),
+    query("fromDate")
+        .optional({ values: "falsy" })
+        .isDate()
+        .withMessage("fromDate must be a valid date (YYYY-MM-DD)"),
+    query("toDate")
+        .optional({ values: "falsy" })
+        .isDate()
+        .withMessage("toDate must be a valid date (YYYY-MM-DD)"),
 ];
 
 // ─── GET /income/history ──────────────────────────────────────────────────────
