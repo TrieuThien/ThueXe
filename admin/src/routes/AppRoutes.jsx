@@ -35,6 +35,10 @@ import CouponListPage from "../pages/coupons/CouponListPage";
 import CouponCreatePage from "../pages/coupons/CouponCreatePage";
 import CouponEditPage from "../pages/coupons/CouponEditPage";
 import CouponDetailPage from "../pages/coupons/CouponDetailPage";
+import BannerListPage from "../pages/banners/BannerListPage";
+import BannerCreatePage from "../pages/banners/BannerCreatePage";
+import BannerEditPage from "../pages/banners/BannerEditPage";
+import BannerDetailPage from "../pages/banners/BannerDetailPage";
 import RewardPointsPage from "../pages/reward-points/RewardPointsPage";
 import BookingCreatePage from "../pages/bookings/BookingCreatePage";
 import BookingDispatchPage from "../pages/bookings/BookingDispatchPage";
@@ -84,6 +88,7 @@ function getElementByRoleAndPath(role, path) {
             "area/create": <ZoneCreatePage />,
             "areas": <ZoneListPage />,
             "coupons": <CouponListPage />,
+            "banners": <BannerListPage />,
             "reward-points": <RewardPointsPage />,
             "customer/create": <NewCustomer />,
             "customers": <CustomerList />,
@@ -151,6 +156,9 @@ export default function AppRoutes() {
                 <Route path="coupons/create" element={<CouponCreatePage />} />
                 <Route path="coupons/:id" element={<CouponDetailPage />} />
                 <Route path="coupons/:id/edit" element={<CouponEditPage />} />
+                <Route path="banners/create" element={<BannerCreatePage />} />
+                <Route path="banners/:id" element={<BannerDetailPage />} />
+                <Route path="banners/:id/edit" element={<BannerEditPage />} />
                 <Route path="bookings/:bookingId" element={<BookingDetailPage />} />
             </Route>
 

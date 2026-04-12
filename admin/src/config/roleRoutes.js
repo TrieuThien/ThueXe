@@ -120,7 +120,7 @@ export const MENU_BY_ROLE = {
             ],
         },
         { label: "Theo dõi vị trí", path: "map-tracking", icon: MapPinned },
-        // { label: "Gửi thông báo", path: "send-broadcast", icon: Megaphone },
+        { label: "Quảng cáo di động", path: "banners", icon: Megaphone },
         { label: "Mã giảm giá", path: "coupons", icon: TicketPercent },
         { label: "Chương trình tích điểm", path: "reward-points", icon: ShieldCheck },
         { label: "Giao dịch", path: "transactions", icon: Receipt },
