@@ -43,14 +43,14 @@ export default function AdminDashboardPage() {
                 ...prev,
                 ...response,
                 revenueSeries: [
-                    { label: "Booking", value: Number(response?.bookings?.revenue || 0) },
-                    { label: "Rental", value: Number(response?.rentals?.revenue || 0) },
-                    { label: "Wallet", value: Number(response?.wallets?.total_balance || 0) },
+                    { label: "Đặt xe", value: Number(response?.bookings?.revenue || 0) },
+                    { label: "Thuê xe", value: Number(response?.rentals?.revenue || 0) },
+                    { label: "Ví", value: Number(response?.wallets?.total_balance || 0) },
                 ],
                 serviceBreakdown: [
-                    { label: "Total", value: Number(response?.bookings?.total || 0) },
-                    { label: "Completed", value: Number(response?.bookings?.completed || 0) },
-                    { label: "Cancelled", value: Number(response?.bookings?.cancelled || 0) },
+                    { label: "Tổng cộng", value: Number(response?.bookings?.total || 0) },
+                    { label: "Hoàn thành", value: Number(response?.bookings?.completed || 0) },
+                    { label: "Đã hủy", value: Number(response?.bookings?.cancelled || 0) },
                 ],
             }));
         } catch {
@@ -64,9 +64,9 @@ export default function AdminDashboardPage() {
 
     const quickLinks = useMemo(
         () => [
-            { to: "/admin/bookings", label: "Booking list" },
-            { to: "/admin/drivers", label: "Driver list" },
-            { to: "/admin/customers", label: "Customer list" },
+            { to: "/admin/bookings", label: "Danh sách đặt xe" },
+            { to: "/admin/drivers", label: "Danh sách tài xế" },
+            { to: "/admin/customers", label: "Danh sách khách hàng" },
         ],
         []
     );
@@ -85,24 +85,24 @@ export default function AdminDashboardPage() {
             />
 
             <section className="grid gap-4 xl:grid-cols-3">
-                <StatCard label="Total bookings" value={summary.bookings?.total || 0} tone="blue" icon={Car} />
-                <StatCard label="Completed trips" value={summary.bookings?.completed || 0} tone="emerald" icon={CircleCheckBig} />
-                <StatCard label="Booking revenue" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.bookings?.revenue || 0))} VND`} tone="amber" icon={Wallet} />
-                <StatCard label="Drivers online/total" value={`${summary.drivers?.online || 0}/${summary.drivers?.total || 0}`} tone="cyan" icon={UserRound} />
-                <StatCard label="Users active/total" value={`${summary.users?.active || 0}/${summary.users?.total || 0}`} tone="blue" icon={UserRound} />
-                <StatCard label="Cancel rate" value={`${Number(summary.operations?.cancellation_rate_percent || 0).toFixed(2)}%`} tone="amber" icon={CircleCheckBig} />
+                <StatCard label="Tổng số đơn thuê" value={summary.bookings?.total || 0} tone="blue" icon={Car} />
+                <StatCard label="Chuyến đi hoàn thành" value={summary.bookings?.completed || 0} tone="emerald" icon={CircleCheckBig} />
+                <StatCard label="Doanh thu đặt xe" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.bookings?.revenue || 0))} VND`} tone="amber" icon={Wallet} />
+                <StatCard label="Tài xế trực tuyến/Tổng" value={`${summary.drivers?.online || 0}/${summary.drivers?.total || 0}`} tone="cyan" icon={UserRound} />
+                <StatCard label="Người dùng hoạt động/Tổng" value={`${summary.users?.active || 0}/${summary.users?.total || 0}`} tone="blue" icon={UserRound} />
+                <StatCard label="Tỷ lệ hủy bỏ" value={`${Number(summary.operations?.cancellation_rate_percent || 0).toFixed(2)}%`} tone="amber" icon={CircleCheckBig} />
             </section>
 
             <section className="grid gap-4 xl:grid-cols-2">
                 <article className="rounded-[28px] border border-slate-200 bg-white p-5">
-                    <h2 className="text-lg font-bold text-slate-900">Revenue by day/month</h2>
+                    <h2 className="text-lg font-bold text-slate-900">Doanh thu theo ngày/tháng</h2>
                     <div className="mt-4">
                         <BarChart items={(summary.revenueSeries || []).map((item) => ({ label: item.label || item.date || "-", value: Number(item.value || item.amount || 0) }))} />
                     </div>
                 </article>
 
                 <article className="rounded-[28px] border border-slate-200 bg-white p-5">
-                    <h2 className="text-lg font-bold text-slate-900">Bookings by service type</h2>
+                    <h2 className="text-lg font-bold text-slate-900">Số lượng đặt xe theo loại dịch vụ</h2>
                     <div className="mt-4">
                         <BarChart items={(summary.serviceBreakdown || []).map((item) => ({ label: item.label || item.service_type || "-", value: Number(item.value || item.count || 0) }))} />
                     </div>
@@ -110,7 +110,7 @@ export default function AdminDashboardPage() {
             </section>
 
             <section className="rounded-[28px] border border-slate-200 bg-white p-5">
-                <h2 className="text-lg font-bold text-slate-900">Quick links</h2>
+                <h2 className="text-lg font-bold text-slate-900">Truy cập nhanh</h2>
                 <div className="mt-3 flex flex-wrap gap-3">
                     {quickLinks.map((item) => <Link key={item.to} to={item.to} className="rounded-2xl border border-slate-300 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">{item.label}</Link>)}
                 </div>

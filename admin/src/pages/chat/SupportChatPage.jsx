@@ -106,7 +106,7 @@ export default function SupportChatPage() {
 
             <section className="grid min-h-[620px] gap-4 xl:grid-cols-[340px_1fr]">
                 <aside className="rounded-[28px] border border-slate-200 bg-white p-4">
-                    <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-900"><MessageCircleMore className="h-5 w-5 text-cyan-700" />Conversations</h2>
+                    <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-slate-900"><MessageCircleMore className="h-5 w-5 text-cyan-700" />Cuộc hội thoại</h2>
                     <div className="space-y-2">
                         {conversations.map((item) => {
                             const id = item.thread_key;
@@ -124,7 +124,7 @@ export default function SupportChatPage() {
 
                 <article className="flex flex-col rounded-[28px] border border-slate-200 bg-white">
                     <div className="border-b border-slate-200 px-5 py-4">
-                        <h2 className="font-bold text-slate-900">{selectedConversation?.customer_name || "Select a conversation"}</h2>
+                        <h2 className="font-bold text-slate-900">{selectedConversation?.customer_name || "Chọn cuộc hội thoại"}</h2>
                     </div>
                     <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
                         {messages.map((item, index) => {
@@ -141,7 +141,7 @@ export default function SupportChatPage() {
                     </div>
                     <form onSubmit={handleSend} className="border-t border-slate-200 p-4">
                         <div className="flex items-center gap-2 rounded-2xl border border-slate-300 px-3 py-2">
-                            <input value={reply} onChange={(event) => setReply(event.target.value)} className="w-full bg-transparent px-2 py-1 outline-none" placeholder="Reply message..." />
+                            <input value={reply} onChange={(event) => setReply(event.target.value)} className="w-full bg-transparent px-2 py-1 outline-none" placeholder="Trả lời tin nhắn..." />
                             <button type="submit" className="rounded-xl bg-cyan-600 p-2 text-white"><SendHorizontal className="h-4 w-4" /></button>
                         </div>
                     </form>

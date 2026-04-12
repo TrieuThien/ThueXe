@@ -32,15 +32,15 @@ export default function DriverReportPage() {
         <div className="space-y-6">
             <PageHeader badge={t("adminModules.reports.badge")} title={t("adminModules.reports.driverTitle")} description={t("adminModules.reports.desc")} actions={<button type="button" onClick={loadData} className="rounded-2xl border border-white/30 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"><span className="inline-flex items-center gap-2"><RefreshCw className="h-4 w-4" />{t("adminModules.refresh")}</span></button>} />
             <section className="grid gap-4 xl:grid-cols-4">
-                <StatCard label="Total trips" value={totalTrips} tone="blue" />
-                <StatCard label="Completed" value={summary.completed} tone="emerald" />
-                <StatCard label="Cancelled" value={summary.cancelled} tone="amber" />
-                <StatCard label="Avg rating" value={summary.avgRating} tone="cyan" />
+                <StatCard label="Tổng số chuyến" value={totalTrips} tone="blue" />
+                <StatCard label="Hoàn thành" value={summary.completed} tone="emerald" />
+                <StatCard label="Đã hủy" value={summary.cancelled} tone="amber" />
+                <StatCard label="Đánh giá trung bình" value={summary.avgRating} tone="cyan" />
             </section>
             <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
                 <div className="overflow-auto">
                     <table className="min-w-full text-sm">
-                        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Driver</th><th className="px-4 py-3">Trips</th><th className="px-4 py-3">Completed</th><th className="px-4 py-3">Cancelled</th><th className="px-4 py-3">Avg rating</th></tr></thead>
+                        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Tài xế</th><th className="px-4 py-3">Chuyến đi</th><th className="px-4 py-3">Hoàn thành</th><th className="px-4 py-3">Đã hủy</th><th className="px-4 py-3">Đánh giá trung bình</th></tr></thead>
                         <tbody>{rows.map((row) => <tr key={row.driver_id || row.id} className="border-t border-slate-100"><td className="px-4 py-3">{row.driver_name || "--"}</td><td className="px-4 py-3">{row.total_trips || 0}</td><td className="px-4 py-3">{row.completed_trips || 0}</td><td className="px-4 py-3">{row.cancelled_by_driver || 0}</td><td className="px-4 py-3">{Number(row.avg_user_rating || 0).toFixed(2)}</td></tr>)}</tbody>
                     </table>
                 </div>

@@ -111,22 +111,22 @@ export default function TransactionsPage() {
                         </div>
                     </label>
                     <label>
-                        <span className="mb-2 block text-sm font-medium text-slate-600">Entry Type</span>
+                        <span className="mb-2 block text-sm font-medium text-slate-600">Loại giao dịch</span>
                         <select value={type} onChange={(event) => { setPage(1); setType(event.target.value); }} className="w-full rounded-2xl border border-slate-300 px-3 py-2.5">
-                            <option value="">All</option>
-                            <option value="topup">topup</option>
-                            <option value="ride_payment">ride_payment</option>
-                            <option value="rental_payment">rental_payment</option>
-                            <option value="manual_adjustment">manual_adjustment</option>
-                            <option value="withdrawal">withdrawal</option>
+                            <option value="">Tất cả</option>
+                            <option value="topup">Nạp tiền</option>
+                            <option value="ride_payment">Thanh toán chuyến đi</option>
+                            <option value="rental_payment">Thanh toán thuê xe</option>
+                            <option value="manual_adjustment">Điều chỉnh thủ công</option>
+                            <option value="withdrawal">Rút tiền</option>
                         </select>
                     </label>
                     <label>
-                        <span className="mb-2 block text-sm font-medium text-slate-600">Direction</span>
+                        <span className="mb-2 block text-sm font-medium text-slate-600">Phương thức thanh toán</span>
                         <select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} className="w-full rounded-2xl border border-slate-300 px-3 py-2.5">
-                            <option value="">All</option>
-                            <option value="credit">credit</option>
-                            <option value="debit">debit</option>
+                            <option value="">Tất cả</option>
+                            <option value="credit">Credit</option>
+                            <option value="debit">Debit</option>
                         </select>
                     </label>
                 </div>
@@ -142,7 +142,7 @@ export default function TransactionsPage() {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                     <tr>
-                                        <th className="px-4 py-3">Ledger ID</th><th className="px-4 py-3">Wallet</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Balance After</th><th className="px-4 py-3">Direction</th><th className="px-4 py-3">Entry</th><th className="px-4 py-3">Actor</th><th className="px-4 py-3">Time</th>
+                                        <th className="px-4 py-3">ID giao dịch</th><th className="px-4 py-3">Ví</th><th className="px-4 py-3">Số tiền</th><th className="px-4 py-3">Số dư</th><th className="px-4 py-3">Phương thức</th><th className="px-4 py-3">Loại giao dịch</th><th className="px-4 py-3">Tác nhân</th><th className="px-4 py-3">Thời gian</th>
                                     </tr>
                                 </thead>
                                 <tbody>

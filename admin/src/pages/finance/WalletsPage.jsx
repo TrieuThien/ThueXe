@@ -59,7 +59,7 @@ export default function WalletsPage() {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                     <tr>
-                                        <th className="px-4 py-3">Wallet</th><th className="px-4 py-3">Owner</th><th className="px-4 py-3">Actor Type</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Action</th>
+                                        <th className="px-4 py-3">ID Ví</th><th className="px-4 py-3">Chủ sở hữu</th><th className="px-4 py-3">Loại tài khoản</th><th className="px-4 py-3">Số dư</th><th className="px-4 py-3">Trạng thái</th><th className="px-4 py-3">Hành động</th>
                                     </tr>
                                 </thead>
                                 <tbody>

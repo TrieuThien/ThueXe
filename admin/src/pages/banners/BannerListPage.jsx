@@ -143,7 +143,7 @@ export default function BannerListPage() {
               id="search"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Tim theo tieu de hoac noi dung"
+              placeholder="Tìm theo tiêu đề hoặc nội dung"
               className="min-h-11 w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
           </div>

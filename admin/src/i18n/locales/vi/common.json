@@ -229,7 +229,7 @@
                          "payouts":  {
                                          "badge":  "Chi trả",
                                          "title":  "Duyệt yêu cầu thanh toán",
-                                         "desc":  "Xử lý yêu cầu chi trả cho tài xế và chủ xe."
+                                         "desc":  "Xử lý yêu cầu chi trả cho tài xế, chủ xe và khách hàng."
                                      },
                          "broadcast":  {
                                            "badge":  "Thông báo",

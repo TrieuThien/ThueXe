@@ -79,18 +79,18 @@ export default function VehicleOwnerDetail() {
     const activationStatus = formatVehicleOwnerActivationStatus(owner?.is_activated);
     const verificationStatus = formatVehicleOwnerVerificationStatus(owner?.verification_status);
     const tabs = [
-        { key: "vehicles", label: "Vehicles" },
-        { key: "rentals", label: "Rentals" },
-        { key: "withdrawals", label: "Withdrawals" },
-        { key: "walletLedger", label: "Wallet ledger" },
-        { key: "documents", label: "Documents" },
+        { key: "vehicles", label: "Phương tiện" },
+        { key: "rentals", label: "Cho thuê" },
+        { key: "withdrawals", label: "Rút tiền" },
+        { key: "walletLedger", label: "Ví" },
+        { key: "documents", label: "Tài liệu" },
     ];
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col gap-3 rounded-[28px] bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-900 px-6 py-6 text-white lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                    <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">Vehicle owner detail</p>
+                    <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">Chi tiết chủ xe </p>
                     <h1 className="mt-2 text-3xl font-bold">{owner?.fullname || `Chủ xe #${ownerId}`}</h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-200">Xem hồ sơ chủ xe, thống kê, phương tiện, booking, ví và hồ sơ xác minh trên cùng một màn hình.</p>
                 </div>
@@ -149,25 +149,25 @@ export default function VehicleOwnerDetail() {
                             ) : null}
                             {tab === "rentals" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Rental</th><th className="px-6 py-4">Khách hàng</th><th className="px-6 py-4">Bắt đầu</th><th className="px-6 py-4">Kết thúc</th><th className="px-6 py-4">Tổng tiền</th><th className="px-6 py-4">Payment</th><th className="px-6 py-4">Status</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Cho thuê</th><th className="px-6 py-4">Khách hàng</th><th className="px-6 py-4">Bắt đầu</th><th className="px-6 py-4">Kết thúc</th><th className="px-6 py-4">Tổng tiền</th><th className="px-6 py-4">Thanh toán</th><th className="px-6 py-4">Trạng thái</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.rentals || []).map((item) => <tr key={item.rental_id} className="text-sm text-slate-700"><td className="px-6 py-4">{item.rental_code || `#${item.rental_id}`}</td><td className="px-6 py-4">{item.customer_name || "--"}</td><td className="px-6 py-4">{formatDateTime(item.start_datetime)}</td><td className="px-6 py-4">{formatDateTime(item.end_datetime)}</td><td className="px-6 py-4">{formatMoney(item.total_price)}</td><td className="px-6 py-4">{item.payment_status || "--"}</td><td className="px-6 py-4">{item.status || "--"}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
                             {tab === "withdrawals" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Withdrawal ID</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Requested</th><th className="px-6 py-4">Processed</th><th className="px-6 py-4">Action</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID rút tiền</th><th className="px-6 py-4">Số tiền</th><th className="px-6 py-4">Trạng thái</th><th className="px-6 py-4">Yêu cầu</th><th className="px-6 py-4">Xử lý</th><th className="px-6 py-4">Hành động</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.withdrawals || []).map((item) => <tr key={item.withdrawal_id} className="text-sm text-slate-700"><td className="px-6 py-4">#{item.withdrawal_id}</td><td className="px-6 py-4">{formatMoney(item.amount)}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{formatDateTime(item.requested_at)}</td><td className="px-6 py-4">{formatDateTime(item.processed_at)}</td><td className="px-6 py-4"><div className="flex gap-2">{String(item.status || "").toLowerCase() === "pending" ? <><button type="button" onClick={() => handleWithdrawalAction(item, "approve")} className="rounded-xl border border-emerald-200 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50">Approve</button><button type="button" onClick={() => handleWithdrawalAction(item, "reject")} className="rounded-xl border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50">Reject</button></> : <span className="text-xs text-slate-400">Đã xử lý</span>}</div></td></tr>)}</tbody>
                                 </table>
                             ) : null}
                             {tab === "walletLedger" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Ledger ID</th><th className="px-6 py-4">Direction</th><th className="px-6 py-4">Type</th><th className="px-6 py-4">Amount</th><th className="px-6 py-4">Balance after</th><th className="px-6 py-4">Created</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID sổ cái</th><th className="px-6 py-4">Direction</th><th className="px-6 py-4">Loại</th><th className="px-6 py-4">Số tiền</th><th className="px-6 py-4">Số dư sau</th><th className="px-6 py-4">Ngày tạo</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.walletLedger || []).map((item) => <tr key={item.ledger_id} className="text-sm text-slate-700"><td className="px-6 py-4">#{item.ledger_id}</td><td className="px-6 py-4">{item.direction || "--"}</td><td className="px-6 py-4">{item.entry_type || "--"}</td><td className="px-6 py-4">{formatMoney(item.amount)}</td><td className="px-6 py-4">{formatMoney(item.balance_after)}</td><td className="px-6 py-4">{formatDateTime(item.created_at)}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
                             {tab === "documents" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Document</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Expiry</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Updated</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Hồ sơ</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Hạn sử dụng</th><th className="px-6 py-4">Trạng thái</th><th className="px-6 py-4">Cập nhật</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.documents || []).map((item) => <tr key={item.id} className="text-sm text-slate-700"><td className="px-6 py-4">{item.document_title || "--"}</td><td className="px-6 py-4">{item.doc_number || "--"}</td><td className="px-6 py-4">{formatDateTime(item.doc_expiry_date)}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{formatDateTime(item.updated_at)}</td></tr>)}</tbody>
                                 </table>
                             ) : null}

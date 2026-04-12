@@ -59,7 +59,7 @@ export default function PayoutsPage() {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                     <tr>
-                                        <th className="px-4 py-3">Withdrawal ID</th><th className="px-4 py-3">Actor</th><th className="px-4 py-3">Wallet</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Requested</th><th className="px-4 py-3">Action</th>
+                                        <th className="px-4 py-3">ID yêu cầu rút</th><th className="px-4 py-3">Tác nhân</th><th className="px-4 py-3">Ví</th><th className="px-4 py-3">Số tiền</th><th className="px-4 py-3">Yêu cầu</th><th className="px-4 py-3">Hành động</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -72,8 +72,8 @@ export default function PayoutsPage() {
                                             <td className="px-4 py-3">{row.requested_at ? new Date(row.requested_at).toLocaleString("vi-VN") : "--"}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button type="button" onClick={() => handleReview(row, "approve")} className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 px-3 py-1.5 text-emerald-700 hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" />Approve</button>
-                                                    <button type="button" onClick={() => handleReview(row, "reject")} className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50"><XCircle className="h-4 w-4" />Reject</button>
+                                                    <button type="button" onClick={() => handleReview(row, "approve")} className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 px-3 py-1.5 text-emerald-700 hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" />Duyệt</button>
+                                                    <button type="button" onClick={() => handleReview(row, "reject")} className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50"><XCircle className="h-4 w-4" />Từ chối</button>
                                                 </div>
                                             </td>
                                         </tr>

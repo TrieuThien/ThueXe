@@ -37,16 +37,16 @@ export default function PaymentReportPage() {
         <div className="space-y-6">
             <PageHeader badge={t("adminModules.reports.badge")} title={t("adminModules.reports.paymentTitle")} description={t("adminModules.reports.desc")} actions={<button type="button" onClick={loadData} className="rounded-2xl border border-white/30 px-4 py-2.5 text-sm font-semibold hover:bg-white/10"><span className="inline-flex items-center gap-2"><RefreshCw className="h-4 w-4" />{t("adminModules.refresh")}</span></button>} />
             <section className="grid gap-4 xl:grid-cols-4">
-                <StatCard label="Revenue" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.revenue || 0))} VND`} tone="blue" />
-                <StatCard label="Wallet balance" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.walletBalance || 0))} VND`} tone="emerald" />
-                <StatCard label="Wallet count" value={summary.walletCount} tone="amber" />
-                <StatCard label="Pending documents" value={summary.pendingDocs} tone="cyan" />
+                <StatCard label="Doanh thu" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.revenue || 0))} VND`} tone="blue" />
+                <StatCard label="Số dư ví" value={`${new Intl.NumberFormat("vi-VN").format(Number(summary.walletBalance || 0))} VND`} tone="emerald" />
+                <StatCard label="Số lượng ví" value={summary.walletCount} tone="amber" />
+                <StatCard label="Tài liệu đang chờ" value={summary.pendingDocs} tone="cyan" />
             </section>
             <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
                 <div className="overflow-auto">
                     <table className="min-w-full text-sm">
-                        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Period</th><th className="px-4 py-3">Total bookings</th><th className="px-4 py-3">Completed</th><th className="px-4 py-3">Cancelled</th><th className="px-4 py-3">Revenue</th></tr></thead>
-                        <tbody>{rows.map((row, index) => <tr key={row.period || index} className="border-t border-slate-100"><td className="px-4 py-3">{row.period || "--"}</td><td className="px-4 py-3">{row.total_bookings || 0}</td><td className="px-4 py-3">{row.completed_bookings || 0}</td><td className="px-4 py-3">{row.cancelled_bookings || 0}</td><td className="px-4 py-3">{new Intl.NumberFormat("vi-VN").format(Number(row.revenue || 0))}</td></tr>)}</tbody>
+                        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3">Thời gian</th><th className="px-4 py-3">Tổng số chuyến</th><th className="px-4 py-3">Hoàn thành</th><th className="px-4 py-3">Đã hủy</th><th className="px-4 py-3">Doanh thu</th></tr></thead>
+                        <tbody>{rows.map((row, index) => <tr key={row.period || index} className="border-t border-slate-100"><td className="px-4 py-3">{row.period || "--"}</td><td className="px-4 py-3">{row.total_bookings || 0}</td><td className="px-4 py-3">{row.completed_bookings || 0}</td><td className="px-4 py-3">{row.cancelled_bookings || 0}</td><td className="px-4 py-3">{new Intl.NumberFormat("vi-VN").format(Number(row.revenue || 0))} VND</td></tr>)}</tbody>
                     </table>
                 </div>
             </section>
