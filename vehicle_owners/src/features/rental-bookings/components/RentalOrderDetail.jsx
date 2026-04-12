@@ -75,18 +75,18 @@ export default function RentalOrderDetail({
             <p className="text-xs uppercase tracking-wiđể text-slate-500">Goi thue</p>
             <p className="mt-1 text-sm font-semibold text-slate-800">{booking.servicePackage.name}</p>
             <p className="text-sm text-slate-700">{RENTAL_SERVICE_TYPE_LABELS[booking.servicePackage.serviceType]}</p>
-            <p className="text-sm text-slate-700">Han muc: {booking.servicePackage.includedDistanceKm} km</p>
+            <p className="text-sm text-slate-700">Hạn mục: {booking.servicePackage.includedDistanceKm} km</p>
           </div>
         </div>
 
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <p className="text-xs uppercase tracking-wiđể text-slate-500">Diem giao xe</p>
+            <p className="text-xs uppercase tracking-wiđể text-slate-500">Điểm giao xe</p>
             <p className="mt-1 text-sm text-slate-700">{booking.pickup.location}</p>
             <p className="text-sm text-slate-700">{formatDateTime(booking.pickup.at)}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <p className="text-xs uppercase tracking-wiđể text-slate-500">Diem nhan xe</p>
+            <p className="text-xs uppercase tracking-wiđể text-slate-500">Điểm nhận xe</p>
             <p className="mt-1 text-sm text-slate-700">{booking.dropoff.location}</p>
             <p className="text-sm text-slate-700">{formatDateTime(booking.dropoff.at)}</p>
           </div>

@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
     }
 
     const normalizedError = new Error(
-      payload.error?.message || payload.message || 'Co loi khi ket noi den may chu. Vui long thu lai.',
+      payload.error?.message || payload.message || 'Có lỗi khi kết nối tới máy chủ. Vui lòng thử lại.',
     );
     normalizedError.code = payload.error?.code || payload.code || 'UNKNOWN_ERROR';
     normalizedError.fields = payload.error?.fields || payload.details || [];

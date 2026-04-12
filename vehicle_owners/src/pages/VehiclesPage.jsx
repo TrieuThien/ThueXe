@@ -150,10 +150,10 @@ export default function VehiclesPage() {
     <section>
       <PageHeader
         title="Quản lý xe"
-        description="Thêm xe, Cập nhật thông tin va theo dõi Trạng thái duyệt Đăng ký."
+        description="Thêm xe, Cập nhật thông tin va theo dõi trạng thái duyệt đăng ký."
         actions={
           <button type="button" className="btn btn-primary" onClick={onCreateClick}>
-            Thêm xe moi
+            Thêm xe mới
           </button>
         }
       />
@@ -165,7 +165,7 @@ export default function VehiclesPage() {
         onStatusChange={(status) => setQuery((prev) => ({ ...prev, page: 1, status }))}
         statusOptions={statusOptions}
         onReset={() => setQuery((prev) => ({ ...prev, page: 1, search: '', status: 'all' }))}
-        searchPlaceholder="Tìm theo ten xe, Biển số, Khu vực"
+        searchPlaceholder="Tìm theo tên xe, Biển số, Khu vực"
       />
 
       <DataTable
@@ -175,16 +175,16 @@ export default function VehiclesPage() {
         error={isError}
         pagination={data}
         onPageChange={(page) => setQuery((prev) => ({ ...prev, page }))}
-        emptyMessage="Chưa có xe nao. Bam 'Thêm xe moi' để bat dau."
+        emptyMessage="Chưa có xe nào. Bấm 'Thêm xe mới' để bắt đầu."
       />
 
       {openForm && (
         <div className="fixed inset-0 z-[998] grid place-items-center bg-slate-950/55 p-4">
           <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-            <h3 className="mb-4 text-xl font-bold">{editingVehicle ? 'Cập nhật xe' : 'Thêm xe moi'}</h3>
+            <h3 className="mb-4 text-xl font-bold">{editingVehicle ? 'Cập nhật xe' : 'Thêm xe mới'}</h3>
             <form className="grid gap-3 md:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
               <div className="flex flex-col gap-1.5">
-                <label className="form-label">Ten xe</label>
+                <label className="form-label">Tên xe</label>
                 <input className="input-field" {...register('name')} />
                 {errors.name && <p className="error-text">{errors.name.message}</p>}
               </div>
@@ -247,7 +247,7 @@ export default function VehiclesPage() {
                   className="btn btn-primary"
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
-                  {editingVehicle ? 'Lưu Cập nhật' : 'Tạo xe'}
+                  {editingVehicle ? 'Lưu cập nhật' : 'Tạo xe'}
                 </button>
               </div>
             </form>
@@ -258,7 +258,7 @@ export default function VehiclesPage() {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         title="Xóa xe"
-        message={`Ban chac chan muon Xóa xe ${deleteTarget?.name || ''}?`}
+        message={`Bạn chắc chắn muốn xóa xe ${deleteTarget?.name || ''}?`}
         confirmText="Xóa xe"
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
