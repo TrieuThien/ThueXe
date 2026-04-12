@@ -1,35 +1,36 @@
 import { z } from "zod";
 
 const phoneRegex = /^(0|\+84)[0-9]{9,10}$/;
-const passwordRegex = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,32}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,128}$/;
 
 export const identifierSchema = z
   .string()
   .trim()
-  .min(1, "Vui long nhap email hoac so dien thoai")
+  .min(1, "Vui lòng nhập email hoặc số điện thoại")
   .refine(
     (value) => z.email().safeParse(value).success || phoneRegex.test(value),
-    "Email hoac so dien thoai khong hop le",
+    "Email hoặc số điện thoại không hợp lệ",
   );
 
 export const passwordSchema = z
   .string()
-  .min(8, "Mat khau toi thieu 8 ky tu")
-  .max(32, "Mat khau toi da 32 ky tu")
-  .regex(passwordRegex, "Mat khau phai gom chu hoa, chu thuong va so");
+  .min(10, "Mật khẩu tối thiểu 10 ký tự")
+  .max(128, "Mật khẩu tối đa 128 ký tự")
+  .regex(passwordRegex, "Mật khẩu phải gồm chữ hoa, chữ thường, số và ký tự đặc biệt");
 
 export const loginSchema = z.object({
   identifier: identifierSchema,
-  password: z.string().min(1, "Vui long nhap mat khau"),
+  password: z.string().min(1, "Vui lòng nhập mật khẩu"),
 });
 
 export const registerSchema = z
   .object({
-    fullName: z.string().trim().min(2, "Ho ten toi thieu 2 ky tu").max(80, "Ho ten toi da 80 ky tu"),
+    firstName: z.string().trim().min(2, "Tên tối thiểu 2 ký tự").max(64, "Tên tối đa 64 ký tự"),
+    lastName: z.string().trim().min(2, "Họ tối thiểu 2 ký tự").max(64, "Họ tối đa 64 ký tự"),
     email: z.string().trim().optional(),
     phoneNumber: z.string().trim().optional(),
     password: passwordSchema,
-    confirmPassword: z.string().min(1, "Vui long nhap lai mat khau"),
+    confirmPassword: z.string().min(1, "Vui lòng nhập lại mật khẩu"),
   })
   .superRefine((values, ctx) => {
     const hasEmail = Boolean(values.email);
@@ -38,7 +39,7 @@ export const registerSchema = z
     if (!hasEmail && !hasPhone) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Can nhap email hoac so dien thoai",
+        message: "Vui lòng nhập email hoặc số điện thoại",
         path: ["email"],
       });
     }
@@ -46,7 +47,7 @@ export const registerSchema = z
     if (hasEmail && !z.email().safeParse(values.email).success) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Email khong hop le",
+        message: "Email không hợp lệ",
         path: ["email"],
       });
     }
@@ -54,7 +55,7 @@ export const registerSchema = z
     if (hasPhone && !phoneRegex.test(values.phoneNumber ?? "")) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "So dien thoai khong hop le",
+        message: "Số điện thoại không hợp lệ",
         path: ["phoneNumber"],
       });
     }
@@ -62,14 +63,14 @@ export const registerSchema = z
     if (values.password !== values.confirmPassword) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Mat khau nhap lai khong khop",
+        message: "Mật khẩu nhập lại không khớp",
         path: ["confirmPassword"],
       });
     }
   });
 
 export const otpSchema = z.object({
-  otpCode: z.string().length(6, "OTP phai gom 6 chu so").regex(/^[0-9]+$/, "OTP chi gom chu so"),
+  otpCode: z.string().length(6, "OTP phải gồm 6 chữ số").regex(/^[0-9]+$/, "OTP chỉ gồm chữ số"),
 });
 
 export const forgotPasswordSchema = z.object({
@@ -79,10 +80,10 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordSchema = z
   .object({
     newPassword: passwordSchema,
-    confirmNewPassword: z.string().min(1, "Vui long nhap lai mat khau"),
+    confirmNewPassword: z.string().min(1, "Vui lòng nhập lại mật khẩu"),
   })
   .refine((data) => data.newPassword === data.confirmNewPassword, {
-    message: "Mat khau nhap lai khong khop",
+    message: "Mật khẩu nhập lại không khớp",
     path: ["confirmNewPassword"],
   });
 

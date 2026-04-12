@@ -1,5 +1,6 @@
-import { QUERY_KEYS } from "../../constants";
+import { APP_CONFIG, QUERY_KEYS } from "../../constants";
 import {
+  Coordinate,
   CreateRideBookingRequest,
   CreateRideBookingResponse,
   DriverAllocationStatusResponse,
@@ -11,298 +12,490 @@ import {
   RideRouteEstimateResponse,
   RideVehicleOption,
 } from "../../types";
-import { apiClient } from "../api/client";
 import { ApiError } from "../api/errors";
-import { mockDelay } from "../mock/mockDelay";
+import { apiClient } from "../api/client";
 
-const USE_MOCK_RIDE_FLOW = true;
-const allocationPollCount: Record<string, number> = {};
-
-const baseRoute: RideRouteEstimateResponse = {
-  routeId: "route_mock_1",
-  distanceKm: 8.2,
-  etaMinutes: 22,
-  polyline: "mock_polyline",
-  polylineCoordinates: [
-    { latitude: 10.773, longitude: 106.699 },
-    { latitude: 10.778, longitude: 106.703 },
-    { latitude: 10.785, longitude: 106.709 },
-    { latitude: 10.792, longitude: 106.713 },
-  ],
-  pickup: {
-    address: "",
-    coordinate: { latitude: 10.773, longitude: 106.699 },
-  },
-  destination: {
-    address: "",
-    coordinate: { latitude: 10.792, longitude: 106.713 },
-  },
-  stops: [],
-};
-
-const vehicleOptions: RideVehicleOption[] = [
-  {
-    vehicleCode: "BIKE",
-    displayName: "Xe máy",
-    description: "Đi nhanh trong nội thành",
-    seats: 1,
-    etaPickupMinutes: 2,
-    baseFare: 12000,
-    perKmFare: 4200,
-    serviceFee: 4000,
-    bookingFee: 3000,
-  },
-  {
-    vehicleCode: "CAR_4",
-    displayName: "Xe 4 chỗ",
-    description: "Tiện lợi cho cả nhóm nhỏ",
-    seats: 4,
-    etaPickupMinutes: 4,
-    baseFare: 25000,
-    perKmFare: 8200,
-    serviceFee: 8000,
-    bookingFee: 5000,
-  },
-  {
-    vehicleCode: "CAR_7",
-    displayName: "Xe 7 chỗ",
-    description: "Phù hợp gia đình và hành lý",
-    seats: 7,
-    etaPickupMinutes: 6,
-    baseFare: 35000,
-    perKmFare: 9800,
-    serviceFee: 10000,
-    bookingFee: 7000,
-  },
-];
-
-const paymentMethods: RidePaymentMethodOption[] = [
-  { id: "wallet", type: "WALLET", displayName: "Ví ThueXe", subtitle: "Số dư khả dụng" },
-  { id: "cash", type: "CASH", displayName: "Tiền mặt" },
-  { id: "momo", type: "MOMO", displayName: "MOMO" },
-];
-
-const coupons: RideCouponPreview[] = [
-  { code: "XEMOI30", description: "Giảm 30k chuyến đầu", discountText: "-30.000d" },
-  { code: "DIHOI10", description: "Giảm 10% tối đa 20k", discountText: "-10%" },
-];
-
-function throwError(code: string, message: string, status: number): never {
-  throw new ApiError({ code, message, status });
+interface BackendRoutePoint {
+  lat: number;
+  lng: number;
+  address?: string | null;
 }
 
-function computeDiscount(totalBeforeDiscount: number, couponCode?: string): number {
-  if (!couponCode) {
-    return 0;
+interface BackendRouteEstimateResponse {
+  route_id?: number | string | null;
+  distance_km?: number | string;
+  duration_min?: number | string;
+  polyline?: string;
+}
+
+interface BackendPricingResponse {
+  route_id?: number | string | null;
+  ride_id?: number | string | null;
+  coupon?: {
+    coupon_code?: string;
+  } | null;
+  breakdown?: {
+    base_fare?: number | string;
+    distance_fare?: number | string;
+    time_fare?: number | string;
+    surcharge?: number | string;
+    discount?: number | string;
+    total?: number | string;
+  };
+}
+
+interface BackendCreateBookingResponse {
+  booking?: {
+    id?: number | string;
+    ride_id?: number | string;
+    status?: number;
+    scheduled?: number;
+  };
+}
+
+const FALLBACK_PAYMENT_METHODS: RidePaymentMethodOption[] = [
+  { id: "1", type: "CASH", displayName: "Tien mat" },
+  { id: "2", type: "WALLET", displayName: "Vi ThueXe" },
+  { id: "3", type: "BANK_CARD", displayName: "The/Online Banking" },
+];
+
+function normalizeRidePaymentMethodType(value: unknown): RidePaymentMethodOption["type"] {
+  const normalized = String(value ?? "WALLET").toUpperCase();
+  if (normalized === "CASH" || normalized === "BANK_CARD" || normalized === "MOMO") {
+    return normalized;
+  }
+  return "WALLET";
+}
+
+function toFiniteNumber(value: unknown, fallback = 0): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function resolvePaymentTypeId(paymentMethodId: string): number {
+  const direct = Number(paymentMethodId);
+  if ([1, 2, 3, 4].includes(direct)) {
+    return direct;
   }
 
-  const upper = couponCode.toUpperCase();
+  const normalized = paymentMethodId.trim().toUpperCase();
+  if (normalized.includes("WALLET")) return 2;
+  if (normalized.includes("CASH")) return 1;
+  if (normalized.includes("CARD") || normalized.includes("BANK") || normalized.includes("MOMO")) return 3;
+  return 1;
+}
 
-  if (upper === "XEMOI30") {
-    return Math.min(30000, totalBeforeDiscount);
+function toRidePaymentMethods(payload: unknown): RidePaymentMethodOption[] {
+  const list = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown[] }).items)
+      ? (payload as { items: unknown[] }).items
+      : payload && typeof payload === "object" && Array.isArray((payload as { methods?: unknown[] }).methods)
+        ? (payload as { methods: unknown[] }).methods
+        : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown[] }).data)
+          ? (payload as { data: unknown[] }).data
+          : [];
+
+  const normalized = list
+    .map((item, index) => {
+      const row = item as Record<string, unknown>;
+      const id = row.id ?? row.payment_type ?? row.payment_method_id ?? row.method_id ?? row.code ?? `${index + 1}`;
+      return {
+        id: String(id),
+        type: normalizeRidePaymentMethodType(row.type ?? row.payment_type ?? row.method_type),
+        displayName: String(row.displayName ?? row.title ?? row.name ?? row.label ?? "Phuong thuc thanh toan"),
+        subtitle: row.subtitle ? String(row.subtitle) : undefined,
+      };
+    })
+    .filter((method) => method.id.length > 0);
+
+  if (normalized.length === 0) {
+    return FALLBACK_PAYMENT_METHODS;
   }
 
-  if (upper === "DIHOI10") {
-    return Math.min(Math.round(totalBeforeDiscount * 0.1), 20000);
+  return normalized;
+}
+
+function toRideVehicleOptions(payload: unknown): RideVehicleOption[] {
+  const list = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown[] }).items)
+      ? (payload as { items: unknown[] }).items
+      : payload && typeof payload === "object" && Array.isArray((payload as { vehicles?: unknown[] }).vehicles)
+        ? (payload as { vehicles: unknown[] }).vehicles
+        : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown[] }).data)
+          ? (payload as { data: unknown[] }).data
+          : [];
+
+  return list
+    .map((item, index) => {
+      const row = item as Record<string, unknown>;
+      const vehicleCode = String(row.vehicleCode ?? row.vehicle_code ?? row.ride_id ?? row.id ?? row.code ?? `${index + 1}`);
+      return {
+        vehicleCode,
+        displayName: String(row.displayName ?? row.display_name ?? row.ride_type ?? row.name ?? "Xe"),
+        description: String(row.description ?? row.ride_desc ?? ""),
+        seats: toFiniteNumber(row.seats ?? row.num_seats ?? row.capacity, 4),
+        etaPickupMinutes: toFiniteNumber(row.etaPickupMinutes ?? row.eta_pickup_minutes ?? row.eta, 0),
+        baseFare: toFiniteNumber(row.baseFare ?? row.base_fare ?? row.minimum_fare, 0),
+        perKmFare: toFiniteNumber(row.perKmFare ?? row.per_km_fare ?? row.price_per_km, 0),
+        serviceFee: toFiniteNumber(row.serviceFee ?? row.service_fee, 0),
+        bookingFee: toFiniteNumber(row.bookingFee ?? row.booking_fee, 0),
+      };
+    })
+    .filter((item) => item.vehicleCode.length > 0);
+}
+
+function toDiscountText(discountType: number, discountValue: number): string {
+  if (discountType === 0) {
+    return `-${discountValue}%`;
   }
 
-  return 0;
+  const formatted = Number.isFinite(discountValue) ? discountValue.toLocaleString("vi-VN") : "0";
+  return `-${formatted}d`;
+}
+
+function toRideCoupons(payload: unknown): RideCouponPreview[] {
+  const list = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object" && Array.isArray((payload as { items?: unknown[] }).items)
+      ? (payload as { items: unknown[] }).items
+      : payload && typeof payload === "object" && Array.isArray((payload as { coupons?: unknown[] }).coupons)
+        ? (payload as { coupons: unknown[] }).coupons
+        : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown[] }).data)
+          ? (payload as { data: unknown[] }).data
+          : [];
+
+  return list
+    .map((item) => {
+      const row = item as Record<string, unknown>;
+      const code = String(row.code ?? row.coupon_code ?? "").trim();
+      const discountType = Number(row.discount_type ?? row.discountType ?? 0);
+      const discountValue = Number(row.discount_value ?? row.discountValue ?? 0);
+      return {
+        code,
+        description: String(row.description ?? row.title ?? row.coupon_title ?? ""),
+        discountText: String(row.discountText ?? toDiscountText(discountType, discountValue)),
+      };
+    })
+    .filter((item) => item.code.length > 0);
+}
+
+function toRidePricingEstimate(payload: BackendPricingResponse, request: RidePricingEstimateRequest): RidePricingEstimateResponse {
+  const baseFare = toFiniteNumber(payload.breakdown?.base_fare);
+  const distanceFare = toFiniteNumber(payload.breakdown?.distance_fare);
+  const timeFare = toFiniteNumber(payload.breakdown?.time_fare);
+  const surcharge = toFiniteNumber(payload.breakdown?.surcharge);
+  const discount = toFiniteNumber(payload.breakdown?.discount);
+  const total = toFiniteNumber(payload.breakdown?.total);
+
+  return {
+    tariffId: `${payload.route_id ?? request.routeId}_${payload.ride_id ?? request.vehicleCode}`,
+    routeId: String(payload.route_id ?? request.routeId),
+    vehicleCode: String(payload.ride_id ?? request.vehicleCode),
+    couponCodeApplied: payload.coupon?.coupon_code,
+    breakdown: {
+      estimatedFare: baseFare + distanceFare + timeFare + surcharge,
+      distanceFee: distanceFare,
+      serviceFee: timeFare,
+      bookingFee: baseFare,
+      surcharge,
+      discount,
+      totalPayable: total,
+      currency: "VND",
+    },
+  };
+}
+
+function toCreateRideBookingResponse(payload: BackendCreateBookingResponse): CreateRideBookingResponse {
+  const bookingId = String(payload.booking?.id ?? "0");
+  const bookingStatus = payload.booking?.scheduled === 1 ? "SCHEDULED" : "PENDING";
+  return {
+    bookingId,
+    rideId: String(payload.booking?.ride_id ?? "0"),
+    bookingStatus,
+    message: bookingStatus === "SCHEDULED" ? "Booking scheduled successfully." : "Booking created successfully.",
+  };
+}
+
+function toDriverAllocationStatusResponse(payload: unknown): DriverAllocationStatusResponse {
+  const row = payload as Record<string, unknown>;
+  const booking = (row.booking ?? {}) as Record<string, unknown>;
+  const driver = (booking.driver ?? {}) as Record<string, unknown>;
+  const status = Number(booking.status ?? 0);
+  const hasDriver = Boolean(driver.driver_id);
+
+  if (hasDriver) {
+    return {
+      bookingId: String(booking.id ?? "0"),
+      allocationStatus: "ALLOCATED",
+      driverId: String(driver.driver_id),
+      driverName: [driver.firstname, driver.lastname].filter(Boolean).join(" ").trim() || undefined,
+      driverPhone: driver.phone ? String(driver.phone) : undefined,
+      vehiclePlate: undefined,
+      etaPickupMinutes: undefined,
+    };
+  }
+
+  if ([2, 4, 5].includes(status)) {
+    return {
+      bookingId: String(booking.id ?? "0"),
+      allocationStatus: "FAILED",
+      reason: booking.cancel_comment ? String(booking.cancel_comment) : "Khong tim duoc tai xe",
+    };
+  }
+
+  return {
+    bookingId: String(booking.id ?? "0"),
+    allocationStatus: "SEARCHING",
+  };
+}
+
+function toCoordinate(point: BackendRoutePoint): Coordinate {
+  return {
+    latitude: Number(point.lat),
+    longitude: Number(point.lng),
+  };
+}
+
+function decodePolyline(polyline: string): Coordinate[] {
+  const coordinates: Coordinate[] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < polyline.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+
+    do {
+      byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < polyline.length);
+
+    const dLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += dLat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < polyline.length);
+
+    const dLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += dLng;
+
+    coordinates.push({
+      latitude: lat / 1e5,
+      longitude: lng / 1e5,
+    });
+  }
+
+  return coordinates;
+}
+
+async function geocodeAddress(address: string): Promise<Coordinate | null> {
+  const query = address.trim();
+  if (!query) return null;
+
+  const params = new URLSearchParams({
+    q: query,
+    format: "jsonv2",
+    limit: "1",
+    addressdetails: "0",
+  });
+
+  const response = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) return null;
+
+  const payload = (await response.json()) as Array<{ lat?: string; lon?: string }>;
+  const first = payload[0];
+  const latitude = first?.lat ? Number(first.lat) : NaN;
+  const longitude = first?.lon ? Number(first.lon) : NaN;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  return {
+    latitude,
+    longitude,
+  };
+}
+
+async function resolvePoint(address: string, coordinate?: Coordinate): Promise<BackendRoutePoint> {
+  let resolved: Coordinate | null | undefined = coordinate;
+  if (!resolved) {
+    resolved = await geocodeAddress(address);
+  }
+
+  if (!resolved) {
+    throw new ApiError({
+      code: "MAP_API_ERROR",
+      message: `Khong xac dinh duoc toa do cho dia chi: ${address}`,
+      status: 422,
+    });
+  }
+
+  return {
+    lat: resolved.latitude,
+    lng: resolved.longitude,
+    address: address.trim(),
+  };
 }
 
 export const rideFlowService = {
   getRouteEstimate: async (payload: RideRouteEstimateRequest): Promise<RideRouteEstimateResponse> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(600);
+    const stopAddresses = payload.stopAddresses.filter((item) => item.trim().length > 0).slice(0, 2);
+    const pickupPoint = await resolvePoint(payload.pickupAddress, payload.pickupCoordinate ?? payload.currentLocation);
+    const destinationPoint = await resolvePoint(payload.destinationAddress, payload.destinationCoordinate);
 
-      if (payload.pickupAddress.toLowerCase().includes("map-error") || payload.destinationAddress.toLowerCase().includes("map-error")) {
-        throwError("MAP_API_ERROR", "Dịch vụ map không phản hồi", 502);
+    const waypoints: BackendRoutePoint[] = [];
+    for (let i = 0; i < stopAddresses.length; i += 1) {
+      const stopAddress = stopAddresses[i] ?? "";
+      if (!stopAddress) {
+        continue;
       }
-
-      if (payload.destinationAddress.toLowerCase().includes("eta-error")) {
-        throwError("ETA_UNAVAILABLE", "Không tính được ETA cho lộ trình này", 422);
-      }
-
-      const stopAddresses = payload.stopAddresses.filter(Boolean).slice(0, 2);
-      const stops = stopAddresses.map((address, index) => ({
-        address,
-        coordinate: {
-          latitude: 10.778 + index * 0.003,
-          longitude: 106.704 + index * 0.003,
-        },
-      }));
-
-      return {
-        ...baseRoute,
-        routeId: `route_${Date.now()}`,
-        distanceKm: baseRoute.distanceKm + stopAddresses.length * 1.8,
-        etaMinutes: baseRoute.etaMinutes + stopAddresses.length * 6,
-        pickup: {
-          ...baseRoute.pickup,
-          address: payload.pickupAddress,
-          coordinate: payload.currentLocation ?? baseRoute.pickup.coordinate,
-        },
-        destination: {
-          ...baseRoute.destination,
-          address: payload.destinationAddress,
-        },
-        stops,
-      };
+      const stopCoordinate = payload.stopCoordinates?.[i];
+      const resolvedStop = await resolvePoint(stopAddress, stopCoordinate);
+      waypoints.push(resolvedStop);
     }
 
-    const response = await apiClient.post<RideRouteEstimateResponse>("/rides/routes/estimate", payload);
-    return response.data;
+    const response = await apiClient.post<BackendRouteEstimateResponse>(`${APP_CONFIG.customerApiPrefix}/ride/map/estimate-route`, {
+      pickup: pickupPoint,
+      dropoff: destinationPoint,
+      waypoints,
+    });
+
+    const distanceKm = Number(response.data.distance_km || 0);
+    const etaMinutesRaw = Number(response.data.duration_min || 0);
+    const polyline = String(response.data.polyline || "");
+    const polylineCoordinates =
+      polyline.length > 0 ? decodePolyline(polyline) : [toCoordinate(pickupPoint), ...waypoints.map(toCoordinate), toCoordinate(destinationPoint)];
+
+    return {
+      routeId: String(response.data.route_id ?? "0"),
+      distanceKm: Number.isFinite(distanceKm) ? distanceKm : 0,
+      etaMinutes: Number.isFinite(etaMinutesRaw) ? Math.max(1, Math.round(etaMinutesRaw)) : 1,
+      polyline,
+      polylineCoordinates,
+      pickup: {
+        address: payload.pickupAddress,
+        coordinate: toCoordinate(pickupPoint),
+      },
+      destination: {
+        address: payload.destinationAddress,
+        coordinate: toCoordinate(destinationPoint),
+      },
+      stops: waypoints.map((item, index) => ({
+        address: stopAddresses[index] ?? item.address ?? `Diem dung ${index + 1}`,
+        coordinate: toCoordinate(item),
+      })),
+    };
   },
 
-  getVehicleOptions: async (_routeId: string): Promise<RideVehicleOption[]> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(300);
-      return vehicleOptions;
-    }
-
-    const response = await apiClient.get<RideVehicleOption[]>(`/rides/tariffs/options?routeId=${_routeId}`);
-    return response.data;
+  getVehicleOptions: async (routeId: string): Promise<RideVehicleOption[]> => {
+    const response = await apiClient.get<unknown>(`${APP_CONFIG.customerApiPrefix}/rides`, {
+      params: { routeId },
+    });
+    return toRideVehicleOptions(response.data);
   },
 
   getPaymentMethods: async (): Promise<RidePaymentMethodOption[]> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(200);
-      return paymentMethods;
-    }
-
-    const response = await apiClient.get<RidePaymentMethodOption[]>("/payments/methods");
-    return response.data;
+    const response = await apiClient.get<unknown>(`${APP_CONFIG.customerApiPrefix}/wallet`);
+    return toRidePaymentMethods(response.data);
   },
 
   getAvailableCoupons: async (): Promise<RideCouponPreview[]> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(180);
-      return coupons;
-    }
-
-    const response = await apiClient.get<RideCouponPreview[]>("/coupon_codes/quick");
-    return response.data;
+    const response = await apiClient.get<unknown>(`${APP_CONFIG.customerApiPrefix}/coupons/available`);
+    return toRideCoupons(response.data);
   },
 
   estimatePricing: async (payload: RidePricingEstimateRequest): Promise<RidePricingEstimateResponse> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(500);
+    const pricingPayload = {
+      route_id: Number(payload.routeId),
+      ride_id: Number(payload.vehicleCode),
+      service_type: 0,
+      payment_type: resolvePaymentTypeId(payload.paymentMethodId),
+      coupon_code: payload.couponCode ? String(payload.couponCode).trim().toUpperCase() : undefined,
+      scheduled_at: payload.scheduledAt,
+      map_estimate: {
+        distance_km: toFiniteNumber(payload.distanceKm, 0),
+        duration_min: toFiniteNumber(payload.durationMin, 0),
+      },
+    };
 
-      if (payload.vehicleCode === "PRICING_ERROR") {
-        throwError("PRICING_ERROR", "Không tính được bảng giá", 500);
-      }
-
-      const vehicle = vehicleOptions.find((item) => item.vehicleCode === payload.vehicleCode);
-
-      if (!vehicle) {
-        throwError("PRICING_ERROR", "Không tìm thấy loại xe", 404);
-      }
-
-      const routeDistance = 8.2;
-      const estimatedFare = vehicle.baseFare;
-      const distanceFee = Math.round(vehicle.perKmFare * routeDistance);
-      const surcharge = payload.scheduledAt ? 7000 : 0;
-      const subtotal = estimatedFare + distanceFee + vehicle.serviceFee + vehicle.bookingFee + surcharge;
-      const discount = computeDiscount(subtotal, payload.couponCode);
-
-      return {
-        tariffId: `tariff_${payload.vehicleCode}`,
-        routeId: payload.routeId,
-        vehicleCode: payload.vehicleCode,
-        couponCodeApplied: discount > 0 ? payload.couponCode : undefined,
-        breakdown: {
-          estimatedFare,
-          distanceFee,
-          serviceFee: vehicle.serviceFee,
-          bookingFee: vehicle.bookingFee,
-          surcharge,
-          discount,
-          totalPayable: subtotal - discount,
-          currency: "VND",
-        },
-      };
-    }
-
-    const response = await apiClient.post<RidePricingEstimateResponse>("/rides/pricing/estimate", payload);
-    return response.data;
+    const response = await apiClient.post<BackendPricingResponse>(`${APP_CONFIG.customerApiPrefix}/ride/fare-estimate`, pricingPayload);
+    return toRidePricingEstimate(response.data, payload);
   },
 
   createRideBooking: async (payload: CreateRideBookingRequest): Promise<CreateRideBookingResponse> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(600);
-
-      if (payload.pickupAddress.toLowerCase().includes("booking-error")) {
-        throwError("BOOKING_CREATE_ERROR", "Không tạo được booking", 500);
-      }
-
-      if (payload.pickupAddress.toLowerCase().includes("offline")) {
-        throwError("NETWORK_ERROR", "Không có kết nối mạng", 0);
-      }
-
-      const bookingId = `booking_${Date.now()}`;
-      allocationPollCount[bookingId] = 0;
-
-      return {
-        bookingId,
-        rideId: `ride_${Date.now()}`,
-        bookingStatus: payload.bookingType === "SCHEDULED" ? "SCHEDULED" : "PENDING",
-        message:
-          payload.bookingType === "SCHEDULED"
-            ? "Đặt lịch thành công"
-            : "Đã tạo booking đang tìm tài xế",
-      };
+    const pickupCoordinate = payload.pickupCoordinate ?? payload.currentLocation;
+    if (!pickupCoordinate || !payload.destinationCoordinate) {
+      throw new ApiError({
+        code: "INVALID_COORDINATE",
+        message: "Thieu toa do diem don/diem den",
+        status: 422,
+      });
     }
 
-    const response = await apiClient.post<CreateRideBookingResponse>("/bookings/rides", payload);
-    return response.data;
+    const waypoints = (payload.stopCoordinates ?? [])
+      .filter((item): item is Coordinate => Boolean(item))
+      .map((item, index) => ({
+        lat: item.latitude,
+        lng: item.longitude,
+        address: payload.stopAddresses[index] ?? undefined,
+      }))
+      .slice(0, 2);
+
+    const bookingPayload = {
+      route_id: Number(payload.routeId),
+      ride_id: Number(payload.vehicleCode),
+      service_type: 0,
+      payment_type: resolvePaymentTypeId(payload.paymentMethodId),
+      scheduled_at: payload.bookingType === "SCHEDULED" ? payload.scheduledAt : undefined,
+      pickup_address: payload.pickupAddress,
+      dropoff_address: payload.destinationAddress,
+      pickup: {
+        lat: pickupCoordinate.latitude,
+        lng: pickupCoordinate.longitude,
+      },
+      dropoff: {
+        lat: payload.destinationCoordinate.latitude,
+        lng: payload.destinationCoordinate.longitude,
+      },
+      waypoints,
+      map_estimate: {
+        distance_km: toFiniteNumber(payload.distanceKm, 0),
+        duration_min: toFiniteNumber(payload.durationMin, 0),
+      },
+      coupon_code: payload.couponCode ? String(payload.couponCode).trim().toUpperCase() : undefined,
+      num_seats: payload.numSeats ?? 1,
+      note: payload.note,
+    };
+
+    const response = await apiClient.post<BackendCreateBookingResponse>(`${APP_CONFIG.customerApiPrefix}/ride/bookings`, bookingPayload);
+    return toCreateRideBookingResponse(response.data);
   },
 
   getDriverAllocationStatus: async (bookingId: string): Promise<DriverAllocationStatusResponse> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      await mockDelay(350);
-      allocationPollCount[bookingId] = (allocationPollCount[bookingId] ?? 0) + 1;
-
-      if (bookingId.includes("nodriver")) {
-        return {
-          bookingId,
-          allocationStatus: "FAILED",
-          reason: "Không tìm thấy tài xế phù hợp trong khu vực",
-        };
-      }
-
-      if ((allocationPollCount[bookingId] ?? 0) < 3) {
-        return {
-          bookingId,
-          allocationStatus: "SEARCHING",
-        };
-      }
-
-      return {
-        bookingId,
-        allocationStatus: "ALLOCATED",
-        driverId: "driver_1",
-        driverName: "Tran Van B",
-        driverPhone: "0988111222",
-        vehiclePlate: "51H-123.45",
-        etaPickupMinutes: 4,
-      };
-    }
-
-    const response = await apiClient.get<DriverAllocationStatusResponse>(`/driver_allocate/status?bookingId=${bookingId}`);
-    return response.data;
+    const response = await apiClient.get<unknown>(`${APP_CONFIG.customerApiPrefix}/ride/bookings/${bookingId}/tracking`);
+    return toDriverAllocationStatusResponse(response.data);
   },
 
   retryDriverAllocation: async (bookingId: string): Promise<DriverAllocationStatusResponse> => {
-    if (USE_MOCK_RIDE_FLOW) {
-      allocationPollCount[bookingId] = 0;
-      await mockDelay(250);
-      return {
-        bookingId,
-        allocationStatus: "SEARCHING",
-      };
-    }
-
-    const response = await apiClient.post<DriverAllocationStatusResponse>("/driver_allocate/retry", { bookingId });
-    return response.data;
+    const response = await apiClient.get<unknown>(`${APP_CONFIG.customerApiPrefix}/ride/bookings/${bookingId}/tracking`);
+    return toDriverAllocationStatusResponse(response.data);
   },
 };
 

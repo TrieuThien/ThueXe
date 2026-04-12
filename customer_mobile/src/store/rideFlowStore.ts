@@ -90,6 +90,12 @@ export const useRideFlowStore = create<RideFlowDraftState>((set, get) => ({
       couponCode: state.couponCode,
       note: state.note,
       currentLocation: state.currentLocation,
+      pickupCoordinate: state.routeEstimate.pickup.coordinate,
+      destinationCoordinate: state.routeEstimate.destination.coordinate,
+      stopCoordinates: state.routeEstimate.stops.map((item) => item.coordinate),
+      distanceKm: state.routeEstimate.distanceKm,
+      durationMin: state.routeEstimate.etaMinutes,
+      numSeats: 1,
     };
   },
   resetRideFlow: () => set(initialState),

@@ -1,17 +1,20 @@
 import { DriverLocation } from "../types";
-import { mockDelay } from "./mock/mockDelay";
+import { realtimeApi } from "./api/modules";
 
 export const trackingService = {
-  getDriverLocation: async (driverId: string): Promise<DriverLocation> => {
-    await mockDelay(250);
+  getDriverLocation: async (bookingId: string): Promise<DriverLocation> => {
+    const response = await realtimeApi.getDriverLocationFallback(bookingId);
+    const payload = response.data as any;
+    const data = payload?.driverLocation ?? payload;
+
     return {
-      driverId,
-      heading: 180,
-      speedKmh: 28,
-      lastUpdatedAt: new Date().toISOString(),
+      driverId: String(data?.driverId ?? data?.driver_id ?? ""),
+      heading: Number(data?.heading ?? 0),
+      speedKmh: Number(data?.speedKmh ?? data?.speed_kmh ?? 0),
+      lastUpdatedAt: String(data?.lastUpdatedAt ?? data?.last_updated_at ?? new Date().toISOString()),
       location: {
-        lat: 10.782,
-        lng: 106.699,
+        lat: Number(data?.location?.lat ?? data?.lat ?? 0),
+        lng: Number(data?.location?.lng ?? data?.lng ?? 0),
       },
     };
   },

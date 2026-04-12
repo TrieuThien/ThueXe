@@ -1,4 +1,4 @@
-import { zodResolver } from "@hookform/resolvers/zod";
+﻿import { zodResolver } from "@hookform/resolvers/zod";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Controller, useForm } from "react-hook-form";
 import { StyleSheet, Text } from "react-native";
@@ -78,9 +78,6 @@ export function VerifyOTPScreen({ navigation, route }: Props) {
         loading={resendOtpMutation.isPending}
         style={styles.secondaryButton}
       />
-
-      <Text style={styles.tipText}>OTP test: 000000 (sai), 999999 (hết hạn), 123456 (đúng)</Text>
-
       <AuthLinkRow label="Sai thông tin?" actionLabel="Quay lại đăng nhập" onPress={() => navigation.replace("Login")} />
     </AuthScreenLayout>
   );
@@ -96,3 +93,4 @@ const styles = StyleSheet.create({
     opacity: 0.65,
   },
 });
+

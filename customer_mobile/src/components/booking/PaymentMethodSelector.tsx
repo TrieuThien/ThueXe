@@ -11,10 +11,11 @@ interface PaymentMethodSelectorProps {
 
 export function PaymentMethodSelector({ methods, selectedId, onSelect }: PaymentMethodSelectorProps) {
   const { theme } = useTheme();
+  const safeMethods = Array.isArray(methods) ? methods : [];
 
   return (
     <View style={styles.container}>
-      {methods.map((method) => {
+      {safeMethods.map((method) => {
         const selected = selectedId === method.id;
         return (
           <Pressable

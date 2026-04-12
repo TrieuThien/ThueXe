@@ -19,7 +19,8 @@ export function RegisterScreen({ navigation }: Props) {
     formState: { errors },
   } = useForm<RegisterFormValues>({
     defaultValues: {
-      fullName: "",
+      firstName: "",
+      lastName: "",
       email: "",
       phoneNumber: "",
       password: "",
@@ -31,7 +32,8 @@ export function RegisterScreen({ navigation }: Props) {
   const onSubmit = handleSubmit(async (values) => {
     try {
       const response = await registerMutation.mutateAsync({
-        fullName: values.fullName,
+        firstName: values.firstName,
+        lastName: values.lastName,
         email: values.email || undefined,
         phoneNumber: values.phoneNumber || undefined,
         password: values.password,
@@ -52,14 +54,28 @@ export function RegisterScreen({ navigation }: Props) {
     <AuthScreenLayout title="Đăng ký" subtitle="Tạo tài khoản mới để gọi xe, thuê xe và thuê tài xế.">
       <Controller
         control={control}
-        name="fullName"
+        name="lastName"
         render={({ field, fieldState }) => (
           <TextField
-            label="Họ và tên"
+            label="Họ"
             value={field.value}
             onChangeText={field.onChange}
             errorMessage={fieldState.error?.message}
-            placeholder="Nguyen Van A"
+            placeholder="Nguyen"
+          />
+        )}
+      />
+
+      <Controller
+        control={control}
+        name="firstName"
+        render={({ field, fieldState }) => (
+          <TextField
+            label="Tên"
+            value={field.value}
+            onChangeText={field.onChange}
+            errorMessage={fieldState.error?.message}
+            placeholder="Van A"
           />
         )}
       />
@@ -105,7 +121,7 @@ export function RegisterScreen({ navigation }: Props) {
             onChangeText={field.onChange}
             secureTextEntry
             errorMessage={fieldState.error?.message}
-            placeholder="Ít nhất 8 ký tự"
+            placeholder="Tối thiểu 10 ký tự, gồm chữ hoa/thường/số/ký tự đặc biệt"
           />
         )}
       />

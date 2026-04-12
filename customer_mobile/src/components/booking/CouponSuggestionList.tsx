@@ -10,10 +10,11 @@ interface CouponSuggestionListProps {
 
 export function CouponSuggestionList({ coupons, onSelectCoupon }: CouponSuggestionListProps) {
   const { theme } = useTheme();
+  const safeCoupons = Array.isArray(coupons) ? coupons : [];
 
   return (
     <View style={styles.container}>
-      {coupons.map((coupon) => (
+      {safeCoupons.map((coupon) => (
         <Pressable
           key={coupon.code}
           onPress={() => onSelectCoupon(coupon.code)}

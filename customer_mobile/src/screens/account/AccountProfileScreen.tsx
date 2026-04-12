@@ -107,7 +107,7 @@ export function AccountProfileScreen({ navigation }: Props) {
               <Text style={[styles.avatarText, { color: theme.colors.text }]}>{(currentUser?.fullName?.[0] ?? "K").toUpperCase()}</Text>
             </View>
           )}
-          <Text style={[styles.avatarHint, { color: theme.colors.textMuted }]}>Ảnh đại diện (`users.photo_file`)</Text>
+          <Text style={[styles.avatarHint, { color: theme.colors.textMuted }]}>Ảnh đại diện</Text>
           <Pressable
             onPress={onPickAvatar}
             style={[styles.pickImageButton, { backgroundColor: theme.colors.surfaceMuted, borderColor: theme.colors.border }]}
@@ -120,7 +120,7 @@ export function AccountProfileScreen({ navigation }: Props) {
         <TextField label="Tên" value={lastName} onChangeText={setLastName} placeholder="Van A" />
 
         <View style={styles.fieldBlock}>
-          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Giới tính (`users.sex`)</Text>
+          <Text style={[styles.fieldLabel, { color: theme.colors.text }]}>Giới tính</Text>
           <View style={[styles.pickerWrap, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
             <Picker
               selectedValue={gender}

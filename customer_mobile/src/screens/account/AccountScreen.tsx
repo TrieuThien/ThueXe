@@ -1,11 +1,12 @@
 ﻿import { Ionicons } from "@expo/vector-icons";
 import { NavigationProp, useNavigation } from "@react-navigation/native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { useQueryClient } from "@tanstack/react-query";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppHeader, HeaderTextButton } from "../../components";
-import { AccountStackParamList, MainTabParamList } from "../../navigation";
+import { AccountStackParamList, MainTabParamList, RootStackParamList } from "../../navigation";
 import { useAppStore, useAuthStore } from "../../store";
 import { useTheme } from "../../theme";
 
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<AccountStackParamList, "AccountMain">;
 
 export function AccountScreen({ navigation }: Props) {
   const { theme } = useTheme();
+  const queryClient = useQueryClient();
   const tabNavigation = useNavigation<NavigationProp<MainTabParamList>>();
   const currentUser = useAuthStore((state) => state.currentUser);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -23,6 +25,14 @@ export function AccountScreen({ navigation }: Props) {
 
   const handleToggleTheme = () => {
     setThemeMode(themeMode === "light" ? "dark" : "light");
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    void queryClient.clear();
+
+    const rootNavigation = navigation.getParent()?.getParent() as NavigationProp<RootStackParamList> | undefined;
+    rootNavigation?.navigate("Auth", { screen: "Login" });
   };
 
   const actions: Array<{
@@ -54,7 +64,7 @@ export function AccountScreen({ navigation }: Props) {
       id: "logout",
       title: "Đăng xuất",
       icon: "log-out-outline",
-      onPress: clearSession,
+      onPress: handleLogout,
       iconColor: theme.colors.danger,
     },
   ];

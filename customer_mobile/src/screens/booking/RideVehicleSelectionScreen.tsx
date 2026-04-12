@@ -46,15 +46,17 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
   const vehiclesQuery = useRideVehicleOptionsQuery(routeEstimate?.routeId);
   const paymentsQuery = useRidePaymentMethodsQuery();
   const couponsQuery = useRideCouponsQuery();
+  const safeVehicles = Array.isArray(vehiclesQuery.data) ? vehiclesQuery.data : [];
+  const safeCoupons = Array.isArray(couponsQuery.data) ? couponsQuery.data : [];
 
   useEffect(() => {
-    if (!selectedVehicleCode && vehiclesQuery.data?.[0] && !paymentMethodId && paymentsQuery.data?.[0]) {
+    if (!selectedVehicleCode && safeVehicles[0] && !paymentMethodId && paymentsQuery.data?.[0]) {
       setVehicleSelection({
-        vehicleCode: vehiclesQuery.data[0].vehicleCode,
+        vehicleCode: safeVehicles[0].vehicleCode,
         paymentMethodId: paymentsQuery.data[0].id,
       });
     }
-  }, [selectedVehicleCode, paymentMethodId, vehiclesQuery.data, paymentsQuery.data, setVehicleSelection]);
+  }, [selectedVehicleCode, paymentMethodId, safeVehicles, paymentsQuery.data, setVehicleSelection]);
 
   const pricingPayload = useMemo(() => {
     if (!routeEstimate?.routeId || !selectedVehicleCode || !paymentMethodId) {
@@ -67,8 +69,10 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
       paymentMethodId,
       couponCode: couponCode || undefined,
       scheduledAt,
+      distanceKm: routeEstimate.distanceKm,
+      durationMin: routeEstimate.etaMinutes,
     };
-  }, [routeEstimate?.routeId, selectedVehicleCode, paymentMethodId, couponCode, scheduledAt]);
+  }, [routeEstimate, selectedVehicleCode, paymentMethodId, couponCode, scheduledAt]);
 
   const pricingQuery = useRidePricingQuery(pricingPayload);
 
@@ -96,7 +100,7 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Loại xe</Text>
         {vehiclesQuery.isLoading ? <LoadingState message="Đang tải danh sách xe..." /> : null}
         {vehiclesQuery.isError ? <ErrorState description="Lỗi khi tải loại xe" onRetry={vehiclesQuery.refetch} /> : null}
-        {vehiclesQuery.data?.map((item) => (
+        {safeVehicles.map((item) => (
           <RideVehicleOptionCard
             key={item.vehicleCode}
             option={item}
@@ -104,7 +108,7 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
             onSelect={(vehicleCode) =>
               setVehicleSelection({
                 vehicleCode,
-                paymentMethodId: paymentMethodId ?? paymentsQuery.data?.[0]?.id ?? "cash",
+                paymentMethodId: paymentMethodId ?? paymentsQuery.data?.[0]?.id ?? "1",
               })
             }
           />
@@ -118,7 +122,7 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
             selectedId={paymentMethodId}
             onSelect={(nextPaymentId) =>
               setVehicleSelection({
-                vehicleCode: selectedVehicleCode ?? vehiclesQuery.data?.[0]?.vehicleCode ?? "CAR_4",
+                vehicleCode: selectedVehicleCode ?? safeVehicles[0]?.vehicleCode ?? "1",
                 paymentMethodId: nextPaymentId,
               })
             }
@@ -132,7 +136,7 @@ export function RideVehicleSelectionScreen({ navigation }: Props) {
           onPress={() => setCouponCode(couponInput.trim() || undefined)}
           style={styles.applyButton}
         />
-        {couponsQuery.data ? <CouponSuggestionList coupons={couponsQuery.data} onSelectCoupon={setCouponCode} /> : null}
+        {safeCoupons.length > 0 ? <CouponSuggestionList coupons={safeCoupons} onSelectCoupon={setCouponCode} /> : null}
 
         {pricingQuery.isLoading ? <LoadingState message="Đang cập nhật giá cước..." /> : null}
         {pricingQuery.isError ? <AuthErrorNotice message={getRideFlowErrorMessage(pricingQuery.error)} /> : null}

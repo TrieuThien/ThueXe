@@ -1,4 +1,4 @@
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+﻿import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -24,6 +24,8 @@ export function RentalPackageListScreen({ navigation }: Props) {
   const setSelectedPackage = useRentalFlowStore((state) => state.setSelectedPackage);
 
   const query = useRentalPackagesQuery(criteria ?? undefined);
+  const packages = Array.isArray(query.data?.packages) ? query.data.packages : [];
+  const suggestions = Array.isArray(query.data?.suggestions) ? query.data.suggestions : [];
 
   if (!criteria) {
     return (
@@ -43,10 +45,10 @@ export function RentalPackageListScreen({ navigation }: Props) {
         {query.isLoading ? <LoadingState message="Đang tìm gói thuê..." /> : null}
         {query.isError ? <ErrorState description="Không tải được danh sách gói" onRetry={query.refetch} /> : null}
 
-        {query.data && query.data.packages.length === 0 ? (
+        {query.data && packages.length === 0 ? (
           <View style={styles.emptyWrap}>
             <EmptyState title="Không có gói phù hợp" description="Thử điều chỉnh thời gian hoặc khu vực điểm đón." />
-            {query.data.suggestions.map((item) => (
+            {suggestions.map((item) => (
               <Text key={item} style={[styles.suggestion, { color: theme.colors.textMuted }]}>
                 - {item}
               </Text>
@@ -55,7 +57,7 @@ export function RentalPackageListScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        {query.data?.packages.map((pkg) => (
+        {packages.map((pkg) => (
           <RentalPackageCard
             key={pkg.packageId}
             item={pkg}
@@ -64,7 +66,7 @@ export function RentalPackageListScreen({ navigation }: Props) {
           />
         ))}
 
-        {query.data?.packages.length ? (
+        {packages.length ? (
           <>
             <PrimaryButton title="Sửa thông tin" onPress={() => navigation.navigate("RentalBookingForm")} />
             <PrimaryButton

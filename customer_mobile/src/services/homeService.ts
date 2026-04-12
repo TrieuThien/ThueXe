@@ -1,25 +1,25 @@
 import { HomeOverview } from "../types";
-import { HOME_LIMITS } from "../constants";
-import { mockDelay } from "./mock/mockDelay";
-import { mockHomeOverview } from "./mock/homeData";
+import { APP_CONFIG } from "../constants";
 import { apiClient } from "./api/client";
 
-const USE_MOCK_HOME = true;
+function ensureArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function normalizeHomeOverview(payload: Partial<HomeOverview> | null | undefined): HomeOverview {
+  return {
+    currentAddress: String(payload?.currentAddress ?? ""),
+    banners: ensureArray(payload?.banners),
+    quickDestinations: ensureArray(payload?.quickDestinations),
+    recentRoutes: ensureArray(payload?.recentRoutes),
+    popularServices: ensureArray(payload?.popularServices),
+    featuredCoupons: ensureArray(payload?.featuredCoupons),
+  };
+}
 
 export const homeService = {
   getHomeOverview: async (): Promise<HomeOverview> => {
-    if (USE_MOCK_HOME) {
-      await mockDelay(500);
-
-      return {
-        ...mockHomeOverview,
-        recentRoutes: mockHomeOverview.recentRoutes.slice(0, HOME_LIMITS.maxRecentRoutes),
-        popularServices: mockHomeOverview.popularServices.slice(0, HOME_LIMITS.maxPopularServices),
-        featuredCoupons: mockHomeOverview.featuredCoupons.slice(0, HOME_LIMITS.maxCoupons),
-      };
-    }
-
-    const response = await apiClient.get<HomeOverview>("/home/overview");
-    return response.data;
+    const response = await apiClient.get<HomeOverview>(`${APP_CONFIG.customerApiPrefix}/home`);
+    return normalizeHomeOverview(response.data);
   },
 };

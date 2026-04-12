@@ -34,6 +34,10 @@ export function LoginScreen({ navigation }: Props) {
     try {
       const session = await loginMutation.mutateAsync(values);
       setSession({ accessToken: session.accessToken, refreshToken: session.refreshToken, user: session.user });
+      const rootNavigation = navigation.getParent();
+      if (rootNavigation?.canGoBack()) {
+        rootNavigation.goBack();
+      }
     } catch (error) {
       setError("root", { message: getAuthErrorMessage(error) });
     }

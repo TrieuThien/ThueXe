@@ -15,6 +15,7 @@ import {
   RouteSummaryCard,
   TextField,
 } from "../../components";
+import type { Coordinate } from "../../types";
 import {
   getRideFlowErrorMessage,
   useAddressAutocomplete,
@@ -28,6 +29,7 @@ import { reverseGeocodeToDisplayAddress } from "../../utils/address";
 import { RideLocationFormValues, rideLocationSchema } from "../../validation/rideSchemas";
 
 type Props = NativeStackScreenProps<BookingStackParamList, "RideLocationPicker">;
+type StopEntry = { address: string; coordinate: Coordinate | undefined };
 
 function formatDateTimeInput(date: Date): string {
   const year = date.getFullYear();
@@ -56,6 +58,10 @@ export function RideLocationPickerScreen({ navigation }: Props) {
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(true);
   const [showStop1Suggestions, setShowStop1Suggestions] = useState(true);
   const [showStop2Suggestions, setShowStop2Suggestions] = useState(true);
+  const [pickupCoordinate, setPickupCoordinate] = useState<Coordinate | undefined>(undefined);
+  const [destinationCoordinate, setDestinationCoordinate] = useState<Coordinate | undefined>(undefined);
+  const [stop1Coordinate, setStop1Coordinate] = useState<Coordinate | undefined>(undefined);
+  const [stop2Coordinate, setStop2Coordinate] = useState<Coordinate | undefined>(undefined);
   const pickupAutoFilledRef = useRef(false);
 
   const {
@@ -86,9 +92,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
 
   const locationBias = location.data
     ? {
-        latitude: location.data.latitude,
-        longitude: location.data.longitude,
-      }
+      latitude: location.data.latitude,
+      longitude: location.data.longitude,
+    }
     : undefined;
 
   const pickupAutocomplete = useAddressAutocomplete(pickupInput ?? "", locationBias);
@@ -105,10 +111,14 @@ export function RideLocationPickerScreen({ navigation }: Props) {
       const currentPickup = getValues("pickupAddress");
       if (!currentPickup || pickupAutoFilledRef.current) {
         setValue("pickupAddress", location.data.address, { shouldValidate: true });
+        setPickupCoordinate({
+          latitude: location.data.latitude,
+          longitude: location.data.longitude,
+        });
         pickupAutoFilledRef.current = true;
       }
     }
-  }, [location.data?.address, setValue, getValues]);
+  }, [location.data?.address, location.data?.latitude, location.data?.longitude, setValue, getValues]);
 
   const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -134,7 +144,11 @@ export function RideLocationPickerScreen({ navigation }: Props) {
 
   const onEstimateRoute = handleSubmit(async (values) => {
     try {
-      const stopAddresses = [values.stop1, values.stop2].filter((item): item is string => Boolean(item?.trim()));
+      const stopEntries: StopEntry[] = [
+        { address: values.stop1 ?? "", coordinate: stop1Coordinate },
+        { address: values.stop2 ?? "", coordinate: stop2Coordinate },
+      ].filter((item) => item.address.trim().length > 0);
+      const stopAddresses = stopEntries.map((item) => item.address);
       const scheduledAt =
         values.isScheduled && values.scheduledAtText
           ? new Date(values.scheduledAtText.replace(" ", "T")).toISOString()
@@ -144,12 +158,15 @@ export function RideLocationPickerScreen({ navigation }: Props) {
         pickupAddress: values.pickupAddress,
         destinationAddress: values.destinationAddress,
         stopAddresses,
+        pickupCoordinate,
+        destinationCoordinate,
+        stopCoordinates: stopEntries.map((item) => item.coordinate),
         scheduledAt,
         currentLocation: location.data
           ? {
-              latitude: location.data.latitude,
-              longitude: location.data.longitude,
-            }
+            latitude: location.data.latitude,
+            longitude: location.data.longitude,
+          }
           : undefined,
       });
 
@@ -161,9 +178,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
         scheduledAt,
         currentLocation: location.data
           ? {
-              latitude: location.data.latitude,
-              longitude: location.data.longitude,
-            }
+            latitude: location.data.latitude,
+            longitude: location.data.longitude,
+          }
           : undefined,
         routeEstimate: route,
       });
@@ -190,7 +207,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}> 
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <AppHeader title="Chọn lộ trình" />
       <ScrollView contentContainerStyle={styles.container}>
         <Controller
@@ -204,6 +221,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                 onChangeText={(text) => {
                   pickupAutoFilledRef.current = false;
                   setShowPickupSuggestions(true);
+                  setPickupCoordinate(undefined);
                   field.onChange(text);
                 }}
                 errorMessage={fieldState.error?.message}
@@ -215,14 +233,14 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               ) : null}
 
               {!pickupAutocomplete.loading &&
-              showPickupSuggestions &&
-              (pickupInput ?? "").trim().length >= 2 &&
-              pickupAutocomplete.suggestions.length === 0 ? (
+                showPickupSuggestions &&
+                (pickupInput ?? "").trim().length >= 2 &&
+                pickupAutocomplete.suggestions.length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
               {showPickupSuggestions && pickupAutocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                   {pickupAutocomplete.suggestions.map((item, index) => (
                     <Pressable
                       key={item.id}
@@ -230,6 +248,12 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                         pickupAutoFilledRef.current = false;
                         const nextLabel = await resolveSuggestionLabel(item);
                         setValue("pickupAddress", nextLabel, { shouldValidate: true });
+                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                          setPickupCoordinate({
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                          });
+                        }
                         setShowPickupSuggestions(false);
                       }}
                       style={[
@@ -259,6 +283,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                 value={field.value}
                 onChangeText={(text) => {
                   setShowDestinationSuggestions(true);
+                  setDestinationCoordinate(undefined);
                   field.onChange(text);
                 }}
                 errorMessage={fieldState.error?.message}
@@ -270,20 +295,26 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               ) : null}
 
               {!destinationAutocomplete.loading &&
-              showDestinationSuggestions &&
-              (destinationInput ?? "").trim().length >= 2 &&
-              destinationAutocomplete.suggestions.length === 0 ? (
+                showDestinationSuggestions &&
+                (destinationInput ?? "").trim().length >= 2 &&
+                destinationAutocomplete.suggestions.length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
               {showDestinationSuggestions && destinationAutocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                   {destinationAutocomplete.suggestions.map((item, index) => (
                     <Pressable
                       key={item.id}
                       onPress={async () => {
                         const nextLabel = await resolveSuggestionLabel(item);
                         setValue("destinationAddress", nextLabel, { shouldValidate: true });
+                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                          setDestinationCoordinate({
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                          });
+                        }
                         setShowDestinationSuggestions(false);
                       }}
                       style={[
@@ -313,6 +344,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                 value={field.value}
                 onChangeText={(text) => {
                   setShowStop1Suggestions(true);
+                  setStop1Coordinate(undefined);
                   field.onChange(text);
                 }}
                 errorMessage={fieldState.error?.message}
@@ -324,20 +356,26 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               ) : null}
 
               {!stop1Autocomplete.loading &&
-              showStop1Suggestions &&
-              (stop1Input ?? "").trim().length >= 2 &&
-              stop1Autocomplete.suggestions.length === 0 ? (
+                showStop1Suggestions &&
+                (stop1Input ?? "").trim().length >= 2 &&
+                stop1Autocomplete.suggestions.length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
               {showStop1Suggestions && stop1Autocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                   {stop1Autocomplete.suggestions.map((item, index) => (
                     <Pressable
                       key={item.id}
                       onPress={async () => {
                         const nextLabel = await resolveSuggestionLabel(item);
                         setValue("stop1", nextLabel, { shouldValidate: true });
+                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                          setStop1Coordinate({
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                          });
+                        }
                         setShowStop1Suggestions(false);
                       }}
                       style={[
@@ -367,6 +405,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                 value={field.value}
                 onChangeText={(text) => {
                   setShowStop2Suggestions(true);
+                  setStop2Coordinate(undefined);
                   field.onChange(text);
                 }}
                 errorMessage={fieldState.error?.message}
@@ -378,20 +417,26 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               ) : null}
 
               {!stop2Autocomplete.loading &&
-              showStop2Suggestions &&
-              (stop2Input ?? "").trim().length >= 2 &&
-              stop2Autocomplete.suggestions.length === 0 ? (
+                showStop2Suggestions &&
+                (stop2Input ?? "").trim().length >= 2 &&
+                stop2Autocomplete.suggestions.length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
               {showStop2Suggestions && stop2Autocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                   {stop2Autocomplete.suggestions.map((item, index) => (
                     <Pressable
                       key={item.id}
                       onPress={async () => {
                         const nextLabel = await resolveSuggestionLabel(item);
                         setValue("stop2", nextLabel, { shouldValidate: true });
+                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                          setStop2Coordinate({
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                          });
+                        }
                         setShowStop2Suggestions(false);
                       }}
                       style={[
@@ -466,7 +511,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
         <AuthErrorNotice message={errors.root?.message} />
 
         <PrimaryButton
-          title="Tính quãng đường và ETA"
+          title="Tìm quãng đường và chọn xe"
           onPress={onEstimateRoute}
           loading={routeMutation.isPending}
         />

@@ -3,6 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { useState } from "react";
 
 import { RootNavigator } from "../navigation";
+import { RealtimeBridge } from "./RealtimeBridge";
 import { ThemeProvider, useTheme } from "../theme";
 
 function AppContent() {
@@ -11,6 +12,7 @@ function AppContent() {
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
+      <RealtimeBridge />
       <RootNavigator />
     </>
   );

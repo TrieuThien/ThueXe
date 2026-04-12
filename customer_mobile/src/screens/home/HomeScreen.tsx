@@ -19,7 +19,7 @@ import {
 import { SERVICE_TYPE_OPTIONS } from "../../constants";
 import { useCurrentLocation, useHomeOverviewQuery } from "../../hooks";
 import { MainTabParamList } from "../../navigation";
-import { useBookingDraftStore } from "../../store";
+import { useAuthStore, useBookingDraftStore, useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
 import { FeaturedCoupon, HomeBanner, QuickDestination, RecentRoute, RideType } from "../../types";
 import { formatCurrencyVND } from "../../utils/format";
@@ -28,15 +28,42 @@ type Props = BottomTabScreenProps<MainTabParamList, "Home">;
 
 export function HomeScreen({ navigation }: Props) {
   const { theme } = useTheme();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const setRideType = useBookingDraftStore((state) => state.setRideType);
   const setLocations = useBookingDraftStore((state) => state.setLocations);
+  const setRentalServiceType = useRentalFlowStore((state) => state.setServiceType);
 
-  const homeQuery = useHomeOverviewQuery();
+  const homeQuery = useHomeOverviewQuery(isAuthenticated);
   const location = useCurrentLocation(true);
+  const homeOverview = homeQuery.data ?? {
+    currentAddress: "",
+    banners: [],
+    quickDestinations: [],
+    recentRoutes: [],
+    popularServices: [],
+    featuredCoupons: [],
+  };
 
   const serviceCards = useMemo(() => SERVICE_TYPE_OPTIONS, []);
 
+  const goToLogin = () => {
+    const parent = navigation.getParent() as { navigate: (name: string, params?: unknown) => void } | null;
+    parent?.navigate("Auth", { screen: "Login" });
+  };
+
   const goBookingFlow = (rideType: RideType, destinationAddress?: string) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        "Yêu cầu đăng nhập",
+        "Vui lòng đăng nhập để sử dụng tính năng đặt xe/thuê xe.",
+        [
+          { text: "Để sau", style: "cancel" },
+          { text: "Đăng nhập", onPress: goToLogin },
+        ],
+      );
+      return;
+    }
+
     setRideType(rideType);
     setLocations(location.data?.address ?? "", destinationAddress ?? "");
 
@@ -45,7 +72,8 @@ export function HomeScreen({ navigation }: Props) {
       return;
     }
 
-    if (rideType === "RENTAL_CAR") {
+    if (rideType === "RENTAL_CAR" || rideType === "RENTAL_DRIVER") {
+      setRentalServiceType(rideType);
       navigation.navigate("Booking", { screen: "RentalBookingForm" });
       return;
     }
@@ -79,19 +107,18 @@ export function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
       <AppHeader title="Trang chủ" />
 
-      {homeQuery.isLoading ? <LoadingState message="Đang tải dữ liệu trang chủ..." /> : null}
-      {homeQuery.isError ? <ErrorState description="Không thể tải dữ liệu trang chủ" onRetry={homeQuery.refetch} /> : null}
-
-      {!homeQuery.isLoading && !homeQuery.isError && homeQuery.data ? (
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {isAuthenticated && homeQuery.isLoading ? <LoadingState message="Đang tải dữ liệu trang chủ..." /> : null}
+      
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {isAuthenticated && homeQuery.isError ? <ErrorState description="Không thể tải dữ liệu trang chủ" onRetry={homeQuery.refetch} /> : null}
           <DestinationSearchCard
-            currentAddress={location.data?.address ?? homeQuery.data.currentAddress}
+            currentAddress={location.data?.address ?? homeOverview.currentAddress}
             isLocating={location.loading}
             locationError={location.error}
             onRefreshLocation={() => {
               void location.fetchLocation();
             }}
-            onPressSearch={() => navigation.navigate("Booking", { screen: "RideLocationPicker" })}
+            onPressSearch={() => goBookingFlow("CALL_RIDE")}
           />
 
           <View style={styles.section}>
@@ -112,27 +139,27 @@ export function HomeScreen({ navigation }: Props) {
 
           <View style={styles.section}>
             <HomeSectionHeader title="Ưu đãi nổi bật" />
-            <HomeBannerList banners={homeQuery.data.banners} onPressBanner={handleBannerPress} />
+            <HomeBannerList banners={homeOverview.banners} onPressBanner={handleBannerPress} />
           </View>
 
           
 
           <View style={styles.section}>
             <HomeSectionHeader title="Điểm đến nhanh" />
-            {homeQuery.data.quickDestinations.length === 0 ? (
+            {homeOverview.quickDestinations.length === 0 ? (
               <EmptyState title="Chưa có điểm đến nhanh" description="Thêm điểm đến yêu thích để đặt xe nhanh hơn." />
             ) : (
-              <QuickDestinationList destinations={homeQuery.data.quickDestinations} onPress={handleQuickDestinationPress} />
+              <QuickDestinationList destinations={homeOverview.quickDestinations} onPress={handleQuickDestinationPress} />
             )}
           </View>
 
           <View style={styles.section}>
             <HomeSectionHeader title="Dịch vụ phổ biến" />
-            {homeQuery.data.popularServices.length === 0 ? (
+            {homeOverview.popularServices.length === 0 ? (
               <EmptyState title="Chưa có gợi ý" description="Các gợi ý dịch vụ sẽ hiển tại đây." />
             ) : (
               <View style={styles.popularList}>
-                {homeQuery.data.popularServices.map((service) => (
+                {homeOverview.popularServices.map((service) => (
                   <HomeServiceCard
                     key={service.id}
                     title={service.title}
@@ -147,11 +174,11 @@ export function HomeScreen({ navigation }: Props) {
 
           <View style={styles.section}>
             <HomeSectionHeader title="Lịch sử gần đây" />
-            {homeQuery.data.recentRoutes.length === 0 ? (
+            {homeOverview.recentRoutes.length === 0 ? (
               <EmptyState title="Chưa có lịch sử" description="Các lộ trình đã đi sẽ hiển ở đây." />
             ) : (
               <View style={styles.recentList}>
-                {homeQuery.data.recentRoutes.map((route) => (
+                {homeOverview.recentRoutes.map((route) => (
                   <RecentRouteCard key={route.id} item={route} onPress={handleRecentRoutePress} />
                 ))}
               </View>
@@ -160,11 +187,11 @@ export function HomeScreen({ navigation }: Props) {
 
           <View style={styles.section}>
             <HomeSectionHeader title="Khuyến mãi dành cho bạn" />
-            {homeQuery.data.featuredCoupons.length === 0 ? (
+            {homeOverview.featuredCoupons.length === 0 ? (
               <EmptyState title="Không có coupon" description="Coupon mới sẽ được cập nhật sớm." />
             ) : (
               <View style={styles.couponList}>
-                {homeQuery.data.featuredCoupons.map((coupon) => (
+                {homeOverview.featuredCoupons.map((coupon) => (
                   <FeaturedCouponCard key={coupon.id} coupon={coupon} onPress={handleCouponPress} />
                 ))}
               </View>
@@ -172,8 +199,7 @@ export function HomeScreen({ navigation }: Props) {
           </View>
 
           <Text style={[styles.footer, { color: theme.colors.textMuted }]}>ThueXe - Di chuyển tiện lợi mỗi ngày</Text>
-        </ScrollView>
-      ) : null}
+      </ScrollView>
     </SafeAreaView>
   );
 }

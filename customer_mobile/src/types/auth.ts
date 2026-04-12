@@ -20,7 +20,8 @@ export interface LoginResponse extends AuthTokens {
 }
 
 export interface RegisterRequest {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email?: string;
   phoneNumber?: string;
   password: string;

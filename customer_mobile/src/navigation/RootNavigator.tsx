@@ -11,7 +11,6 @@ import { RootStackParamList } from "./types";
 const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const hasHydrated = useAuthStore((state) => state.hasHydrated);
   const { theme, isDark } = useTheme();
 
@@ -46,11 +45,15 @@ export function RootNavigator() {
   return (
     <NavigationContainer theme={navigationTheme}>
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
-          <RootStack.Screen name="Main" component={MainTabNavigator} />
-        ) : (
-          <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-        )}
+        <RootStack.Screen name="Main" component={MainTabNavigator} />
+        <RootStack.Screen
+          name="Auth"
+          component={AuthStackNavigator}
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

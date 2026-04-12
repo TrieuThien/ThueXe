@@ -1,4 +1,4 @@
-import { NativeStackScreenProps } from "@react-navigation/native-stack";
+﻿import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -25,6 +25,7 @@ export function TransactionHistoryScreen(_props: Props) {
   );
 
   const query = useWalletTransactionHistoryQuery(filter);
+  const items = Array.isArray(query.data?.items) ? query.data.items : [];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -56,11 +57,11 @@ export function TransactionHistoryScreen(_props: Props) {
 
         {query.isLoading ? <LoadingState /> : null}
         {query.isError ? <ErrorState onRetry={query.refetch} /> : null}
-        {!query.isLoading && !query.isError && query.data?.items.length === 0 ? (
+        {!query.isLoading && !query.isError && items.length === 0 ? (
           <EmptyState title="Không có giao dịch phù hợp" />
         ) : null}
 
-        {query.data?.items.map((item) => (
+        {items.map((item) => (
           <WalletTransactionItem key={item.id} item={item} />
         ))}
       </ScrollView>

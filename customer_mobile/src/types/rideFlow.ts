@@ -14,6 +14,9 @@ export interface RideRouteEstimateRequest {
   pickupAddress: string;
   destinationAddress: string;
   stopAddresses: string[];
+  pickupCoordinate?: Coordinate;
+  destinationCoordinate?: Coordinate;
+  stopCoordinates?: Array<Coordinate | undefined>;
   scheduledAt?: string;
   currentLocation?: Coordinate;
 }
@@ -47,6 +50,8 @@ export interface RidePricingEstimateRequest {
   paymentMethodId: string;
   couponCode?: string;
   scheduledAt?: string;
+  distanceKm?: number;
+  durationMin?: number;
 }
 
 export interface RidePricingBreakdown {
@@ -94,6 +99,12 @@ export interface CreateRideBookingRequest {
   couponCode?: string;
   note?: string;
   currentLocation?: Coordinate;
+  pickupCoordinate?: Coordinate;
+  destinationCoordinate?: Coordinate;
+  stopCoordinates?: Coordinate[];
+  distanceKm?: number;
+  durationMin?: number;
+  numSeats?: number;
 }
 
 export interface CreateRideBookingResponse {

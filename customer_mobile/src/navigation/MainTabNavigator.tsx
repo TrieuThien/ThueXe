@@ -2,6 +2,7 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
 import { HomeScreen } from "../screens";
+import { useAuthStore } from "../store";
 import { useTheme } from "../theme";
 import { AccountStackNavigator } from "./AccountStackNavigator";
 import { BookingStackNavigator } from "./BookingStackNavigator";
@@ -12,6 +13,11 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainTabNavigator() {
   const { theme } = useTheme();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const openAuthLogin = (navigation: { getParent: () => unknown }) => {
+    const parent = navigation.getParent() as { navigate: (name: string, params?: unknown) => void } | null;
+    parent?.navigate("Auth", { screen: "Login" });
+  };
 
   return (
     <Tab.Navigator
@@ -43,12 +49,42 @@ export function MainTabNavigator() {
         listeners={({ navigation }) => ({
           tabPress: (event) => {
             event.preventDefault();
+            if (!isAuthenticated) {
+              openAuthLogin(navigation);
+              return;
+            }
             navigation.navigate("Booking", { screen: "BookingHome" });
           },
         })}
       />
-      <Tab.Screen name="Wallet" component={WalletStackNavigator} options={{ title: "Ví" }} />
-      <Tab.Screen name="Account" component={AccountStackNavigator} options={{ title: "Tài khoản" }} />
+      <Tab.Screen
+        name="Wallet"
+        component={WalletStackNavigator}
+        options={{ title: "Ví" }}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            if (isAuthenticated) {
+              return;
+            }
+            event.preventDefault();
+            openAuthLogin(navigation);
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Account"
+        component={AccountStackNavigator}
+        options={{ title: "Tài khoản" }}
+        listeners={({ navigation }) => ({
+          tabPress: (event) => {
+            if (isAuthenticated) {
+              return;
+            }
+            event.preventDefault();
+            openAuthLogin(navigation);
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 }
