@@ -8,6 +8,7 @@ import {
     patchPushTokenHandler,
     refreshTokenHandler,
     registerHandler,
+    resendOtpHandler,
     resetPasswordHandler,
     verifyOtpHandler,
 } from "../../controllers/customer/authController.mjs";
@@ -26,6 +27,7 @@ import {
     patchPushTokenValidator,
     refreshTokenValidator,
     registerValidator,
+    resendOtpValidator,
     resetPasswordValidator,
     verifyOtpValidator,
 } from "../../validators/customer/authValidators.js";
@@ -34,6 +36,7 @@ const router = Router();
 
 router.post("/register", authRegisterLimiter, registerValidator, registerHandler);
 router.post("/verify-otp", verifyOtpValidator, verifyOtpHandler);
+router.post("/resend-otp", authForgotPasswordLimiter, resendOtpValidator, resendOtpHandler);
 router.post("/login", authLoginLimiter, loginValidator, loginHandler);
 router.post(
     "/forgot-password",

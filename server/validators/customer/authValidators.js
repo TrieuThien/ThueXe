@@ -90,6 +90,22 @@ const forgotPasswordSchema = Joi.object({
     }),
 });
 
+const resendOtpSchema = Joi.object({
+    verificationId: Joi.number().integer().min(1).optional(),
+    userId: Joi.number().integer().min(1).optional(),
+    identifier: Joi.string().trim().min(3).max(64).optional().custom((value, helpers) => {
+        if (!isValidIdentifier(value)) {
+            return helpers.message("identifier must be a valid email or phone number");
+        }
+        return value;
+    }),
+}).custom((value, helpers) => {
+    if (!value.verificationId && !value.userId && !value.identifier) {
+        return helpers.message("verificationId or identifier is required");
+    }
+    return value;
+});
+
 const resetPasswordSchema = Joi.object({
     token: Joi.string().trim().min(20).optional(),
     resetCode: Joi.string().trim().min(4).max(20).optional(),
@@ -131,6 +147,7 @@ export const registerValidator = validate(registerSchema);
 export const verifyOtpValidator = validate(verifyOtpSchema);
 export const loginValidator = validate(loginSchema);
 export const forgotPasswordValidator = validate(forgotPasswordSchema);
+export const resendOtpValidator = validate(resendOtpSchema);
 export const resetPasswordValidator = validate(resetPasswordSchema);
 export const refreshTokenValidator = validate(refreshTokenSchema);
 export const logoutValidator = validate(logoutSchema);

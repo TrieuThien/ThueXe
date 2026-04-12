@@ -37,6 +37,7 @@ const allowedOrigins = [
   "http://10.0.2.2:8081", // Android emulator
   "http://10.0.2.2:8000", // Android emulator direct access
   "http://0.0.0.0:8000", // Android emulator alternative
+  "http://10.0.3.2:8000" // Genymotion emulator
 ].filter(Boolean); // Remove any undefined values
 
 const allowedOriginSet = new Set(allowedOrigins);

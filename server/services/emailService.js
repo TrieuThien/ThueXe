@@ -44,6 +44,62 @@ export async function sendPasswordResetEmail({ toEmail, resetLink }) {
     });
 }
 
+export async function sendDriverActivationEmail({ toEmail, firstname, code }) {
+    const mailer = getTransporter();
+
+    if (!mailer) {
+        console.warn(
+            `[driver-auth] Email service not configured. OTP for ${toEmail}: ${code}`
+        );
+        return;
+    }
+
+    const safeName = String(firstname || "Tài xế");
+
+    await mailer.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_APP_ADMIN,
+        to: toEmail,
+        subject: "ThueXe - Mã xác thực tài khoản tài xế",
+        text:
+            `Xin chào ${safeName},\n\n` +
+            `Mã OTP xác thực tài khoản của bạn là: ${code}\n\n` +
+            "Mã có hiệu lực trong một lần sử dụng. Không chia sẻ mã này cho bất kỳ ai.",
+        html:
+            `<p>Xin chào <strong>${safeName}</strong>,</p>` +
+            `<p>Mã OTP xác thực tài khoản của bạn là:</p>` +
+            `<p style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#0369a1">${code}</p>` +
+            "<p>Mã có hiệu lực trong một lần sử dụng. Không chia sẻ mã này cho bất kỳ ai.</p>",
+    });
+}
+
+export async function sendCustomerActivationEmail({ toEmail, firstname, code }) {
+    const mailer = getTransporter();
+
+    if (!mailer) {
+        console.warn(
+            `[customer-auth] Email service not configured. OTP for ${toEmail}: ${code}`
+        );
+        return;
+    }
+
+    const safeName = String(firstname || "Khach hang");
+
+    await mailer.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_APP_ADMIN,
+        to: toEmail,
+        subject: "ThueXe - Mã xác thực tài khoản",
+        text:
+            `Xin chào ${safeName},\n\n` +
+            `Mã OTP xác thực tài khoản của bạn là: ${code}\n\n` +
+            "Mã có hiệu lực cho một lần sử dụng. Không chia sẻ mã này cho bất kỳ ai.",
+        html:
+            `<p>Xin chào <strong>${safeName}</strong>,</p>` +
+            "<p>Mã OTP xác thực tài khoản của bạn là:</p>" +
+            `<p style="font-size:28px;font-weight:bold;letter-spacing:6px;color:#0369a1">${code}</p>` +
+            "<p>Mã có hiệu lực cho một lần sử dụng. Không chia sẻ mã này cho bất kỳ ai.</p>",
+    });
+}
+
 export async function sendOwnerRegisterVerificationEmail({ toEmail, ownerName, verifyLink, expiresMinutes = 3 }) {
     const mailer = getTransporter();
     if (!mailer) {

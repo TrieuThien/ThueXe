@@ -1,5 +1,5 @@
 import sqldb from "../../config/sqldatabase.js";
-import { sendPasswordResetEmail } from "../emailService.js";
+import { sendCustomerActivationEmail, sendPasswordResetEmail } from "../emailService.js";
 import {
     consumeAccountCode,
     createCustomerAccount,
@@ -51,6 +51,13 @@ function normalizeIdentifier(identifier) {
     return value.includes("@") ? value.toLowerCase() : value;
 }
 
+function generateNumericOtp(length = 6) {
+    const size = Math.max(Number(length) || 6, 4);
+    const min = 10 ** (size - 1);
+    const max = 10 ** size - 1;
+    return String(Math.floor(min + Math.random() * (max - min + 1)));
+}
+
 function mapContext(context) {
     const normalized = String(context).trim().toUpperCase();
     if (normalized === "ACTIVATION" || normalized === "0") return CODE_CONTEXT.ACTIVATION;
@@ -92,6 +99,10 @@ function assertAccountAvailable(account) {
 }
 
 async function issueTokenPair(account, conn) {
+    if (!account || !account.id) {
+        throw new AppError("Unable to issue token for this account.", 500, "TOKEN_ISSUE_FAILED");
+    }
+
     const refreshTokenId = generateCodeToken(10);
 
     const accessToken = signAccessToken({
@@ -146,7 +157,7 @@ export async function registerCustomer(payload) {
     }
 
     const passwordHash = await hashPassword(payload.password);
-    const activationCode = generateCodeToken(6);
+    const activationCode = generateNumericOtp(6);
 
     const connection = await sqldb.getConnection();
     try {
@@ -179,22 +190,82 @@ export async function registerCustomer(payload) {
             connection
         );
 
-        const account = await findCustomerById(userId);
+        const account = await findCustomerById(userId, connection);
         const tokens = await issueTokenPair(account, connection);
 
         await connection.commit();
 
-        return {
+        const response = {
             user: toAuthUser(account),
             activationRequired: true,
             ...tokens,
         };
+
+        if (email) {
+            void sendCustomerActivationEmail({
+                toEmail: email,
+                firstname: account.firstname,
+                code: activationCode,
+            }).catch((mailErr) => {
+                console.error("[customer-auth] Failed to send activation email:", mailErr.message);
+            });
+        } else if (phone) {
+            console.info(
+                `[customer-auth] Activation OTP for ${phone}: ${activationCode}`
+            );
+        }
+
+        return response;
     } catch (error) {
         await connection.rollback();
         throw error;
     } finally {
         connection.release();
     }
+}
+
+export async function resendCustomerOtp(payload) {
+    const identifier = normalizeIdentifier(payload.identifier);
+    const verificationId = Number(payload.verificationId || payload.userId || 0);
+
+    let account = null;
+    if (verificationId > 0) {
+        account = await findCustomerById(verificationId);
+    } else if (identifier) {
+        account = await findCustomerByIdentifier(identifier);
+    }
+
+    if (!account || account.accountDeleted === 1 || account.isActivated === 1) {
+        return {
+            message: "If the account exists, a new OTP has been sent.",
+        };
+    }
+
+    const activationCode = generateNumericOtp(6);
+
+    await replaceAccountCode({
+        userId: account.id,
+        context: CODE_CONTEXT.ACTIVATION,
+        code: activationCode,
+    });
+
+    if (account.email) {
+        void sendCustomerActivationEmail({
+            toEmail: account.email,
+            firstname: account.firstname,
+            code: activationCode,
+        }).catch((mailErr) => {
+            console.error("[customer-auth] Failed to resend activation email:", mailErr.message);
+        });
+    } else if (account.phone) {
+        console.info(
+            `[customer-auth] Resend activation OTP for ${account.phone}: ${activationCode}`
+        );
+    }
+
+    return {
+        message: "If the account exists, a new OTP has been sent.",
+    };
 }
 
 export async function verifyOtpCode(payload) {
@@ -205,7 +276,7 @@ export async function verifyOtpCode(payload) {
     try {
         await connection.beginTransaction();
 
-        const account = await findCustomerById(userId);
+        const account = await findCustomerById(userId, connection);
 
         if (!account) {
             throw new AppError("User not found.", 404, "USER_NOT_FOUND");

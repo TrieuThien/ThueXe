@@ -31,8 +31,9 @@ function mapCustomerAuthRow(row) {
     };
 }
 
-export async function findCustomerById(userId) {
-    const [rows] = await sqldb.query(
+export async function findCustomerById(userId, conn = null) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
         `SELECT user_id, firstname, lastname, email, phone, address, role, account_type,
                 is_activated, account_active, account_deleted, push_notification_token,
                 country, route_id, disp_lang, country_code, country_dial_code

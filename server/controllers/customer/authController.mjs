@@ -5,6 +5,7 @@ import {
     logout,
     refreshToken,
     registerCustomer,
+    resendCustomerOtp,
     resetPassword,
     updateCurrentProfile,
     updateCurrentPushToken,
@@ -16,6 +17,24 @@ import {
     buildRefreshCookieOptions,
     getRefreshTokenFromRequest,
 } from "../../utils/refreshTokenCookie.js";
+
+function shouldIncludeRefreshTokenInBody(req) {
+    const clientPlatform = String(req?.headers?.["x-client-platform"] || "")
+        .trim()
+        .toLowerCase();
+
+    return clientPlatform === "mobile" || clientPlatform === "app";
+}
+
+function buildAuthResponseData(req, result) {
+    if (shouldIncludeRefreshTokenInBody(req)) {
+        return result;
+    }
+
+    const responseData = { ...result };
+    delete responseData.refreshToken;
+    return responseData;
+}
 
 function setCustomerRefreshCookie(res, refreshToken) {
     const options = buildRefreshCookieOptions();
@@ -41,9 +60,7 @@ export async function registerHandler(req, res, next) {
     try {
         const result = await registerCustomer(req.body);
         setCustomerRefreshCookie(res, result.refreshToken);
-
-        const responseData = { ...result };
-        delete responseData.refreshToken;
+        const responseData = buildAuthResponseData(req, result);
 
         return successResponse(res, responseData, "Register successful", 201);
     } catch (error) {
@@ -60,13 +77,20 @@ export async function verifyOtpHandler(req, res, next) {
     }
 }
 
+export async function resendOtpHandler(req, res, next) {
+    try {
+        const result = await resendCustomerOtp(req.body);
+        return successResponse(res, result, result.message);
+    } catch (error) {
+        return next(error);
+    }
+}
+
 export async function loginHandler(req, res, next) {
     try {
         const result = await loginCustomer(req.body);
         setCustomerRefreshCookie(res, result.refreshToken);
-
-        const responseData = { ...result };
-        delete responseData.refreshToken;
+        const responseData = buildAuthResponseData(req, result);
 
         return successResponse(res, responseData, "Login successful");
     } catch (error) {
@@ -98,9 +122,7 @@ export async function refreshTokenHandler(req, res, next) {
         const result = await refreshToken(refreshTokenValue);
 
         setCustomerRefreshCookie(res, result.refreshToken);
-
-        const responseData = { ...result };
-        delete responseData.refreshToken;
+        const responseData = buildAuthResponseData(req, result);
 
         return successResponse(res, responseData, "Token refreshed");
     } catch (error) {
