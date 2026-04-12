@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,14 +14,13 @@ import { AUTH_OTP_SECONDS } from '../../constants/auth';
 import { useUiStore } from '../../store/uiStore';
 
 const otpSchema = z.object({
-  otp: z.string().regex(/^\d{6}$/, 'OTP gom 6 chu so')
+  otp: z.string().regex(/^\d{6}$/, 'OTP gồm 6 chữ số')
 });
 
 type OtpForm = z.infer<typeof otpSchema>;
 type Props = NativeStackScreenProps<AuthStackParamList, 'VerifyOtp'>;
 
 export const VerifyOtpScreen = ({ navigation, route }: Props) => {
-  const [otpRef, setOtpRef] = useState(route.params.otpRef);
   const [serverError, setServerError] = useState('');
   const { secondsLeft, formatted, reset } = useOtpCountdown(AUTH_OTP_SECONDS);
   const beginLoading = useUiStore((state) => state.beginLoading);
@@ -34,9 +33,7 @@ export const VerifyOtpScreen = ({ navigation, route }: Props) => {
     setError,
     reset: resetForm
   } = useForm<OtpForm>({
-    defaultValues: {
-      otp: ''
-    },
+    defaultValues: { otp: '' },
     resolver: zodResolver(otpSchema)
   });
 
@@ -45,21 +42,13 @@ export const VerifyOtpScreen = ({ navigation, route }: Props) => {
     setServerError('');
 
     try {
-      const result = await authService.verifyOtp({
-        otpRef,
-        identifier: route.params.identifier,
-        otp: values.otp,
-        purpose: route.params.purpose
+      await authService.verifyOtp({
+        driver_id: route.params.driver_id,
+        code: values.otp
       });
 
-      if (route.params.purpose === 'register') {
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      } else {
-        navigation.navigate('ResetPassword', {
-          identifier: route.params.identifier,
-          resetToken: result.resetToken || ''
-        });
-      }
+      // Sau OTP thành công → về màn hình Login (account đã được kích hoạt)
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } catch (error) {
       const serviceError = error as ServiceError;
       if (serviceError.code === 'OTP_INVALID') {
@@ -67,7 +56,7 @@ export const VerifyOtpScreen = ({ navigation, route }: Props) => {
       } else if (serviceError.code === 'OTP_EXPIRED') {
         setError('otp', { message: 'OTP đã hết hạn. Hãy gửi lại mã mới.' });
       } else {
-        setServerError(serviceError.message);
+        setServerError(serviceError.message || 'Xác thực thất bại. Vui lòng thử lại.');
       }
     } finally {
       endLoading();
@@ -78,13 +67,13 @@ export const VerifyOtpScreen = ({ navigation, route }: Props) => {
     beginLoading();
     setServerError('');
     try {
-      const result = await authService.resendOtp(route.params.identifier, route.params.purpose);
-      setOtpRef(result.otpRef);
-      reset(result.expiresIn);
+      await authService.resendOtp(route.params.identifier);
+      // Backend không trả otpRef mới; reset đếm ngược về mặc định
+      reset(AUTH_OTP_SECONDS);
       resetForm({ otp: '' });
     } catch (error) {
       const serviceError = error as ServiceError;
-      setServerError(serviceError.message);
+      setServerError(serviceError.message || 'Không gửi lại được OTP. Vui lòng thử lại.');
     } finally {
       endLoading();
     }

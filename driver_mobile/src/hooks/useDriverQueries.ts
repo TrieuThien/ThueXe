@@ -24,12 +24,6 @@ export const useUpdateProfileMutation = () => {
 export const useDashboardQuery = () =>
   useQuery({ queryKey: queryKeys.dashboard, queryFn: driverService.getDashboard });
 
-export const useCurrentTripQuery = () =>
-  useQuery({ queryKey: queryKeys.currentTrip, queryFn: driverService.getCurrentTrip, refetchInterval: 15000 });
-
-export const useTripHistoryQuery = () =>
-  useQuery({ queryKey: queryKeys.history, queryFn: driverService.getTripHistory });
-
 export const useWalletQuery = () =>
   useQuery({ queryKey: queryKeys.wallet, queryFn: driverService.getWallet });
 

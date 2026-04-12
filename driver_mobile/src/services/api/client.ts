@@ -1,14 +1,15 @@
-﻿import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
-import { API_TIMEOUT } from '../../constants/app';
+import axios, { AxiosError, type AxiosRequestConfig } from 'axios';
+import { API_BASE_URL, API_TIMEOUT } from '../../constants/app';
 import { tokenStorage } from '../storage/tokenStorage';
-import { mockApiAdapter } from '../mock/mockServer';
 
 type RetryableConfig = AxiosRequestConfig & { _retry?: boolean };
 
 const baseConfig: AxiosRequestConfig = {
-  baseURL: 'https://api.thuexe.local',
+  baseURL: API_BASE_URL,
   timeout: API_TIMEOUT,
-  adapter: mockApiAdapter
+  headers: {
+    'x-client-platform': 'mobile'
+  }
 };
 
 export const apiClient = axios.create(baseConfig);
@@ -22,10 +23,15 @@ const runRefreshToken = async (): Promise<string | null> => {
   }
 
   try {
-    const response = await axios.create(baseConfig).post('/auth/refresh', {
+    const response = await axios.create(baseConfig).post('/api/driver/auth/refresh-token', {
       refreshToken: saved.refreshToken
     });
-    const nextTokens = response.data.data;
+    const data = response.data.data as { accessToken: string; refreshToken: string };
+    const nextTokens = {
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      expiresAt: Date.now() + 15 * 60 * 1000
+    };
     await tokenStorage.saveTokens(nextTokens);
     return nextTokens.accessToken;
   } catch {

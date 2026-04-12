@@ -59,7 +59,7 @@ export const RegisterScreen = ({ navigation }: Props) => {
 
       navigation.navigate('VerifyOtp', {
         identifier: response.identifier,
-        otpRef: response.otpRef,
+        driver_id: response.driver_id,
         purpose: response.purpose
       });
     } catch (error) {

@@ -58,11 +58,3 @@ export type SendSupportMessagePayload = {
   content: string;
   attachments?: SupportAttachment[];
 };
-
-export type SupportMockImage = {
-  id: string;
-  fileName: string;
-  uri: string;
-  width: number;
-  height: number;
-};

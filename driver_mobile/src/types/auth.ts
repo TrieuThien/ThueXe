@@ -1,4 +1,4 @@
-﻿export type AuthTokens = {
+export type AuthTokens = {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
@@ -61,34 +61,36 @@ export type RegisterPayload = {
   password: string;
 };
 
-export type OtpPurpose = 'register' | 'forgot_password';
+// Backend: OTP chỉ dùng cho activation (đăng ký), không dùng cho forgot-password
+export type OtpPurpose = 'register';
 
 export type OtpChallengeResponse = {
-  otpRef: string;
-  expiresIn: number;
+  driver_id: number;
   identifier: string;
   purpose: OtpPurpose;
 };
 
 export type VerifyOtpPayload = {
-  otpRef: string;
-  identifier: string;
-  otp: string;
-  purpose: OtpPurpose;
+  driver_id: number;
+  code: string;
 };
 
 export type VerifyOtpResponse = {
-  verified: boolean;
-  resetToken?: string;
+  profile: DriverProfile;
+  tokens: AuthTokens;
 };
 
 export type ForgotPasswordPayload = {
   email: string;
 };
 
+export type ForgotPasswordResponse = {
+  message: string;
+};
+
+// Token đến từ link trong email (deep link hoặc user tự nhập)
 export type ResetPasswordPayload = {
-  identifier: string;
-  resetToken: string;
+  token: string;
   newPassword: string;
 };
 

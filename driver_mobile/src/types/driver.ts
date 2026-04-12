@@ -1,10 +1,8 @@
-﻿import type { AccountStatus, VerificationStatus, WorkingStatus } from './auth';
+import type { AccountStatus, VerificationStatus, WorkingStatus } from './auth';
 
+// DashboardScreen chỉ sử dụng todayIncome → map từ /api/driver/income/summary
 export type DashboardSummary = {
-  todayTrips: number;
   todayIncome: number;
-  onlineHours: number;
-  acceptanceRate: number;
 };
 
 export type DriverAccountStatusResponse = {

@@ -35,8 +35,8 @@ export const LoginScreen = ({ navigation }: Props) => {
     setError
   } = useForm<LoginForm>({
     defaultValues: {
-      identifier: 'driver@thuexe.vn',
-      password: '123456'
+      identifier: '',
+      password: ''
     },
     resolver: zodResolver(loginSchema)
   });

@@ -16,11 +16,10 @@ import { EmptyState, ErrorState, LoadingState } from '../../components/states';
 import {
   useSendSupportMessageMutation,
   useSupportMessagesQuery,
-  useSupportMockImagesQuery,
   useSupportTicketsQuery
 } from '../../hooks/useSupportModuleQueries';
 import type { AccountStackParamList } from '../../types/navigation';
-import type { SupportAttachment, SupportMessage, SupportMockImage, SupportTicketStatus } from '../../types/support';
+import type { SupportMessage, SupportTicketStatus } from '../../types/support';
 import { formatDateTime } from '../../utils/format';
 
 type SupportChatRoute = RouteProp<AccountStackParamList, 'SupportChat'>;
@@ -37,59 +36,34 @@ export const SupportChatScreen = () => {
   const flatListRef = useRef<FlatList<SupportMessage>>(null);
 
   const [input, setInput] = useState('');
-  const [showAttachmentPanel, setShowAttachmentPanel] = useState(false);
-  const [selectedImageIds, setSelectedImageIds] = useState<string[]>([]);
 
   const ticketId = route.params.ticketId;
 
   const ticketsQuery = useSupportTicketsQuery();
   const messagesQuery = useSupportMessagesQuery(ticketId);
-  const mockImagesQuery = useSupportMockImagesQuery();
   const sendMutation = useSendSupportMessageMutation();
 
   const safeTickets = useMemo(() => (Array.isArray(ticketsQuery.data) ? ticketsQuery.data : []), [ticketsQuery.data]);
   const safeMessages = useMemo(() => (Array.isArray(messagesQuery.data) ? messagesQuery.data : []), [messagesQuery.data]);
-  const safeMockImages = useMemo(() => (Array.isArray(mockImagesQuery.data) ? mockImagesQuery.data : []), [mockImagesQuery.data]);
 
   const ticket = useMemo(() => safeTickets.find((item) => item.id === ticketId), [ticketId, safeTickets]);
-  const selectedImages = useMemo(
-    () => safeMockImages.filter((item) => selectedImageIds.includes(item.id)),
-    [safeMockImages, selectedImageIds]
-  );
 
-  const sendingDisabled = sendMutation.isPending || (!input.trim() && selectedImages.length === 0);
-
-  const toggleImage = (image: SupportMockImage) => {
-    setSelectedImageIds((previous) =>
-      previous.includes(image.id) ? previous.filter((id) => id !== image.id) : [...previous, image.id]
-    );
-  };
+  const sendingDisabled = sendMutation.isPending || !input.trim();
 
   const onSend = () => {
     if (sendingDisabled) {
       return;
     }
 
-    const attachments: SupportAttachment[] = selectedImages.map((item) => ({
-      id: `att-${item.id}-${Date.now()}`,
-      type: 'image',
-      fileName: item.fileName,
-      uri: item.uri,
-      width: item.width,
-      height: item.height
-    }));
-
     sendMutation.mutate(
       {
         ticketId,
         content: input.trim(),
-        attachments
+        attachments: []
       },
       {
         onSuccess: () => {
           setInput('');
-          setSelectedImageIds([]);
-          setShowAttachmentPanel(false);
           setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         }
       }
@@ -100,14 +74,13 @@ export const SupportChatScreen = () => {
     return <LoadingState label="Đang tải chat hỗ trợ..." />;
   }
 
-  if (ticketsQuery.isError || messagesQuery.isError || mockImagesQuery.isError) {
+  if (ticketsQuery.isError || messagesQuery.isError) {
     return (
       <ErrorState
         title="Không tải được màn hình chat"
         onRetry={() => {
           void ticketsQuery.refetch();
           void messagesQuery.refetch();
-          void mockImagesQuery.refetch();
         }}
       />
     );
@@ -158,48 +131,7 @@ export const SupportChatScreen = () => {
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
         />
 
-        {selectedImages.length ? (
-          <View style={styles.selectedWrap}>
-            <Text style={styles.selectedLabel}>Ảnh đã chọn ({selectedImages.length})</Text>
-            <FlatList
-              horizontal
-              data={selectedImages}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.selectedList}
-              renderItem={({ item }) => <Image source={{ uri: item.uri }} style={styles.selectedImage} />}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
-        ) : null}
-
-        {showAttachmentPanel ? (
-          <View style={styles.attachmentPanel}>
-            <Text style={styles.attachmentTitle}>Đính kèm hình ảnh mock</Text>
-            <FlatList
-              horizontal
-              data={safeMockImages}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.attachmentList}
-              renderItem={({ item }) => {
-                const active = selectedImageIds.includes(item.id);
-                return (
-                  <Pressable onPress={() => toggleImage(item)} style={[styles.attachmentPicker, active && styles.attachmentPickerActive]}>
-                    <Image source={{ uri: item.uri }} style={styles.attachmentPickerImage} />
-                    <Text style={styles.attachmentPickerText} numberOfLines={1}>
-                      {item.fileName}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
-        ) : null}
-
         <View style={styles.inputRow}>
-          <Pressable onPress={() => setShowAttachmentPanel((value) => !value)} style={styles.attachBtn}>
-            <Text style={styles.attachText}>{showAttachmentPanel ? 'Đóng' : 'Ảnh mock'}</Text>
-          </Pressable>
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -299,81 +231,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: '#CBD5E1'
   },
-  selectedWrap: {
-    gap: 8
-  },
-  selectedLabel: {
-    color: '#334155',
-    fontSize: 12,
-    fontWeight: '700'
-  },
-  selectedList: {
-    gap: 8
-  },
-  selectedImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 10,
-    backgroundColor: '#CBD5E1'
-  },
-  attachmentPanel: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    gap: 8
-  },
-  attachmentTitle: {
-    color: '#0F172A',
-    fontWeight: '700',
-    fontSize: 13
-  },
-  attachmentList: {
-    gap: 8
-  },
-  attachmentPicker: {
-    width: 140,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden'
-  },
-  attachmentPickerActive: {
-    borderColor: '#2563EB',
-    borderWidth: 2
-  },
-  attachmentPickerImage: {
-    width: '100%',
-    height: 88,
-    backgroundColor: '#CBD5E1'
-  },
-  attachmentPickerText: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 11,
-    color: '#334155'
-  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
-  },
-  attachBtn: {
-    minHeight: 42,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    backgroundColor: '#FFFFFF'
-  },
-  attachText: {
-    color: '#334155',
-    fontWeight: '700',
-    fontSize: 12
   },
   input: {
     flex: 1,

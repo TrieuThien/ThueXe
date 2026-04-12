@@ -21,12 +21,6 @@ export const useSupportMessagesQuery = (ticketId: string) =>
     enabled: Boolean(ticketId)
   });
 
-export const useSupportMockImagesQuery = () =>
-  useQuery({
-    queryKey: queryKeys.supportMockImages,
-    queryFn: supportService.getMockImages
-  });
-
 export const useCreateSupportTicketMutation = () => {
   const queryClient = useQueryClient();
 

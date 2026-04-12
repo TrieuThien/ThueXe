@@ -1,8 +1,8 @@
-﻿import React from 'react';
+import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthLayout } from '../../layouts/AuthLayout';
 import { AppButton, AppTextInput, AuthTextLink } from '../../components/common';
@@ -21,6 +21,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 export const ForgotPasswordScreen = ({ navigation }: Props) => {
   const beginLoading = useUiStore((state) => state.beginLoading);
   const endLoading = useUiStore((state) => state.endLoading);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const {
     control,
@@ -28,35 +29,27 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
     formState: { errors, isSubmitting },
     setError
   } = useForm<ForgotForm>({
-    defaultValues: {
-      email: ''
-    },
+    defaultValues: { email: '' },
     resolver: zodResolver(forgotSchema)
   });
 
   const onSubmit = handleSubmit(async (values) => {
     beginLoading();
+    setSuccessMessage('');
     try {
       const result = await authService.forgotPassword({ email: values.email });
-      navigation.navigate('VerifyOtp', {
-        identifier: result.identifier,
-        otpRef: result.otpRef,
-        purpose: result.purpose
-      });
+      // Backend gửi link reset qua email, không có OTP flow trên mobile
+      setSuccessMessage(result.message || 'Vui lòng kiểm tra email để đặt lại mật khẩu.');
     } catch (error) {
       const serviceError = error as ServiceError;
-      if (serviceError.code === 'EMAIL_NOT_FOUND') {
-        setError('email', { message: 'Email chưa tồn tại' });
-      } else {
-        setError('email', { message: serviceError.message });
-      }
+      setError('email', { message: serviceError.message || 'Không gửi được yêu cầu. Vui lòng thử lại.' });
     } finally {
       endLoading();
     }
   });
 
   return (
-    <AuthLayout title="Quên mật khẩu" subtitle="Nhập email để nhận OTP đặt lại mật khẩu">
+    <AuthLayout title="Quên mật khẩu" subtitle="Nhập email để nhận link đặt lại mật khẩu">
       <View style={styles.form}>
         <Controller
           control={control}
@@ -73,7 +66,11 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
           )}
         />
 
-        <AppButton title="Gửi mã OTP" onPress={onSubmit} loading={isSubmitting} />
+        {successMessage ? (
+          <Text style={styles.successMessage}>{successMessage}</Text>
+        ) : null}
+
+        <AppButton title="Gửi yêu cầu" onPress={onSubmit} loading={isSubmitting} />
 
         <AuthTextLink label="Quay lại đăng nhập" onPress={() => navigation.navigate('Login')} />
       </View>
@@ -84,5 +81,11 @@ export const ForgotPasswordScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   form: {
     gap: 16
+  },
+  successMessage: {
+    color: '#059669',
+    textAlign: 'center',
+    fontSize: 14,
+    paddingHorizontal: 8
   }
 });

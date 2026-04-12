@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,10 +34,7 @@ export const ResetPasswordScreen = ({ navigation, route }: Props) => {
     formState: { errors, isSubmitting },
     setError
   } = useForm<ResetForm>({
-    defaultValues: {
-      password: '',
-      confirmPassword: ''
-    },
+    defaultValues: { password: '', confirmPassword: '' },
     resolver: zodResolver(resetSchema)
   });
 
@@ -45,22 +42,22 @@ export const ResetPasswordScreen = ({ navigation, route }: Props) => {
     beginLoading();
     try {
       await authService.resetPassword({
-        identifier: route.params.identifier,
-        resetToken: route.params.resetToken,
+        token: route.params.token,
         newPassword: values.password
       });
-
       navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } catch (error) {
       const serviceError = error as ServiceError;
-      setError('password', { message: serviceError.message || 'Không đặt lại được mật khẩu' });
+      setError('password', {
+        message: serviceError.message || 'Không đặt lại được mật khẩu. Token có thể đã hết hạn.'
+      });
     } finally {
       endLoading();
     }
   });
 
   return (
-    <AuthLayout title="Đặt lại mật khẩu" subtitle="ạo mật khẩu mới cho tài khoản tài xế">
+    <AuthLayout title="Đặt lại mật khẩu" subtitle="Tạo mật khẩu mới cho tài khoản tài xế">
       <View style={styles.form}>
         <Controller
           control={control}
@@ -93,7 +90,6 @@ export const ResetPasswordScreen = ({ navigation, route }: Props) => {
         />
 
         <AppButton title="Cập nhật mật khẩu" onPress={onSubmit} loading={isSubmitting} />
-
         <AuthTextLink label="Quay lại đăng nhập" onPress={() => navigation.navigate('Login')} />
       </View>
     </AuthLayout>
@@ -101,7 +97,5 @@ export const ResetPasswordScreen = ({ navigation, route }: Props) => {
 };
 
 const styles = StyleSheet.create({
-  form: {
-    gap: 16
-  }
+  form: { gap: 16 }
 });

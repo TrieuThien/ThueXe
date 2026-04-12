@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
+import MapView, { Marker } from 'react-native-maps';
 import { MainLayout } from '../../layouts/MainLayout';
 import { AppButton } from '../../components/common';
 import { EmptyState, ErrorState, LoadingState } from '../../components/states';
@@ -91,6 +92,19 @@ export const WorkingStatusScreen = () => {
   }
 
   const overview = workingQuery.data;
+  const currentRegion = overview.lastLocation
+    ? {
+        latitude: overview.lastLocation.lat,
+        longitude: overview.lastLocation.lng,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01
+      }
+    : {
+        latitude: 10.7769,
+        longitude: 106.7009,
+        latitudeDelta: 0.08,
+        longitudeDelta: 0.08
+      };
 
   const toggleServiceType = async (typeId: ServiceTypeId) => {
     setUiError('');
@@ -163,15 +177,27 @@ export const WorkingStatusScreen = () => {
 
   return (
     <MainLayout title="Trạng thái làm việc">
-      <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapLabel}>Map placeholder</Text>
-        {overview.lastLocation ? (
-          <Text style={styles.locationText}>
-            {overview.lastLocation.lat.toFixed(5)}, {overview.lastLocation.lng.toFixed(5)}
-          </Text>
-        ) : (
-          <Text style={styles.locationText}>Chưa có vị trí</Text>
-        )}
+      <View style={styles.mapWrapper}>
+        <MapView style={styles.map} initialRegion={currentRegion}>
+          {overview.lastLocation ? (
+            <Marker
+              coordinate={{
+                latitude: overview.lastLocation.lat,
+                longitude: overview.lastLocation.lng
+              }}
+              title="Vị trí hiện tại"
+            />
+          ) : null}
+        </MapView>
+        <View style={styles.mapInfo}>
+          {overview.lastLocation ? (
+            <Text style={styles.locationText}>
+              {overview.lastLocation.lat.toFixed(5)}, {overview.lastLocation.lng.toFixed(5)}
+            </Text>
+          ) : (
+            <Text style={styles.locationText}>Chưa có vị trí</Text>
+          )}
+        </View>
       </View>
 
       <CardInfo title="Online / Offline" subtitle="Bắt đầu online để nhận cuộc gọi mới">
@@ -222,21 +248,29 @@ export const WorkingStatusScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  mapPlaceholder: {
+  mapWrapper: {
     borderRadius: 16,
     minHeight: 180,
-    backgroundColor: '#DBEAFE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#CBD5E1'
   },
-  mapLabel: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#1E3A8A'
+  map: {
+    height: 220,
+    width: '100%'
+  },
+  mapInfo: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)'
   },
   locationText: {
-    color: '#1E40AF',
+    color: '#F8FAFC',
     fontWeight: '600'
   },
   switchRow: {

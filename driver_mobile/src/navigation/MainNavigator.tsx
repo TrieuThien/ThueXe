@@ -45,7 +45,7 @@ const AccountStack = createNativeStackNavigator<AccountStackParamList>();
 
 const stackScreenOptions = {
   headerTitleAlign: 'left' as const,
-  statusBarTranslucent: false,
+  // statusBarTranslucent: false,
   statusBarStyle: 'dark' as const,
 };
 

@@ -1,4 +1,4 @@
-﻿import type { NavigatorScreenParams } from '@react-navigation/native';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { OtpPurpose } from './auth';
 import type { TopupPaymentMethod, TopupResultStatus } from './wallet';
 
@@ -7,13 +7,13 @@ export type AuthStackParamList = {
   Register: undefined;
   VerifyOtp: {
     identifier: string;
-    otpRef: string;
+    driver_id: number;
     purpose: OtpPurpose;
   };
   ForgotPassword: undefined;
+  // Token đến từ deep link email; ResetPassword vẫn giữ trong stack để hỗ trợ deep link sau này
   ResetPassword: {
-    identifier: string;
-    resetToken: string;
+    token: string;
   };
 };
 
