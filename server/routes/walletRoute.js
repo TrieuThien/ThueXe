@@ -7,6 +7,7 @@ import {
     adminListWalletAccountsHandler,
     adminListWalletLedgerHandler,
     adminProcessWithdrawalHandler,
+    adminUpdateWalletStatusHandler,
     adminWalletOverviewHandler,
     createWithdrawalHandler,
     getMyWalletHandler,
@@ -19,6 +20,7 @@ import {
 import {
     adminAdjustWalletValidator,
     adminProcessWithdrawalValidator,
+    adminUpdateWalletStatusValidator,
     adminWalletAccountsValidator,
     adminWalletLedgerValidator,
     createWithdrawalValidator,
@@ -107,6 +109,14 @@ router.post(
     adminAdjustWalletValidator,
     validateRequest,
     adminAdjustWalletHandler
+);
+router.patch(
+    "/api/wallets/admin/accounts/:walletId/status",
+    requireAuth,
+    requireRole("admin"),
+    adminUpdateWalletStatusValidator,
+    validateRequest,
+    adminUpdateWalletStatusHandler
 );
 router.patch(
     "/api/wallets/admin/withdrawals/:withdrawalId",

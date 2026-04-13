@@ -4,6 +4,7 @@ import {
     adminListWalletAccounts,
     adminListWalletLedger,
     adminProcessWithdrawal,
+    adminUpdateWalletStatus,
     adminWalletOverview,
     createWithdrawal,
     getMyWallet,
@@ -114,6 +115,18 @@ export async function adminAdjustWalletHandler(req, res, next) {
     try {
         const result = await adminAdjustWallet({ payload: req.body, auth: req.auth });
         return successResponse(res, result, "Wallet adjusted successfully", 201);
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function adminUpdateWalletStatusHandler(req, res, next) {
+    try {
+        const result = await adminUpdateWalletStatus({
+            walletId: req.params.walletId,
+            payload: req.body,
+        });
+        return successResponse(res, result, "Wallet status updated successfully");
     } catch (error) {
         return next(error);
     }

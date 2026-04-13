@@ -51,6 +51,11 @@ export const adminAdjustWalletValidator = [
     body("note").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("note must not exceed 255 characters"),
 ];
 
+export const adminUpdateWalletStatusValidator = [
+    param("walletId").isInt({ min: 1 }).withMessage("walletId must be a positive integer").toInt(),
+    body("status").isInt({ min: 0, max: 1 }).withMessage("status must be 0 (disabled) or 1 (active)").toInt(),
+];
+
 export const adminProcessWithdrawalValidator = [
     param("withdrawalId").isInt({ min: 1 }).withMessage("withdrawalId must be a positive integer").toInt(),
     body("status").isIn(["approved", "rejected", "paid", "cancelled"]).withMessage("status is invalid"),

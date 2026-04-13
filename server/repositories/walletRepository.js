@@ -91,6 +91,17 @@ export async function updateWalletBalance(walletId, balance, conn) {
     );
 }
 
+export async function updateWalletStatus(walletId, status, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE wallet_accounts
+         SET status = ?
+         WHERE wallet_id = ?
+         LIMIT 1`,
+        [status, walletId]
+    );
+}
+
 export async function insertWalletLedger(payload, conn) {
     const db = dbConnection(conn);
     const [result] = await db.query(

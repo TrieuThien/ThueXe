@@ -21,6 +21,7 @@ import {
     markBookingPaidByWallet,
     markRentalPaidByWallet,
     updateWalletBalance,
+    updateWalletStatus,
     updateWithdrawalStatus,
     walletOverview,
 } from "../repositories/walletRepository.js";
@@ -412,6 +413,30 @@ export async function adminAdjustWallet({ payload, auth }) {
             payment_id: paymentId,
         };
     });
+}
+
+export async function adminUpdateWalletStatus({ walletId, payload }) {
+    const numericWalletId = Number(walletId);
+    if (!Number.isInteger(numericWalletId) || numericWalletId < 1) {
+        throw new AppError("Invalid wallet id.", 422, "INVALID_WALLET_ID");
+    }
+    const status = Number(payload.status);
+    if (status !== 0 && status !== 1) {
+        throw new AppError("status must be 0 (disabled) or 1 (active).", 422, "INVALID_STATUS");
+    }
+
+    const conn = await sqldb.getConnection();
+    try {
+        const [rows] = await conn.query(
+            `SELECT wallet_id, status FROM wallet_accounts WHERE wallet_id = ? LIMIT 1`,
+            [numericWalletId]
+        );
+        if (!rows[0]) throw new AppError("Wallet not found.", 404, "WALLET_NOT_FOUND");
+        await updateWalletStatus(numericWalletId, status, conn);
+        return { wallet_id: numericWalletId, status };
+    } finally {
+        conn.release();
+    }
 }
 
 export async function adminProcessWithdrawal({ withdrawalId, payload }) {
