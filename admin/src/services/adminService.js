@@ -24,6 +24,11 @@ export async function adjustWallet(payloadData) {
     return payload(response);
 }
 
+export async function updateWalletStatus(walletId, status) {
+    const response = await apiClient.patch(`/api/wallets/admin/accounts/${walletId}/status`, { status });
+    return payload(response);
+}
+
 export async function getPayouts(params = {}) {
     const response = await apiClient.get("/api/wallets/admin/overview", { params });
     const data = payload(response);
