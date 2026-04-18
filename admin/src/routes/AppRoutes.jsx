@@ -56,6 +56,7 @@ import SystemSettingsPage from "../pages/settings/SystemSettingsPage";
 import DriverReportPage from "../pages/reports/DriverReportPage";
 import CustomerReportPage from "../pages/reports/CustomerReportPage";
 import PaymentReportPage from "../pages/reports/PaymentReportPage";
+import RentalPackagesPage from "../pages/rentals/RentalPackagesPage";
 
 function getElementByRoleAndPath(role, path) {
     const sharedMap = {
@@ -107,6 +108,7 @@ function getElementByRoleAndPath(role, path) {
             "reports/drivers": <DriverReportPage />,
             "reports/customers": <CustomerReportPage />,
             "reports/payments": <PaymentReportPage />,
+            "rental-packages": <RentalPackagesPage />,
         };
 
         if (adminMap[path]) {

@@ -10,6 +10,7 @@ const emptyEditState = {
     num_seats: "",
     icon_type: "1",
     avail: true,
+    provide_rental: false,
     ride_img: null,
     currentImage: "",
 };
@@ -38,6 +39,10 @@ function validateCarForm(form, requireImage = false) {
         nextErrors.icon_type = "Loại icon phải là số nguyên từ 1 đến 6.";
     }
 
+    if (!form.avail && !form.provide_rental) {
+        nextErrors.services = "Phải chọn ít nhất một dịch vụ cung cấp cho loại xe này.";
+    }
+
     if (form.ride_img) {
         const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
         if (!allowedTypes.includes(form.ride_img.type)) {
@@ -61,12 +66,47 @@ function buildFormData(form) {
     formData.append("num_seats", String(Number(form.num_seats)));
     formData.append("icon_type", String(form.icon_type === "" ? 1 : Number(form.icon_type)));
     formData.append("avail", form.avail ? "1" : "0");
+    formData.append("provide_rental", form.provide_rental ? "1" : "0");
 
     if (form.ride_img) {
         formData.append("ride_img", form.ride_img);
     }
 
     return formData;
+}
+
+function ServiceBadges({ avail, provide_rental, size = "md" }) {
+    const hasRide = Number(avail) === 1;
+    const hasRental = Number(provide_rental) === 1;
+
+    const base = size === "sm"
+        ? "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+        : "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold";
+
+    if (!hasRide && !hasRental) {
+        return (
+            <span className={`${base} bg-slate-100 text-slate-500`}>
+                Không cung cấp dịch vụ
+            </span>
+        );
+    }
+
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {hasRide && (
+                <span className={`${base} bg-blue-100 text-blue-700`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                    Gọi xe
+                </span>
+            )}
+            {hasRental && (
+                <span className={`${base} bg-emerald-100 text-emerald-700`}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Cho thuê
+                </span>
+            )}
+        </div>
+    );
 }
 
 function EditCarModal({ car, saving, errors, submitMessage, onChange, onClose, onSubmit }) {
@@ -92,6 +132,9 @@ function EditCarModal({ car, saving, errors, submitMessage, onChange, onClose, o
                     <div>
                         <p className="text-sm uppercase tracking-[0.35em] text-slate-400">Edit car</p>
                         <h2 className="mt-1 text-2xl font-bold text-slate-900">Cập nhật xe #{car.id}</h2>
+                        <div className="mt-2">
+                            <ServiceBadges avail={car.avail} provide_rental={car.provide_rental} />
+                        </div>
                     </div>
                     <button
                         type="button"
@@ -151,15 +194,37 @@ function EditCarModal({ car, saving, errors, submitMessage, onChange, onClose, o
                             />
                         </div>
 
-                        <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-                            <input
-                                type="checkbox"
-                                checked={car.avail}
-                                onChange={(event) => onChange("avail", event.target.checked)}
-                                className="h-4 w-4 rounded border-slate-300"
-                            />
-                            Xe đang sẵn sàng
-                        </label>
+                        {/* Service checkboxes */}
+                        <div className="space-y-2">
+                            <p className="text-sm font-semibold text-slate-700">Dịch vụ cung cấp</p>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-blue-300 hover:bg-blue-50">
+                                <input
+                                    type="checkbox"
+                                    checked={car.avail}
+                                    onChange={(event) => onChange("avail", event.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 accent-blue-600"
+                                />
+                                <span className="flex items-center gap-2">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+                                    Cung cấp dịch vụ gọi xe với loại xe này
+                                </span>
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50">
+                                <input
+                                    type="checkbox"
+                                    checked={car.provide_rental}
+                                    onChange={(event) => onChange("provide_rental", event.target.checked)}
+                                    className="h-4 w-4 rounded border-slate-300 accent-emerald-600"
+                                />
+                                <span className="flex items-center gap-2">
+                                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+                                    Cung cấp dịch vụ cho thuê với loại xe này
+                                </span>
+                            </label>
+                            {errors.services ? (
+                                <p className="text-sm text-red-600">{errors.services}</p>
+                            ) : null}
+                        </div>
                     </section>
 
                     <section className="space-y-5">
@@ -258,6 +323,7 @@ export default function CarList() {
             num_seats: String(car.num_seats ?? ""),
             icon_type: String(car.icon_type ?? 1),
             avail: Number(car.avail) === 1,
+            provide_rental: Number(car.provide_rental) === 1,
             ride_img: null,
             currentImage: car.ride_img || "",
         });
@@ -272,7 +338,7 @@ export default function CarList() {
 
     function updateSelectedCar(field, value) {
         setSelectedCar((prev) => ({ ...prev, [field]: value }));
-        setEditErrors((prev) => ({ ...prev, [field]: "" }));
+        setEditErrors((prev) => ({ ...prev, [field]: "", services: "" }));
     }
 
     async function handleUpdateCar(event) {
@@ -308,7 +374,7 @@ export default function CarList() {
                     <p className="text-sm uppercase tracking-[0.35em] text-blue-200">Vehicle list</p>
                     <h1 className="mt-2 text-3xl font-bold">Danh sách xe</h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-200">
-                        Theo dõi toàn bộ xe trong bảng rides, kiểm tra trạng thái hoạt động và cập nhật nhanh qua modal chỉnh sửa.
+                        Theo dõi các loại xe, kiểm tra dịch vụ đang cung cấp (gọi xe / cho thuê) và cập nhật thông tin.
                     </p>
                 </div>
                 <button
@@ -344,7 +410,7 @@ export default function CarList() {
                     Chưa có xe nào trong hệ thống.
                 </div>
             ) : (
-                <div className="grid gap-5 xl:grid-cols-2">
+                <div className="grid gap-5 xl:grid-cols-1">
                     {cars.map((car) => (
                         <article
                             key={car.id}
@@ -373,14 +439,8 @@ export default function CarList() {
                                             </p>
                                             <h2 className="mt-2 text-2xl font-bold text-slate-900">{car.ride_type}</h2>
                                         </div>
-                                        <span
-                                            className={`rounded-full px-3 py-1 text-xs font-semibold ${Number(car.avail) === 1
-                                                ? "bg-emerald-100 text-emerald-700"
-                                                : "bg-amber-100 text-amber-700"
-                                                }`}
-                                        >
-                                            {Number(car.avail) === 1 ? "Đang rảnh" : "Tạm bận"}
-                                        </span>
+                                        {/* Service badges */}
+                                        <ServiceBadges avail={car.avail} provide_rental={car.provide_rental} />
                                     </div>
 
                                     <p className="text-sm leading-6 text-slate-600">{car.ride_desc}</p>
@@ -399,6 +459,33 @@ export default function CarList() {
                                                     className="h-10 w-10 rounded-xl border border-slate-200 bg-white object-contain p-1.5"
                                                 />
                                                 <p className="text-lg font-semibold text-slate-900">{car.icon_type}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Detailed service status */}
+                                    <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                                            Trạng thái dịch vụ
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="flex items-center gap-2 text-slate-600">
+                                                    <span className={`h-2 w-2 rounded-full ${Number(car.avail) === 1 ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                                    Gọi xe
+                                                </span>
+                                                <span className={`text-xs font-semibold ${Number(car.avail) === 1 ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                    {Number(car.avail) === 1 ? 'Đang hoạt động' : 'Không cung cấp'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="flex items-center gap-2 text-slate-600">
+                                                    <span className={`h-2 w-2 rounded-full ${Number(car.provide_rental) === 1 ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                                    Cho thuê
+                                                </span>
+                                                <span className={`text-xs font-semibold ${Number(car.provide_rental) === 1 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                                    {Number(car.provide_rental) === 1 ? 'Đang hoạt động' : 'Không cung cấp'}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

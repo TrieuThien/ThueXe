@@ -11,7 +11,7 @@ export default function DocumentReviewPage({ subject = "users" }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [preview, setPreview] = useState(null);
-    const actorType = subject === "drivers" ? "driver" : "user";
+    const actorType = subject === "drivers" ? "driver" : subject === "vehicle-owners" ? "owner" : "user";
     const actorTypeLabel = subject === "drivers" ? "Tài xế" : subject === "vehicle-owners" ? "Chủ xe" : "Khách hàng";
     const [filters, setFilters] = useState({
         id: "",
@@ -200,9 +200,9 @@ export default function DocumentReviewPage({ subject = "users" }) {
                                             <td className="px-4 py-3">{row.date_submitted ? new Date(row.date_submitted).toLocaleString("vi-VN") : "--"}</td>
                                             <td className="px-4 py-3">
                                                 <div className="flex flex-wrap gap-2">
-                                                    <button type="button" onClick={() => setPreview(row)} className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-1.5 hover:bg-slate-50"><Eye className="h-4 w-4" />View</button>
-                                                    <button type="button" onClick={() => handleReview(row, "approve")} className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 px-3 py-1.5 text-emerald-700 hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" />Approve</button>
-                                                    <button type="button" onClick={() => handleReview(row, "reject")} className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50"><XCircle className="h-4 w-4" />Reject</button>
+                                                    <button type="button" onClick={() => setPreview(row)} className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-1.5 hover:bg-slate-50"><Eye className="h-4 w-4" />Chi tiết</button>
+                                                    <button type="button" onClick={() => handleReview(row, "approve")} className="inline-flex items-center gap-1 rounded-xl border border-emerald-200 px-3 py-1.5 text-emerald-700 hover:bg-emerald-50"><CheckCircle2 className="h-4 w-4" />Duyệt</button>
+                                                    <button type="button" onClick={() => handleReview(row, "reject")} className="inline-flex items-center gap-1 rounded-xl border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50"><XCircle className="h-4 w-4" />Từ chối</button>
                                                 </div>
                                             </td>
                                         </tr>

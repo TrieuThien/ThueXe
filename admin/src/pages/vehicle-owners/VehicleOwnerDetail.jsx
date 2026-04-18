@@ -83,7 +83,7 @@ export default function VehicleOwnerDetail() {
         { key: "rentals", label: "Cho thuê" },
         { key: "withdrawals", label: "Rút tiền" },
         { key: "walletLedger", label: "Ví" },
-        { key: "documents", label: "Tài liệu" },
+        { key: "documents", label: "Hồ sơ" },
     ];
 
     return (
@@ -143,7 +143,7 @@ export default function VehicleOwnerDetail() {
                         <div className="overflow-x-auto">
                             {tab === "vehicles" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID</th><th className="px-6 py-4">Xe</th><th className="px-6 py-4">Biển số</th><th className="px-6 py-4">Trạng thái</th><th className="px-6 py-4">Xác minh</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID</th><th className="px-6 py-4">Xe</th><th className="px-6 py-4">Biển số</th><th className="px-6 py-4">Trạng thái xác minh</th><th className="px-6 py-4">Xác minh</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.vehicles || []).map((item) => <tr key={item.vehicle_id} className="text-sm text-slate-700"><td className="px-6 py-4">#{item.vehicle_id}</td><td className="px-6 py-4">{`${item.brand || ""} ${item.model || ""} ${item.year || ""}`.trim()}</td><td className="px-6 py-4">{item.license_plate || "--"}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{item.verification_status || "--"}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
@@ -167,7 +167,7 @@ export default function VehicleOwnerDetail() {
                             ) : null}
                             {tab === "documents" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Hồ sơ</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Hạn sử dụng</th><th className="px-6 py-4">Trạng thái</th><th className="px-6 py-4">Cập nhật</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Hồ sơ</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Hạn sử dụng</th><th className="px-6 py-4">Trạng thái xác minh</th><th className="px-6 py-4">Cập nhật</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.documents || []).map((item) => <tr key={item.id} className="text-sm text-slate-700"><td className="px-6 py-4">{item.document_title || "--"}</td><td className="px-6 py-4">{item.doc_number || "--"}</td><td className="px-6 py-4">{formatDateTime(item.doc_expiry_date)}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{formatDateTime(item.updated_at)}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
