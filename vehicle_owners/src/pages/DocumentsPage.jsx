@@ -101,7 +101,7 @@ export default function DocumentsPage() {
           row.missingDocumentCount > 0 ? (
             <span className="font-semibold text-rose-700">Thiếu {row.missingDocumentCount} giấy tờ</span>
           ) : (
-            <span className="font-semibold text-emerald-700">đầy đủ</span>
+            <span className="font-semibold text-emerald-700">Đầy đủ</span>
           ),
       },
       { key: 'addedAt', header: 'Ngày thêm', render: (row) => formatDate(row.addedAt) },

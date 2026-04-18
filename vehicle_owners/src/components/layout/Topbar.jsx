@@ -9,6 +9,15 @@ export default function Topbar() {
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const toggleMobileSidebar = useUiStore((state) => state.toggleMobileSidebar);
+
+  const handleMenuClick = () => {
+    if (window.innerWidth >= 1024) {
+      toggleSidebar();
+    } else {
+      toggleMobileSidebar();
+    }
+  };
 
   const ownerName = useMemo(() => {
     try {
@@ -51,7 +60,7 @@ export default function Topbar() {
 
   return (
     <header className="sticky top-0 z-20 grid grid-cols-1 gap-3 border-b border-sky-100 bg-white/90 px-4 py-3 backdrop-blur md:px-6 lg:grid-cols-[auto_1fr_auto] lg:items-center">
-      <button type="button" className="btn w-fit" onClick={toggleSidebar}>
+      <button type="button" className="btn w-fit" onClick={handleMenuClick}>
         <Menu></Menu>
       </button>
 

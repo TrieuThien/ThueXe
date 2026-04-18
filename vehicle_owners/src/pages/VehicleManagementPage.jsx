@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/ui/PageHeader';
@@ -54,7 +54,7 @@ export default function VehicleManagementPage() {
     mutationFn: vehicleManagementService.createVehicle,
     onSuccess: () => {
       setDuplicatePlateError('');
-      toast.success('Đăng ký xe thành công. Hồ sơ da duoc Gửi duyệt.');
+      toast.success('Đăng ký xe thành công. Hồ sơ đã được gửi duyệt.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-management-list'] });
     },
     onError: (error) => {
@@ -76,7 +76,7 @@ export default function VehicleManagementPage() {
       queryClient.invalidateQueries({ queryKey: ['vehicle-management-document-detail', documentVehicleId] });
       setDocumentVehicleId('');
     },
-    onError: (error) => toast.error(error.message || 'Không thể Cập nhật giấy tờ.'),
+    onError: (error) => toast.error(error.message || 'Không thể cập nhật giấy tờ.'),
   });
 
   return (
@@ -127,5 +127,3 @@ export default function VehicleManagementPage() {
     </section>
   );
 }
-
-

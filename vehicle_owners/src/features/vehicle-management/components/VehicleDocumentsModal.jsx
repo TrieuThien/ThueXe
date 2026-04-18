@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 export default function VehicleDocumentsModal({
@@ -11,6 +11,13 @@ export default function VehicleDocumentsModal({
   submitting,
 }) {
   const [draftDocs, setDraftDocs] = useState({});
+  const objectUrlsRef = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(objectUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
 
   useEffect(() => {
     if (!vehicle || !open) {
@@ -19,13 +26,17 @@ export default function VehicleDocumentsModal({
 
     const initial = {};
     (documentCatalog || []).forEach((docType) => {
-      const existing = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id);
-      initial[docType.id] = {
-        file: null,
-        fileName: existing?.fileName || '',
-        fileUrl: existing?.fileUrl || '',
-        mimeType: existing?.mimeType || '',
-      };
+      if (docType.requiresTwoSides) {
+        const existingFront = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id && x.side === 'front');
+        const existingBack = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id && x.side === 'back');
+        const existingAny = existingFront || existingBack;
+        initial[`${docType.id}_front`] = { file: null, fileName: existingFront?.fileName || '', fileUrl: existingFront?.fileUrl || '', mimeType: existingFront?.mimeType || '' };
+        initial[`${docType.id}_back`] = { file: null, fileName: existingBack?.fileName || '', fileUrl: existingBack?.fileUrl || '', mimeType: existingBack?.mimeType || '' };
+        initial[`${docType.id}_num`] = existingAny?.documentNumber || '';
+      } else {
+        const existing = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id);
+        initial[docType.id] = { file: null, fileName: existing?.fileName || '', fileUrl: existing?.fileUrl || '', mimeType: existing?.mimeType || '', documentNumber: existing?.documentNumber || '' };
+      }
     });
     setDraftDocs(initial);
   }, [vehicle, open, documentCatalog]);
@@ -34,29 +45,35 @@ export default function VehicleDocumentsModal({
     return null;
   }
 
-  const setFile = (docTypeId, file) => {
+  const setFile = (key, file) => {
+    if (objectUrlsRef.current[key]) {
+      URL.revokeObjectURL(objectUrlsRef.current[key]);
+      delete objectUrlsRef.current[key];
+    }
+    let previewUrl = '';
+    if (file) {
+      previewUrl = URL.createObjectURL(file);
+      objectUrlsRef.current[key] = previewUrl;
+    }
     setDraftDocs((prev) => ({
       ...prev,
-      [docTypeId]: {
-        ...prev[docTypeId],
+      [key]: {
+        ...prev[key],
         file,
-        fileName: file?.name || prev[docTypeId]?.fileName || '',
-        fileUrl: file
-          ? file.type === 'application/pdf'
-            ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-            : `https://placehold.co/600x400.png?text=${encodeURIComponent(file.name)}`
-          : prev[docTypeId]?.fileUrl || '',
-        mimeType: file?.type || prev[docTypeId]?.mimeType || '',
+        fileName: file?.name || prev[key]?.fileName || '',
+        fileUrl: file ? previewUrl : prev[key]?.fileUrl || '',
+        mimeType: file?.type || prev[key]?.mimeType || '',
       },
     }));
   };
 
   const requiredMissing = (documentCatalog || []).some((docType) => {
-    if (!docType.required) {
-      return false;
+    if (!docType.required) return false;
+    if (docType.requiresNumber && !(docType.requiresTwoSides ? draftDocs[`${docType.id}_num`] : draftDocs[docType.id]?.documentNumber)) return true;
+    if (docType.requiresTwoSides) {
+      return !draftDocs[`${docType.id}_front`]?.fileUrl || !draftDocs[`${docType.id}_back`]?.fileUrl;
     }
-    const item = draftDocs[docType.id];
-    return !item?.fileUrl;
+    return !draftDocs[docType.id]?.fileUrl;
   });
 
   return (
@@ -66,7 +83,7 @@ export default function VehicleDocumentsModal({
           <h3 className="text-lg font-bold text-slate-900">Cập nhật giấy tờ xe</h3>
           <button type="button" className="btn" onClick={onClose}>
             <X size={16} />
-            Dong
+            Đóng
           </button>
         </div>
 
@@ -80,41 +97,107 @@ export default function VehicleDocumentsModal({
 
             <div className="grid gap-3 md:grid-cols-2">
               {(documentCatalog || []).map((docType) => {
+                if (docType.requiresTwoSides) {
+                  const existingFront = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id && x.side === 'front');
+                  const existingBack = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id && x.side === 'back');
+                  const rejectedSide = [existingFront, existingBack].find((x) => x?.status === 'rejected');
+                  return (
+                    <div key={docType.id} className={`rounded-xl border p-3 md:col-span-2 ${rejectedSide ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {docType.title} {docType.required ? <span className="text-rose-600">*</span> : null}
+                        <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">Yêu cầu ảnh 2 mặt</span>
+                      </p>
+                      {rejectedSide?.reviewNote ? (
+                        <p className="mt-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs text-rose-700">
+                          <span className="font-semibold">Lý do từ chối:</span> {rejectedSide.reviewNote}
+                        </p>
+                      ) : null}
+                      {docType.requiresNumber ? (
+                        <div className="mt-2">
+                          <label className="text-xs font-semibold text-slate-600">
+                            {docType.documentNumberLabel || 'Số giấy tờ'} <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="input-field mt-1"
+                            placeholder={docType.documentNumberLabel || 'Nhập số giấy tờ'}
+                            value={draftDocs[`${docType.id}_num`] || ''}
+                            onChange={(e) => setDraftDocs((prev) => ({ ...prev, [`${docType.id}_num`]: e.target.value }))}
+                          />
+                        </div>
+                      ) : null}
+                      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                        {[{ side: 'front', label: 'Mặt trước' }, { side: 'back', label: 'Mặt sau' }].map(({ side, label }) => {
+                          const key = `${docType.id}_${side}`;
+                          const doc = draftDocs[key] || {};
+                          return (
+                            <div key={side} className="rounded-md border border-dashed border-slate-300 bg-white p-2">
+                              <p className="mb-1 text-xs font-semibold text-slate-600">{label} <span className="text-rose-500">*</span></p>
+                              <input type="file" accept={docType.acceptedMimeTypes.join(',')} className="input-field p-2" onChange={(event) => setFile(key, event.target.files?.[0])} />
+                              <p className="mt-1 text-xs text-slate-500">{doc.fileName || 'Chưa có tệp'}</p>
+                              {doc.fileUrl ? (
+                                doc.mimeType === 'application/pdf' ? (
+                                  <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-semibold text-sky-700 hover:underline">Preview PDF</a>
+                                ) : (
+                                  <img src={doc.fileUrl} alt={`${docType.title} ${label}`} className="mt-1 h-20 w-full rounded-md object-cover" />
+                                )
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
                 const doc = draftDocs[docType.id] || {};
+                const existingDoc = (vehicle.documents || []).find((x) => x.documentTypeId === docType.id && x.side === 'single');
+                const isRejected = existingDoc?.status === 'rejected';
                 return (
-                  <label key={docType.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div key={docType.id} className={`rounded-xl border p-3 ${isRejected ? 'border-rose-200 bg-rose-50' : 'border-slate-200 bg-slate-50'}`}>
                     <p className="text-sm font-semibold text-slate-700">
-                      {docType.name} {docType.required ? <span className="text-rose-600">*</span> : null}
+                      {docType.title} {docType.required ? <span className="text-rose-600">*</span> : null}
                     </p>
+                    {isRejected && existingDoc?.reviewNote ? (
+                      <p className="mt-1.5 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs text-rose-700">
+                        <span className="font-semibold">Lý do từ chối:</span> {existingDoc.reviewNote}
+                      </p>
+                    ) : null}
+                    {docType.requiresNumber ? (
+                      <div className="mt-2">
+                        <label className="text-xs font-semibold text-slate-600">
+                          {docType.documentNumberLabel || 'Số giấy tờ'} <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="input-field mt-1"
+                          placeholder={docType.documentNumberLabel || 'Nhập số giấy tờ'}
+                          value={doc.documentNumber || ''}
+                          onChange={(e) => setDraftDocs((prev) => ({ ...prev, [docType.id]: { ...prev[docType.id], documentNumber: e.target.value } }))}
+                        />
+                      </div>
+                    ) : null}
                     <input
                       type="file"
                       accept={docType.acceptedMimeTypes.join(',')}
                       className="input-field mt-2 p-2"
                       onChange={(event) => setFile(docType.id, event.target.files?.[0])}
                     />
-                    <p className="mt-1 text-xs text-slate-500">{doc.fileName || 'Chưa có tep'}</p>
+                    <p className="mt-1 text-xs text-slate-500">{doc.fileName || 'Chưa có tệp'}</p>
                     {doc.fileUrl ? (
                       doc.mimeType === 'application/pdf' ? (
-                        <a
-                          href={doc.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-2 inline-block text-xs font-semibold text-sky-700 hover:underline"
-                        >
-                          Preview PDF
-                        </a>
+                        <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs font-semibold text-sky-700 hover:underline">Preview PDF</a>
                       ) : (
-                        <img src={doc.fileUrl} alt={docType.name} className="mt-2 h-24 w-full rounded-md object-cover" />
+                        <img src={doc.fileUrl} alt={docType.title} className="mt-2 h-24 w-full rounded-md object-cover" />
                       )
                     ) : null}
-                  </label>
+                  </div>
                 );
               })}
             </div>
 
             {requiredMissing ? (
               <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                Van con giấy tờ bat buoc Chưa duoc Cập nhật.
+                Vẫn còn giấy tờ bắt buộc chưa được cập nhật.
               </p>
             ) : null}
 
@@ -127,14 +210,18 @@ export default function VehicleDocumentsModal({
                 className="btn btn-primary"
                 disabled={submitting || requiredMissing}
                 onClick={() => {
-                  const docs = (documentCatalog || []).map((docType) => ({
-                    documentTypeId: docType.id,
-                    fileName: draftDocs[docType.id]?.fileName || '',
-                    fileUrl: draftDocs[docType.id]?.fileUrl || '',
-                    mimeType: draftDocs[docType.id]?.mimeType || '',
-                    file: draftDocs[docType.id]?.file || null,
-                  }));
-
+                  const docs = [];
+                  (documentCatalog || []).forEach((docType) => {
+                    if (docType.requiresTwoSides) {
+                      const docNumber = draftDocs[`${docType.id}_num`] || null;
+                      ['front', 'back'].forEach((side) => {
+                        const key = `${docType.id}_${side}`;
+                        docs.push({ documentTypeId: docType.id, side, documentNumber: docNumber, fileName: draftDocs[key]?.fileName || '', fileUrl: draftDocs[key]?.fileUrl || '', mimeType: draftDocs[key]?.mimeType || '', file: draftDocs[key]?.file || null });
+                      });
+                    } else {
+                      docs.push({ documentTypeId: docType.id, side: 'single', documentNumber: draftDocs[docType.id]?.documentNumber || null, fileName: draftDocs[docType.id]?.fileName || '', fileUrl: draftDocs[docType.id]?.fileUrl || '', mimeType: draftDocs[docType.id]?.mimeType || '', file: draftDocs[docType.id]?.file || null });
+                    }
+                  });
                   onSubmit(vehicle.id, { documents: docs });
                 }}
               >

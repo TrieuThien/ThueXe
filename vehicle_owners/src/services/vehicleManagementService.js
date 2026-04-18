@@ -9,7 +9,23 @@ export const vehicleManagementService = {
   },
 
   async createVehicle(payload) {
-    const response = await apiClient.post('/vehicle-management/vehicles', payload);
+    const { documents = [], ...vehicleMeta } = payload;
+    const formData = new FormData();
+    Object.entries(vehicleMeta).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) formData.append(k, v);
+    });
+    const docsMeta = documents.map(({ file, fileUrl, ...rest }) => ({
+      ...rest,
+      fileUrl: file instanceof File ? '' : (fileUrl || ''),
+    }));
+    formData.append('documents', JSON.stringify(docsMeta));
+    for (const doc of documents) {
+      if (doc.file instanceof File) {
+        const side = doc.side || 'single';
+        formData.append(`file_${doc.documentTypeId}_${side}`, doc.file);
+      }
+    }
+    const response = await apiClient.post('/vehicle-management/vehicles', formData);
     return unwrap(response);
   },
 

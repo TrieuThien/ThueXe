@@ -15,6 +15,7 @@ export const OWNER_ROUTES = {
   PAYMENTS: '/owner/payments',
   WALLET: '/owner/wallet',
   WITHDRAWALS: '/owner/withdrawals',
+  RENTAL_PACKAGES: '/owner/rental-packages',
 };
 
 export const NAV_ITEMS = [
@@ -24,6 +25,7 @@ export const NAV_ITEMS = [
   { label: 'Hoạt động xe', path: OWNER_ROUTES.VEHICLE_ACTIVITY },
   { label: 'Doanh thu', path: OWNER_ROUTES.REVENUE },
   { label: 'Xe của tôi', path: OWNER_ROUTES.VEHICLES },
+  { label: 'Gói thuê xe', path: OWNER_ROUTES.RENTAL_PACKAGES },
   { label: 'Giấy tờ', path: OWNER_ROUTES.DOCUMENTS },
   { label: 'Đơn thuê', path: OWNER_ROUTES.BOOKINGS },
   { label: 'Bảo trì', path: OWNER_ROUTES.MAINTENANCE },
@@ -46,4 +48,5 @@ export const BREADCRUMB_LABELS = {
   payments: 'Thanh toán',
   wallet: 'Ví chủ xe',
   withdrawals: 'Rút tiền',
+  'rental-packages': 'Gói thuê xe',
 };

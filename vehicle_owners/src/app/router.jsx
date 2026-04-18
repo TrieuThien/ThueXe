@@ -16,6 +16,7 @@ import AccountProfilePage from '../pages/AccountProfilePage';
 import VerificationPage from '../pages/VerificationPage';
 import VehicleActivityPage from '../pages/VehicleActivityPage';
 import OwnerRevenuePage from '../pages/OwnerRevenuePage';
+import RentalPackagesPage from '../pages/RentalPackagesPage';
 import OwnerLandingPage from '../features/owner-landing/OwnerLandingPage';
 import { OWNER_ROUTES } from '../constants/routes';
 import RequireOwnerAuth from './guards/RequireOwnerAuth';
@@ -47,6 +48,7 @@ export const router = createBrowserRouter([
               { path: 'payments', element: <PaymentsPage /> },
               { path: 'wallet', element: <WalletPage /> },
               { path: 'withdrawals', element: <WithdrawalsPage /> },
+              { path: 'rental-packages', element: <RentalPackagesPage /> },
             ],
           },
         ],

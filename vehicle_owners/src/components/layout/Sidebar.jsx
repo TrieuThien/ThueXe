@@ -4,11 +4,23 @@ import { useUiStore } from '../../store/uiStore';
 
 export default function Sidebar() {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
+  const mobileSidebarOpen = useUiStore((state) => state.mobileSidebarOpen);
+  const closeMobileSidebar = useUiStore((state) => state.closeMobileSidebar);
 
   return (
-    <aside
-      className={`fixed inset-y-0 left-0 z-30 hidden border-r border-slate-700 bg-gradient-to-b from-slate-900 to-slate-800 p-3 text-slate-100 transition-all duration-300 lg:block ${sidebarCollapsed ? 'w-24' : 'w-72'}`}
-    >
+    <>
+      {mobileSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
+          onClick={closeMobileSidebar}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-30 border-r border-slate-700 bg-gradient-to-b from-slate-900 to-slate-800 p-3 text-slate-100 transition-all duration-300
+          ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0
+          w-72 ${sidebarCollapsed ? 'lg:w-24' : 'lg:w-72'}`}
+      >
       <div className="mb-5 flex items-center gap-3 rounded-2xl bg-slate-700/40 p-3">
         <img src="/Thuexe-logo.png" alt="ThueXe Logo" className="h-8 w-auto" />
         {!sidebarCollapsed && (
@@ -24,6 +36,7 @@ export default function Sidebar() {
           <NavLink
             key={item.path}
             to={item.path}
+            onClick={closeMobileSidebar}
             className={({ isActive }) =>
               `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${isActive ? 'border border-sky-300/40 bg-sky-400/20 text-white' : 'text-slate-200 hover:bg-slate-700/70'}`
             }
@@ -34,5 +47,6 @@ export default function Sidebar() {
         ))}
       </nav>
     </aside>
+    </>
   );
 }

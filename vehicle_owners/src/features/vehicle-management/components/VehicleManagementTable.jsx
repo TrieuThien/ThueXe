@@ -11,6 +11,7 @@ const verificationBadge = {
   pending_review: 'border-amber-200 bg-amber-50 text-amber-700',
   verified: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   missing_documents: 'border-rose-200 bg-rose-50 text-rose-700',
+  rejected: 'border-red-300 bg-red-50 text-red-700',
 };
 
 const usageLabels = {
@@ -24,6 +25,7 @@ const verifyLabels = {
   pending_review: 'Chờ duyệt',
   verified: 'Đã xác minh',
   missing_documents: 'Thiếu giấy tờ',
+  rejected: 'Bị từ chối',
 };
 
 export default function VehicleManagementTable({
@@ -108,13 +110,13 @@ export default function VehicleManagementTable({
                     {row.missingDocumentCount > 0 ? (
                       <span className="font-semibold text-rose-600">Thiếu {row.missingDocumentCount} giấy tờ</span>
                     ) : (
-                      <span className="font-semibold text-emerald-600">đầy đủ</span>
+                      <span className="font-semibold text-emerald-600">Đầy đủ</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
                     <div className="flex flex-wrap gap-2">
                       <button type="button" className="btn" onClick={() => onOpenDetail(row.id)}>
-                        chi tiết
+                        Chi tiết
                       </button>
                       <button type="button" className="btn" onClick={() => onOpenDocumentModal(row.id)}>
                         Cập nhật giấy tờ

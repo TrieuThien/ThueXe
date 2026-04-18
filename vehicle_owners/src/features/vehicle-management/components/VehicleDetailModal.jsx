@@ -1,6 +1,32 @@
 ﻿import { X } from 'lucide-react';
 import { formatDate } from '../../../utils/format';
 
+function groupDocuments(docs) {
+  const map = new Map();
+  for (const doc of docs) {
+    if (!map.has(doc.documentTypeId)) {
+      map.set(doc.documentTypeId, {
+        documentTypeId: doc.documentTypeId,
+        documentTitle: doc.documentTitle,
+        requiresTwoSides: doc.requiresTwoSides,
+        sides: {},
+      });
+    }
+    const group = map.get(doc.documentTypeId);
+    const sideKey = doc.side || 'single';
+    group.sides[sideKey] = doc;
+    if (doc.requiresTwoSides) group.requiresTwoSides = true;
+  }
+  return Array.from(map.values());
+}
+
+const fuelLangMap = new Map([
+  ['petrol', "Xăng"],
+  ['diesel', "Dầu"],
+  ['electric', "Điện"],
+  ['hybrid', 'Hybrid']
+])
+
 export default function VehicleDetailModal({ open, vehicle, loading, onClose }) {
   if (!open) {
     return null;
@@ -10,10 +36,10 @@ export default function VehicleDetailModal({ open, vehicle, loading, onClose }) 
     <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
       <div className="w-full max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-lg font-bold text-slate-900">chi tiết phương tiện</h3>
+          <h3 className="text-lg font-bold text-slate-900">Chi tiết phương tiện</h3>
           <button type="button" className="btn" onClick={onClose}>
             <X size={16} />
-            Dong
+            Đóng
           </button>
         </div>
 
@@ -29,51 +55,84 @@ export default function VehicleDetailModal({ open, vehicle, loading, onClose }) 
                 <span className="font-semibold">Loại xe:</span> {vehicle.vehicleType}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-semibold">Hang/Model:</span> {vehicle.brand} {vehicle.model}
+                <span className="font-semibold">Hãng/Model:</span> {vehicle.brand} {vehicle.model}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-semibold">Nam:</span> {vehicle.productionYear}
+                <span className="font-semibold">Năm sản xuất:</span> {vehicle.productionYear}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-semibold">Mau:</span> {vehicle.color}
+                <span className="font-semibold">Màu xe:</span> {vehicle.color}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <span className="font-semibold">Số chỗ:</span> {vehicle.seats}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-semibold">Hop so:</span> {vehicle.transmission}
+                <span className="font-semibold">Hộp số:</span> {vehicle.transmission == "auto" ? "Tự động" : "Số sàn"}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                <span className="font-semibold">Nhien lieu:</span> {vehicle.fuelType}
+                <span className="font-semibold">Nhiên liệu:</span> {fuelLangMap.get(vehicle.fuelType)}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <span className="font-semibold">Số km:</span> {vehicle.odometerKm}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm md:col-span-3">
-                <span className="font-semibold">VIN:</span> {vehicle.vin}
+                <span className="font-semibold">Số khung (VIN):</span> {vehicle.vin}
               </p>
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm md:col-span-3">
-                <span className="font-semibold">Ngay them:</span> {formatDate(vehicle.addedAt)}
+                <span className="font-semibold">Ngày thêm:</span> {formatDate(vehicle.addedAt)}
               </p>
               {vehicle.notes ? (
                 <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm md:col-span-3">
-                  <span className="font-semibold">Ghi chu:</span> {vehicle.notes}
+                  <span className="font-semibold">Ghi chú:</span> {vehicle.notes}
                 </p>
               ) : null}
             </div>
 
             <div>
-              <h4 className="text-sm font-bold text-slate-800">giấy tờ da nop</h4>
+              <h4 className="text-sm font-bold text-slate-800">Giấy tờ đã nộp</h4>
               <div className="mt-2 grid gap-2 md:grid-cols-2">
-                {(vehicle.documents || []).map((doc) => (
-                  <div key={doc.documentTypeId} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-sm font-semibold text-slate-700">{doc.documentTypeId}</p>
-                    <p className="mt-1 text-xs text-slate-500">{doc.fileName || 'Chưa có tep'}</p>
-                    {doc.fileUrl ? (
-                      <a className="mt-1 inline-block text-xs font-semibold text-sky-700 hover:underline" href={doc.fileUrl} target="_blank" rel="noreferrer">
-                        Xem tep
-                      </a>
-                    ) : null}
+                {groupDocuments(vehicle.documents || []).map((group) => (
+                  <div key={group.documentTypeId} className={`rounded-lg border border-slate-200 bg-slate-50 p-3${group.requiresTwoSides ? ' md:col-span-2' : ''}`}>
+                    <p className="text-sm font-semibold text-slate-700">
+                      {group.documentTitle || group.documentTypeId}
+                      {group.requiresTwoSides ? (
+                        <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">2 mặt</span>
+                      ) : null}
+                    </p>
+                    {group.requiresTwoSides ? (
+                      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                        {[{ side: 'front', label: 'Mặt trước' }, { side: 'back', label: 'Mặt sau' }].map(({ side, label }) => {
+                          const doc = group.sides[side];
+                          return (
+                            <div key={side} className="rounded-md border border-dashed border-slate-300 bg-white p-2">
+                              <p className="mb-1 text-xs font-semibold text-slate-600">{label}</p>
+                              {doc ? (
+                                doc.mimeType === 'application/pdf' ? (
+                                  <a className="text-xs font-semibold text-sky-700 hover:underline" href={doc.fileUrl} target="_blank" rel="noreferrer">Xem PDF</a>
+                                ) : doc.fileUrl ? (
+                                  <a href={doc.fileUrl} target="_blank" rel="noreferrer">
+                                    <img src={doc.fileUrl} alt={`${group.documentTitle} ${label}`} className="h-24 w-full rounded-md object-cover" />
+                                  </a>
+                                ) : <p className="text-xs text-slate-400">Chưa có tệp</p>
+                              ) : <p className="text-xs text-slate-400">Chưa có tệp</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <>
+                        <p className="mt-1 text-xs text-slate-500">{group.sides.single?.fileName || 'Chưa có tệp'}</p>
+                        {group.sides.single?.fileUrl ? (
+                          group.sides.single.mimeType === 'application/pdf' ? (
+                            <a className="mt-1 inline-block text-xs font-semibold text-sky-700 hover:underline" href={group.sides.single.fileUrl} target="_blank" rel="noreferrer">Xem PDF</a>
+                          ) : (
+                            <a href={group.sides.single.fileUrl} target="_blank" rel="noreferrer">
+                              <img src={group.sides.single.fileUrl} alt={group.documentTitle || group.documentTypeId} className="mt-2 h-32 w-full rounded-md object-cover" />
+                            </a>
+                          )
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

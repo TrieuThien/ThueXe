@@ -8,7 +8,7 @@ const vehicleSchema = z.object({
   brand: z.string().trim().min(1, 'Vui lòng nhập hãng xe.'),
   model: z.string().trim().min(1, 'Vui lòng nhập model.'),
   productionYear: z.coerce.number().min(1990).max(new Date().getFullYear() + 1),
-  color: z.string().trim().min(1, 'Vui lòng nhập màu xe.'),
+  color: z.string().trim().min(1, 'Vui lòng nhập mẫu xe.'),
   plateNumber: z.string().trim().min(6, 'Vui lòng nhập biển số hợp lệ.'),
   vin: z.string().trim().min(10, 'Số khung (VIN) không hợp lệ.'),
   seats: z.coerce.number().min(2, 'Số chỗ phải >= 2.'),
@@ -27,8 +27,8 @@ const defaultValues = {
   plateNumber: '',
   vin: '',
   seats: 5,
-  transmission: 'automatic',
-  fuelType: 'gasoline',
+  transmission: 'auto',
+  fuelType: 'petrol',
   odometerKm: 0,
   notes: '',
 };
@@ -61,16 +61,20 @@ export default function VehicleRegistrationForm({
 
   const requiredMissing = useMemo(
     () =>
-      (documentCatalog || []).some(
-        (docType) => docType.required && !documentFiles[docType.id]?.file,
-      ),
+      (documentCatalog || []).some((docType) => {
+        if (!docType.required) return false;
+        if (docType.requiresTwoSides) {
+          return !documentFiles[`${docType.id}_front`]?.file || !documentFiles[`${docType.id}_back`]?.file;
+        }
+        return !documentFiles[docType.id]?.file;
+      }),
     [documentCatalog, documentFiles],
   );
 
-  const updateFile = (docTypeId, file) => {
+  const updateFile = (key, file) => {
     setDocumentFiles((prev) => ({
       ...prev,
-      [docTypeId]: {
+      [key]: {
         file,
         previewUrl: buildPreviewUrl(file),
       },
@@ -78,20 +82,38 @@ export default function VehicleRegistrationForm({
   };
 
   const submitForm = (values) => {
-    const docs = (documentCatalog || []).map((docType) => {
-      const fileObj = documentFiles[docType.id];
-      const file = fileObj?.file;
-      return {
-        documentTypeId: docType.id,
-        fileName: file?.name || '',
-        fileUrl: file
-          ? file.type === 'application/pdf'
-            ? 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf'
-            : `https://placehold.co/600x400.png?text=${encodeURIComponent(file.name)}`
-          : '',
-        mimeType: file?.type || '',
-        file,
-      };
+    const docs = [];
+    (documentCatalog || []).forEach((docType) => {
+      if (docType.requiresTwoSides) {
+        const frontFile = documentFiles[`${docType.id}_front`]?.file || null;
+        const backFile = documentFiles[`${docType.id}_back`]?.file || null;
+        docs.push({
+          documentTypeId: docType.id,
+          side: 'front',
+          fileName: frontFile?.name || '',
+          fileUrl: frontFile ? URL.createObjectURL(frontFile) : '',
+          mimeType: frontFile?.type || '',
+          file: frontFile,
+        });
+        docs.push({
+          documentTypeId: docType.id,
+          side: 'back',
+          fileName: backFile?.name || '',
+          fileUrl: backFile ? URL.createObjectURL(backFile) : '',
+          mimeType: backFile?.type || '',
+          file: backFile,
+        });
+      } else {
+        const file = documentFiles[docType.id]?.file || null;
+        docs.push({
+          documentTypeId: docType.id,
+          side: 'single',
+          fileName: file?.name || '',
+          fileUrl: file ? URL.createObjectURL(file) : '',
+          mimeType: file?.type || '',
+          file,
+        });
+      }
     });
 
     onSubmit({
@@ -116,20 +138,20 @@ export default function VehicleRegistrationForm({
               <select className="input-field" {...register('vehicleType')}>
                 <option value="">Chọn loại xe</option>
                 {(vehicleTypes || []).map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
+                  <option key={item.id} value={String(item.id)}>
+                    {item.name}
                   </option>
                 ))}
               </select>
               {errors.vehicleType ? <span className="error-text">{errors.vehicleType.message}</span> : null}
             </label>
             <label className="flex flex-col gap-1">
-              <span className="form-label">Hãng xe</span>
+              <span className="form-label">Nhãn hiệu (Brand)</span>
               <input className="input-field" {...register('brand')} />
               {errors.brand ? <span className="error-text">{errors.brand.message}</span> : null}
             </label>
             <label className="flex flex-col gap-1">
-              <span className="form-label">Model</span>
+              <span className="form-label">Số loại (Model code)</span>
               <input className="input-field" {...register('model')} />
               {errors.model ? <span className="error-text">{errors.model.message}</span> : null}
             </label>
@@ -138,13 +160,13 @@ export default function VehicleRegistrationForm({
               <input className="input-field" type="number" {...register('productionYear')} />
             </label>
             <label className="flex flex-col gap-1">
-              <span className="form-label">Mẫu xe</span>
-              <input className="input-field" {...register('color')} />
+              <span className="form-label">Màu xe</span>
+              <input className="input-field" {...register('color')} placeholder='Ví dụ: MPV 7 chỗ hạng B đa dụng'/>
               {errors.color ? <span className="error-text">{errors.color.message}</span> : null}
             </label>
             <label className="flex flex-col gap-1">
               <span className="form-label">Biển số</span>
-              <input className="input-field" {...register('plateNumber')} />
+              <input className="input-field" {...register('plateNumber')} placeholder='51H-123.45'/>
               {errors.plateNumber ? <span className="error-text">{errors.plateNumber.message}</span> : null}
             </label>
           </div>
@@ -170,14 +192,14 @@ export default function VehicleRegistrationForm({
             <label className="flex flex-col gap-1">
               <span className="form-label">Hộp số</span>
               <select className="input-field" {...register('transmission')}>
-                <option value="automatic">Tự động</option>
+                <option value="auto">Tự động</option>
                 <option value="manual">Số sàn</option>
               </select>
             </label>
             <label className="flex flex-col gap-1">
               <span className="form-label">Nhiên liệu</span>
               <select className="input-field" {...register('fuelType')}>
-                <option value="gasoline">Xăng</option>
+                <option value="petrol">Xăng</option>
                 <option value="diesel">Dầu</option>
                 <option value="hybrid">Hybrid</option>
                 <option value="electric">Điện</option>
@@ -197,40 +219,80 @@ export default function VehicleRegistrationForm({
         <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <h4 className="text-sm font-bold text-slate-800">Giấy tờ xe</h4>
           <div className="mt-2 grid gap-2 md:grid-cols-2">
-            {(documentCatalog || []).map((docType) => (
-              <label key={docType.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                <p className="text-sm font-semibold text-slate-700">
-                  {docType.name} {docType.required ? <span className="text-rose-600">*</span> : null}
-                </p>
-                <input
-                  className="input-field mt-2 p-2"
-                  type="file"
-                  accept={docType.acceptedMimeTypes.join(',')}
-                  onChange={(event) => updateFile(docType.id, event.target.files?.[0])}
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  {documentFiles[docType.id]?.file?.name || 'Chưa chọn tep'}
-                </p>
-                {documentFiles[docType.id]?.previewUrl ? (
-                  documentFiles[docType.id].file.type === 'application/pdf' ? (
-                    <a
-                      className="mt-2 inline-block text-xs font-semibold text-sky-700 hover:underline"
-                      href={documentFiles[docType.id].previewUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Xem trước PDF
-                    </a>
-                  ) : (
-                    <img
-                      src={documentFiles[docType.id].previewUrl}
-                      alt={docType.name}
-                      className="mt-2 h-24 w-full rounded-md object-cover"
-                    />
-                  )
-                ) : null}
-              </label>
-            ))}
+            {(documentCatalog || []).map((docType) => {
+              if (docType.requiresTwoSides) {
+                return (
+                  <div key={docType.id} className="rounded-lg border border-slate-200 bg-white p-3 md:col-span-2">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {docType.title} {docType.required ? <span className="text-rose-600">*</span> : null}
+                      <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-600">Yêu cầu ảnh 2 mặt</span>
+                    </p>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                      {[
+                        { side: 'front', label: 'Mặt trước' },
+                        { side: 'back', label: 'Mặt sau' },
+                      ].map(({ side, label }) => {
+                        const key = `${docType.id}_${side}`;
+                        const fileObj = documentFiles[key];
+                        return (
+                          <div key={side} className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-2">
+                            <p className="mb-1 text-xs font-semibold text-slate-600">{label} <span className="text-rose-500">*</span></p>
+                            <input
+                              className="input-field p-2"
+                              type="file"
+                              accept={docType.acceptedMimeTypes.join(',')}
+                              onChange={(event) => updateFile(key, event.target.files?.[0])}
+                            />
+                            <p className="mt-1 text-xs text-slate-500">{fileObj?.file?.name || 'Chưa chọn tệp'}</p>
+                            {fileObj?.previewUrl ? (
+                              fileObj.file.type === 'application/pdf' ? (
+                                <a className="mt-1 inline-block text-xs font-semibold text-sky-700 hover:underline" href={fileObj.previewUrl} target="_blank" rel="noreferrer">Xem trước PDF</a>
+                              ) : (
+                                <img src={fileObj.previewUrl} alt={`${docType.title} ${label}`} className="mt-1 h-20 w-full rounded-md object-cover" />
+                              )
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <label key={docType.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-sm font-semibold text-slate-700">
+                    {docType.title} {docType.required ? <span className="text-rose-600">*</span> : null}
+                  </p>
+                  <input
+                    className="input-field mt-2 p-2"
+                    type="file"
+                    accept={docType.acceptedMimeTypes.join(',')}
+                    onChange={(event) => updateFile(docType.id, event.target.files?.[0])}
+                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    {documentFiles[docType.id]?.file?.name || 'Chưa chọn tệp'}
+                  </p>
+                  {documentFiles[docType.id]?.previewUrl ? (
+                    documentFiles[docType.id].file.type === 'application/pdf' ? (
+                      <a
+                        className="mt-2 inline-block text-xs font-semibold text-sky-700 hover:underline"
+                        href={documentFiles[docType.id].previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Xem trước PDF
+                      </a>
+                    ) : (
+                      <img
+                        src={documentFiles[docType.id].previewUrl}
+                        alt={docType.title}
+                        className="mt-2 h-24 w-full rounded-md object-cover"
+                      />
+                    )
+                  ) : null}
+                </label>
+              );
+            })}
           </div>
           {requiredMissing ? (
             <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
