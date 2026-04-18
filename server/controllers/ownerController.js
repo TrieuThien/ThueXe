@@ -261,7 +261,7 @@ export async function ownerVehicleDocumentTypesHandler(req, res, next) {
 
 export async function ownerVehicleCreateHandler(req, res, next) {
     try {
-        return ownerSuccess(res, await createOwnerVehicleService(req.auth, req.body), requestMeta(req), 201);
+        return ownerSuccess(res, await createOwnerVehicleService(req.auth, req.body, req.files || []), requestMeta(req), 201);
     } catch (error) {
         return next(error);
     }
@@ -294,7 +294,7 @@ export async function ownerVehicleUpdateHandler(req, res, next) {
 
 export async function ownerVehicleDocumentsUpsertHandler(req, res, next) {
     try {
-        return ownerSuccess(res, await upsertOwnerVehicleDocumentsService(req.auth, req.params.vehicleId, req.body), requestMeta(req));
+        return ownerSuccess(res, await upsertOwnerVehicleDocumentsService(req.auth, req.params.vehicleId, req.body, req.files || []), requestMeta(req));
     } catch (error) {
         return next(error);
     }
@@ -530,6 +530,49 @@ export async function ownerRevenueTopupHandler(req, res, next) {
     try {
         const data = await createOwnerRevenueTopup(req.auth, req.body, req.headers["idempotency-key"] || "");
         return ownerSuccess(res, data, requestMeta(req), 201);
+    } catch (error) {
+        return next(error);
+    }
+}
+
+// ─── Rental packages (owner-facing) ──────────────────────────────────────────
+
+import {
+    getVehiclePackagesService,
+    listOwnerRentalPackagesService,
+    setVehiclePackagesService,
+} from "../services/rentalService.js";
+import { successResponse } from "../utils/apiResponse.js";
+
+export async function ownerRentalPackagesListHandler(req, res, next) {
+    try {
+        const result = await listOwnerRentalPackagesService();
+        return successResponse(res, result, "Rental packages fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function ownerVehicleRentalPackagesGetHandler(req, res, next) {
+    try {
+        const result = await getVehiclePackagesService({
+            ownerId: req.auth.userId,
+            vehicleId: req.params.vehicleId,
+        });
+        return successResponse(res, result, "Vehicle rental packages fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function ownerVehicleRentalPackagesSetHandler(req, res, next) {
+    try {
+        const result = await setVehiclePackagesService({
+            ownerId: req.auth.userId,
+            vehicleId: req.params.vehicleId,
+            packageIds: req.body.package_ids,
+        });
+        return successResponse(res, result, "Vehicle rental packages updated successfully");
     } catch (error) {
         return next(error);
     }

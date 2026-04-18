@@ -8,8 +8,8 @@ const allowedMimeTypes = new Set([
     "application/pdf",
 ]);
 
-export const ownerDocUploadSingle = (fieldName = "file", maxFileSize = 10 * 1024 * 1024) => {
-    const upload = multer({
+const buildUpload = (maxFileSize) =>
+    multer({
         storage: multer.memoryStorage(),
         limits: { fileSize: maxFileSize },
         fileFilter: (req, file, cb) => {
@@ -20,13 +20,20 @@ export const ownerDocUploadSingle = (fieldName = "file", maxFileSize = 10 * 1024
         },
     });
 
-    return (req, res, next) => {
-        upload.single(fieldName)(req, res, (error) => {
-            if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
-                return next(new AppError("File exceeds max size 10MB.", 422, "DOCUMENT_TOO_LARGE"));
-            }
-            if (error) return next(error);
-            return next();
-        });
-    };
+const makeCallback = (next) => (err) => {
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
+        return next(new AppError("File exceeds max size 10MB.", 422, "DOCUMENT_TOO_LARGE"));
+    }
+    if (err) return next(err);
+    return next();
+};
+
+export const ownerDocUploadSingle = (fieldName = "file", maxFileSize = 10 * 1024 * 1024) => {
+    const upload = buildUpload(maxFileSize);
+    return (req, res, next) => upload.single(fieldName)(req, res, makeCallback(next));
+};
+
+export const ownerDocUploadAny = (maxFileSize = 10 * 1024 * 1024) => {
+    const upload = buildUpload(maxFileSize);
+    return (req, res, next) => upload.any()(req, res, makeCallback(next));
 };

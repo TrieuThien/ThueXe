@@ -458,6 +458,8 @@ export async function getOwnerVerificationRequiredDocuments() {
             requiresNumber: Number(doc.doc_id_num || 0) === 1,
             requiresExpiryDate: Number(doc.doc_expiry || 0) === 1,
             documentNumberLabel: doc.doc_id_num_title || "Document number",
+            acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+            maxSizeMB: 10,
         })),
     };
 }
@@ -663,6 +665,7 @@ function mapVehicleListItem(row, documentRows) {
 function mapVehicleDetail(row, documents = []) {
     return {
         id: Number(row.vehicle_id),
+        typeId: Number(row.type_id),
         vehicleType: row.type_name,
         brand: row.brand,
         model: row.model,
@@ -705,7 +708,10 @@ export async function getOwnerVehicleDocumentTypes() {
             required: true,
             requiresNumber: Number(item.doc_id_num || 0) === 1,
             requiresExpiryDate: Number(item.doc_expiry || 0) === 1,
+            requiresTwoSides: Number(item.doc_two_sides || 0) === 1,
             documentNumberLabel: item.doc_id_num_title || "Document number",
+            acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+            maxSizeMB: 10,
         })),
     };
 }
@@ -716,7 +722,7 @@ async function resolveVehicleVerificationStatus(vehicleId) {
     return missing ? "missing_documents" : "pending_review";
 }
 
-export async function createOwnerVehicleService(auth, payload) {
+export async function createOwnerVehicleService(auth, payload, uploadedFiles = []) {
     const ownerId = ensureOwnerAuth(auth);
     const plate = String(payload.plateNumber || "").trim().toUpperCase();
     if (!plate) throw new AppError("Plate is required.", 422, "VALIDATION_ERROR");
@@ -725,6 +731,9 @@ export async function createOwnerVehicleService(auth, payload) {
     if (vin && await findVehicleByVin(vin)) throw new AppError("VIN already exists.", 409, "VIN_ALREADY_EXISTS");
     const type = await findVehicleTypeById(Number(payload.vehicleType));
     if (!type) throw new AppError("Vehicle type not found.", 404, "VEHICLE_TYPE_NOT_FOUND");
+
+    const fileMap = new Map();
+    for (const f of uploadedFiles) fileMap.set(f.fieldname, f);
 
     const vehicleId = await runInTx(async (conn) => {
         const createdId = await createOwnerVehicle(ownerId, {
@@ -746,13 +755,28 @@ export async function createOwnerVehicleService(auth, payload) {
 
         for (const doc of payload.documents || []) {
             if (!doc.documentTypeId) continue;
+            const side = doc.side || 'single';
+            const uploadedFile = fileMap.get(`file_${doc.documentTypeId}_${side}`);
+            let fileUrl = doc.fileUrl || null;
+            let mimeType = doc.mimeType || null;
+            let fileSize = doc.fileSize || null;
+            if (uploadedFile) {
+                const uploaded = await uploadBufferToCloudinary(uploadedFile.buffer, {
+                    folder: `thuexe/vehicles/${createdId}/documents`,
+                    resource_type: "auto",
+                });
+                fileUrl = uploaded.secure_url;
+                mimeType = uploadedFile.mimetype;
+                fileSize = uploadedFile.size;
+            }
             await upsertVehicleDocument(createdId, {
                 document_id: Number(doc.documentTypeId),
+                side,
                 doc_number: doc.documentNumber || null,
                 doc_expiry_date: toSqlDate(doc.expiryDate),
-                file_url: doc.fileUrl || null,
-                mime_type: doc.mimeType || null,
-                file_size: doc.fileSize || null,
+                file_url: fileUrl,
+                mime_type: mimeType,
+                file_size: fileSize,
             }, conn);
         }
         const verificationStatus = await resolveVehicleVerificationStatus(createdId);
@@ -789,6 +813,9 @@ export async function getOwnerVehicleDetailService(auth, vehicleIdInput) {
     return mapVehicleDetail(vehicle, docs.map((item) => ({
         id: Number(item.id),
         documentTypeId: Number(item.document_id),
+        documentTitle: item.document_title || "",
+        side: item.side || "single",
+        requiresTwoSides: Number(item.doc_two_sides || 0) === 1,
         fileName: item.file_url ? String(item.file_url).split("/").pop() : "",
         fileUrl: item.file_url || "",
         mimeType: item.mime_type || "",
@@ -796,6 +823,7 @@ export async function getOwnerVehicleDetailService(auth, vehicleIdInput) {
         documentNumber: item.doc_number || "",
         expiryDate: item.doc_expiry_date || "",
         status: item.status || "pending",
+        reviewNote: item.review_note || "",
     })));
 }
 
@@ -824,24 +852,54 @@ export async function updateOwnerVehicleService(auth, vehicleIdInput, payload) {
         status: payload.usageStatus || vehicle.status,
         notes: payload.notes || vehicle.notes,
     });
+
+    if (vehicle.verification_status === "verified" || vehicle.verification_status === "rejected") {
+        await updateVehicleVerificationStatus(vehicleId, "pending_review");
+    }
+
     return getOwnerVehicleDetailService(auth, vehicleId);
 }
 
-export async function upsertOwnerVehicleDocumentsService(auth, vehicleIdInput, payload) {
+export async function upsertOwnerVehicleDocumentsService(auth, vehicleIdInput, payload, uploadedFiles = []) {
     const ownerId = ensureOwnerAuth(auth);
     const vehicleId = Number(vehicleIdInput);
     const vehicle = await findOwnerVehicleById(ownerId, vehicleId);
     if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
 
+    // Build a map of uploaded files keyed by field name: file_<documentTypeId>_<side>
+    const fileMap = new Map();
+    for (const f of uploadedFiles) {
+        fileMap.set(f.fieldname, f);
+    }
+
     await runInTx(async (conn) => {
         for (const doc of payload.documents || []) {
+            const side = doc.side || 'single';
+            const fieldName = `file_${doc.documentTypeId}_${side}`;
+            const uploadedFile = fileMap.get(fieldName);
+
+            let fileUrl = doc.fileUrl || null;
+            let mimeType = doc.mimeType || null;
+            let fileSize = doc.fileSize || null;
+
+            if (uploadedFile) {
+                const uploaded = await uploadBufferToCloudinary(uploadedFile.buffer, {
+                    folder: `thuexe/vehicles/${vehicleId}/documents`,
+                    resource_type: "auto",
+                });
+                fileUrl = uploaded.secure_url;
+                mimeType = uploadedFile.mimetype;
+                fileSize = uploadedFile.size;
+            }
+
             await upsertVehicleDocument(vehicleId, {
                 document_id: Number(doc.documentTypeId),
+                side,
                 doc_number: doc.documentNumber || null,
                 doc_expiry_date: toSqlDate(doc.expiryDate),
-                file_url: doc.fileUrl || null,
-                mime_type: doc.mimeType || null,
-                file_size: doc.fileSize || null,
+                file_url: fileUrl,
+                mime_type: mimeType,
+                file_size: fileSize,
             }, conn);
         }
         const verificationStatus = await resolveVehicleVerificationStatus(vehicleId);

@@ -468,6 +468,106 @@ export async function findVehicleById(vehicleId, conn) {
     };
 }
 
+// ─── Vehicle–Package assignment (vehicle_rental_packages) ────────────────────
+
+export async function listVehiclePackages(vehicleId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT rp.package_id, rp.type_id, rp.service_type, rp.package_name,
+                rp.duration_hours, rp.duration_days, rp.price, rp.distance_limit_km,
+                rp.extra_km_fee, rp.extra_hour_fee, rp.deposit_amount, rp.description, rp.active
+         FROM vehicle_rental_packages vrp
+         INNER JOIN rental_packages rp ON rp.package_id = vrp.package_id
+         WHERE vrp.vehicle_id = ?
+         ORDER BY rp.package_id ASC`,
+        [vehicleId]
+    );
+    return rows.map((row) => ({
+        package_id: Number(row.package_id),
+        type_id: row.type_id === null ? null : Number(row.type_id),
+        service_type: Number(row.service_type || 1),
+        package_name: row.package_name,
+        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
+        duration_days: row.duration_days === null ? null : Number(row.duration_days),
+        price: Number(row.price || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        extra_hour_fee: Number(row.extra_hour_fee || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        description: row.description,
+        active: Number(row.active || 0),
+    }));
+}
+
+export async function replaceVehiclePackages(vehicleId, packageIds, conn) {
+    const db = dbConnection(conn);
+    await db.query(`DELETE FROM vehicle_rental_packages WHERE vehicle_id = ?`, [vehicleId]);
+    if (packageIds.length > 0) {
+        const values = packageIds.map((pid) => [vehicleId, pid]);
+        await db.query(
+            `INSERT INTO vehicle_rental_packages (vehicle_id, package_id) VALUES ?`,
+            [values]
+        );
+    }
+}
+
+// ─── Driver availability for rental ──────────────────────────────────────────
+
+export async function findAvailableDriversForRental(startDatetime, endDatetime, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT DISTINCT d.driver_id, d.firstname, d.lastname, d.phone
+         FROM drivers d
+         INNER JOIN driver_schedule ds
+             ON ds.driver_id = d.driver_id
+             AND ds.status = 'available'
+             AND ds.start_datetime <= ?
+             AND ds.end_datetime >= ?
+         WHERE d.available_for_rental = 1
+           AND d.account_active = 1
+           AND d.is_activated = 1
+           AND d.account_deleted = 0
+           AND d.available = 1
+           AND NOT EXISTS (
+               SELECT 1 FROM rental_bookings rb
+               WHERE rb.driver_id = d.driver_id
+                 AND rb.service_type IN (2, 3)
+                 AND rb.status IN ('scheduled', 'pending', 'in_progress')
+                 AND rb.start_datetime < ?
+                 AND rb.end_datetime > ?
+           )`,
+        [startDatetime, endDatetime, endDatetime, startDatetime]
+    );
+    return rows.map((row) => ({
+        driver_id: Number(row.driver_id),
+        firstname: row.firstname,
+        lastname: row.lastname,
+        phone: row.phone,
+    }));
+}
+
+export async function insertDriverNotificationsBatch(notifications, conn) {
+    const db = dbConnection(conn);
+    if (!notifications.length) return;
+    const values = notifications.map((n) => [n.driver_id, n.content, n.rental_id, n.n_type]);
+    await db.query(
+        `INSERT INTO driver_notifications (driver_id, content, rental_id, n_type, is_read)
+         VALUES ?`,
+        [values]
+    );
+}
+
+export async function countExistingRentalNotificationsForDrivers(rentalId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT COUNT(*) AS cnt FROM driver_notifications WHERE rental_id = ? AND n_type = 10`,
+        [rentalId]
+    );
+    return Number(rows[0]?.cnt || 0);
+}
+
+// ─── Driver lookup ────────────────────────────────────────────────────────────
+
 export async function findDriverById(driverId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(

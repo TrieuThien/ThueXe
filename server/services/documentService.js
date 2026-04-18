@@ -4,6 +4,7 @@ import {
     createSubmission,
     deleteDocumentDefinition,
     findDocumentDefinitionById,
+    findOwnerSubmissionById,
     findVehicleSubmissionById,
     findSubmissionByActorAndDocument,
     findSubmissionById,
@@ -11,14 +12,27 @@ import {
     listDocumentDefinitions,
     listMySubmissions,
     listVehicleSubmissions,
+    setOwnerSubmissionVerification,
     setSubmissionVerification,
     updateVehicleSubmissionReview,
     updateDocumentDefinition,
     updateSubmission,
 } from "../repositories/documentRepository.js";
+import {
+    listVehicleDocuments,
+    updateVehicleVerificationStatus,
+} from "../repositories/ownerRepository.js";
 
 function getMyActorType(auth) {
     return auth.role === "driver" ? "driver" : "user";
+}
+
+function resolveVehicleStatusAfterReview(docs) {
+    if (docs.length === 0) return "missing_documents";
+    if (docs.some((d) => !d.file_url)) return "missing_documents";
+    if (docs.some((d) => d.status === "rejected")) return "rejected";
+    if (docs.some((d) => d.status !== "verified")) return "pending_review";
+    return "verified";
 }
 
 function normalizeDefinitionPayload(payload, existing = null) {
@@ -35,6 +49,7 @@ function normalizeDefinitionPayload(payload, existing = null) {
         doc_id_num: payload.doc_id_num === undefined ? existing?.doc_id_num ?? 0 : Number(payload.doc_id_num),
         doc_id_num_title: String(payload.doc_id_num_title ?? existing?.doc_id_num_title ?? "").trim(),
         doc_id_num_desc: String(payload.doc_id_num_desc ?? existing?.doc_id_num_desc ?? "").trim(),
+        doc_two_sides: payload.doc_two_sides === undefined ? existing?.doc_two_sides ?? 0 : Number(payload.doc_two_sides),
         status: payload.status === undefined ? existing?.status ?? 1 : Number(payload.status),
     };
 }
@@ -219,8 +234,8 @@ export async function listAllDocumentSubmissionsService({ query }) {
         fieldName: "document_id",
         errorCode: "INVALID_DOCUMENT_ID_QUERY",
     });
-    if (actorType && !["user", "driver"].includes(actorType)) {
-        throw new AppError("actor_type must be user or driver.", 422, "INVALID_ACTOR_TYPE");
+    if (actorType && !["user", "driver", "owner"].includes(actorType)) {
+        throw new AppError("actor_type must be user, driver, or owner.", 422, "INVALID_ACTOR_TYPE");
     }
     return {
         items: await listAllSubmissions({ actorType, verified, submissionId, documentId }),
@@ -229,8 +244,8 @@ export async function listAllDocumentSubmissionsService({ query }) {
 
 export async function reviewDocumentSubmission({ actorType, submissionId, payload }) {
     const normalizedActorType = String(actorType || "").trim();
-    if (!["user", "driver"].includes(normalizedActorType)) {
-        throw new AppError("actorType must be user or driver.", 422, "INVALID_ACTOR_TYPE");
+    if (!["user", "driver", "owner"].includes(normalizedActorType)) {
+        throw new AppError("actorType must be user, driver, or owner.", 422, "INVALID_ACTOR_TYPE");
     }
     const numericSubmissionId = Number(submissionId);
     if (!Number.isInteger(numericSubmissionId) || numericSubmissionId < 1) {
@@ -242,6 +257,21 @@ export async function reviewDocumentSubmission({ actorType, submissionId, payloa
         throw new AppError("status must be approved/rejected/expired.", 422, "INVALID_REVIEW_STATUS");
     }
 
+    let verified = 0;
+    if (status === "approved") verified = 1;
+
+    if (normalizedActorType === "owner") {
+        const existing = await findOwnerSubmissionById(numericSubmissionId);
+        if (!existing) {
+            throw new AppError("Submission not found.", 404, "SUBMISSION_NOT_FOUND");
+        }
+        await setOwnerSubmissionVerification({ submissionId: numericSubmissionId, verified });
+        return {
+            submission: await findOwnerSubmissionById(numericSubmissionId),
+            review_status: status,
+        };
+    }
+
     const existing = await findSubmissionById({
         actorType: normalizedActorType,
         submissionId: numericSubmissionId,
@@ -249,10 +279,6 @@ export async function reviewDocumentSubmission({ actorType, submissionId, payloa
     if (!existing) {
         throw new AppError("Submission not found.", 404, "SUBMISSION_NOT_FOUND");
     }
-    let verified = 0;
-    if (status === "approved") verified = 1;
-    if (status === "rejected") verified = 0;
-    if (status === "expired") verified = 0;
     await setSubmissionVerification({
         actorType: normalizedActorType,
         submissionId: numericSubmissionId,
@@ -344,6 +370,10 @@ export async function reviewVehicleDocumentSubmissionService({ submissionId, pay
         status: mappedStatus,
         reviewNote,
     });
+
+    const allDocs = await listVehicleDocuments(existing.vehicle_id);
+    const newVehicleStatus = resolveVehicleStatusAfterReview(allDocs);
+    await updateVehicleVerificationStatus(existing.vehicle_id, newVehicleStatus);
 
     return {
         submission: await findVehicleSubmissionById(numericSubmissionId),

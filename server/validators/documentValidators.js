@@ -19,6 +19,7 @@ export const createDocumentDefinitionValidator = [
     body("doc_id_num").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("doc_id_num must be 0 or 1").toInt(),
     body("doc_id_num_title").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("doc_id_num_title must not exceed 255 characters"),
     body("doc_id_num_desc").optional({ values: "falsy" }).trim().isLength({ max: 1000 }).withMessage("doc_id_num_desc must not exceed 1000 characters"),
+    body("doc_two_sides").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("doc_two_sides must be 0 or 1").toInt(),
     body("status").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("status must be 0 or 1").toInt(),
 ];
 
@@ -46,12 +47,12 @@ export const updateMySubmissionValidator = [
 export const listAllSubmissionsValidator = [
     query("id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("id must be a positive integer").toInt(),
     query("document_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("document_id must be a positive integer").toInt(),
-    query("actor_type").optional({ values: "falsy" }).isIn(["user", "driver"]).withMessage("actor_type must be user or driver"),
+    query("actor_type").optional({ values: "falsy" }).isIn(["user", "driver", "owner"]).withMessage("actor_type must be user, driver, or owner"),
     query("verified").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("verified must be 0 or 1").toInt(),
 ];
 
 export const reviewSubmissionValidator = [
-    param("actorType").isIn(["user", "driver"]).withMessage("actorType must be user or driver"),
+    param("actorType").isIn(["user", "driver", "owner"]).withMessage("actorType must be user, driver, or owner"),
     param("submissionId").isInt({ min: 1 }).withMessage("submissionId must be a positive integer").toInt(),
     body("status").isIn(["approved", "rejected", "expired"]).withMessage("status must be approved/rejected/expired"),
 ];

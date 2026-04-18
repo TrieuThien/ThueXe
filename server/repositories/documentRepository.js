@@ -49,7 +49,7 @@ export async function listDocumentDefinitions(filters = {}) {
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
     const [rows] = await sqldb.query(
-        `SELECT id, title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, status, date_created
+        `SELECT id, title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, doc_two_sides, status, date_created
          FROM documents
          ${whereSql}
          ORDER BY id DESC`,
@@ -66,6 +66,7 @@ export async function listDocumentDefinitions(filters = {}) {
         doc_id_num: Number(row.doc_id_num || 0),
         doc_id_num_title: row.doc_id_num_title,
         doc_id_num_desc: row.doc_id_num_desc,
+        doc_two_sides: Number(row.doc_two_sides || 0),
         status: Number(row.status || 0),
         date_created: row.date_created,
     }));
@@ -74,7 +75,7 @@ export async function listDocumentDefinitions(filters = {}) {
 export async function findDocumentDefinitionById(documentId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(
-        `SELECT id, title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, status, date_created
+        `SELECT id, title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, doc_two_sides, status, date_created
          FROM documents
          WHERE id = ?
          LIMIT 1`,
@@ -93,6 +94,7 @@ export async function findDocumentDefinitionById(documentId, conn) {
         doc_id_num: Number(row.doc_id_num || 0),
         doc_id_num_title: row.doc_id_num_title,
         doc_id_num_desc: row.doc_id_num_desc,
+        doc_two_sides: Number(row.doc_two_sides || 0),
         status: Number(row.status || 0),
         date_created: row.date_created,
     };
@@ -102,8 +104,8 @@ export async function createDocumentDefinition(payload, conn) {
     const db = dbConnection(conn);
     const [result] = await db.query(
         `INSERT INTO documents
-         (title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (title, doc_desc, doc_city, doc_type, doc_user, doc_expiry, doc_id_num, doc_id_num_title, doc_id_num_desc, doc_two_sides, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
             payload.title,
             payload.doc_desc,
@@ -114,6 +116,7 @@ export async function createDocumentDefinition(payload, conn) {
             payload.doc_id_num,
             payload.doc_id_num_title,
             payload.doc_id_num_desc,
+            payload.doc_two_sides,
             payload.status,
         ]
     );
@@ -124,7 +127,7 @@ export async function updateDocumentDefinition(documentId, payload, conn) {
     const db = dbConnection(conn);
     await db.query(
         `UPDATE documents
-         SET title = ?, doc_desc = ?, doc_city = ?, doc_type = ?, doc_user = ?, doc_expiry = ?, doc_id_num = ?, doc_id_num_title = ?, doc_id_num_desc = ?, status = ?
+         SET title = ?, doc_desc = ?, doc_city = ?, doc_type = ?, doc_user = ?, doc_expiry = ?, doc_id_num = ?, doc_id_num_title = ?, doc_id_num_desc = ?, doc_two_sides = ?, status = ?
          WHERE id = ?
          LIMIT 1`,
         [
@@ -137,6 +140,7 @@ export async function updateDocumentDefinition(documentId, payload, conn) {
             payload.doc_id_num,
             payload.doc_id_num_title,
             payload.doc_id_num_desc,
+            payload.doc_two_sides,
             payload.status,
             documentId,
         ]
@@ -235,7 +239,7 @@ export async function listMySubmissions({ actorType, actorId }) {
     const { table, actorColumn } = resolveSubmissionTable(actorType);
     const [rows] = await sqldb.query(
         `SELECT s.id, s.${actorColumn} AS actor_id, s.document_id, s.doc_number, s.doc_expiry_date, s.verified, s.date_submitted,
-                d.title, d.doc_desc, d.doc_expiry, d.doc_id_num, d.doc_id_num_title
+                d.title, d.doc_desc, d.doc_expiry, d.doc_id_num, d.doc_id_num_title, d.doc_two_sides
          FROM ${table} s
          LEFT JOIN documents d ON d.id = s.document_id
          WHERE s.${actorColumn} = ?
@@ -255,6 +259,7 @@ export async function listMySubmissions({ actorType, actorId }) {
         doc_expiry: Number(row.doc_expiry || 0),
         doc_id_num: Number(row.doc_id_num || 0),
         doc_id_num_title: row.doc_id_num_title,
+        doc_two_sides: Number(row.doc_two_sides || 0),
     }));
 }
 
@@ -292,8 +297,32 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
                 ${whereSql}`;
     };
 
+    const buildOwnerQuery = () => {
+        const where = [];
+        if (submissionId !== undefined) {
+            where.push("s.id = ?");
+            params.push(submissionId);
+        }
+        if (documentId !== undefined) {
+            where.push("s.document_id = ?");
+            params.push(documentId);
+        }
+        if (verified !== undefined) {
+            where.push("s.verified = ?");
+            params.push(verified);
+        }
+        const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+        return `SELECT 'owner' AS actor_type, s.id, s.owner_id AS actor_id, s.document_id, s.doc_number, s.doc_expiry_date, s.verified, s.date_submitted,
+                       d2.title, COALESCE(vo.fullname, '') AS actor_name
+                FROM vehicle_owner_documents s
+                LEFT JOIN documents d2 ON d2.id = s.document_id
+                LEFT JOIN vehicle_owners vo ON vo.owner_id = s.owner_id
+                ${whereSql}`;
+    };
+
     if (!actorType || actorType === "user") chunks.push(buildQuery("user"));
     if (!actorType || actorType === "driver") chunks.push(buildQuery("driver"));
+    if (!actorType || actorType === "owner") chunks.push(buildOwnerQuery());
 
     const [rows] = await sqldb.query(
         `${chunks.join(" UNION ALL ")} ORDER BY id DESC`,
@@ -311,6 +340,48 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
         verified: Number(row.verified || 0),
         date_submitted: row.date_submitted,
     }));
+}
+
+export async function setOwnerSubmissionVerification({ submissionId, verified }, conn) {
+    const db = dbConnection(conn);
+    const status = verified === 1 ? "verified" : "rejected";
+    await db.query(
+        `UPDATE vehicle_owner_documents
+         SET verified = ?, status = ?
+         WHERE id = ?
+         LIMIT 1`,
+        [verified, status, submissionId]
+    );
+}
+
+export async function findOwnerSubmissionById(submissionId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT s.id, s.owner_id AS actor_id, s.document_id, s.doc_number, s.doc_expiry_date,
+                s.verified, s.status, s.date_submitted,
+                d.title, COALESCE(vo.fullname, '') AS actor_name
+         FROM vehicle_owner_documents s
+         LEFT JOIN documents d ON d.id = s.document_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = s.owner_id
+         WHERE s.id = ?
+         LIMIT 1`,
+        [submissionId]
+    );
+    if (!rows[0]) return null;
+    const row = rows[0];
+    return {
+        actor_type: "owner",
+        id: Number(row.id),
+        actor_id: Number(row.actor_id),
+        actor_name: row.actor_name,
+        document_id: Number(row.document_id),
+        title: row.title,
+        doc_number: row.doc_number,
+        doc_expiry_date: row.doc_expiry_date,
+        verified: Number(row.verified || 0),
+        status: row.status,
+        date_submitted: row.date_submitted,
+    };
 }
 
 export async function listVehicleSubmissions({
@@ -359,9 +430,16 @@ export async function listVehicleSubmissions({
             vd.id,
             vd.vehicle_id,
             v.owner_id,
+            v.brand,
+            v.model,
+            v.year,
+            v.color,
+            v.license_plate,
             vd.document_id,
             d.title AS document_title,
             d.doc_city,
+            d.doc_two_sides,
+            vd.side,
             vd.doc_number,
             vd.doc_expiry_date,
             vd.file_url,
@@ -384,9 +462,16 @@ export async function listVehicleSubmissions({
         id: Number(row.id),
         vehicle_id: Number(row.vehicle_id),
         owner_id: Number(row.owner_id),
+        brand: row.brand || null,
+        model: row.model || null,
+        year: row.year ? Number(row.year) : null,
+        color: row.color || null,
+        license_plate: row.license_plate || null,
         document_id: Number(row.document_id),
         document_title: row.document_title,
         doc_city: row.doc_city === null ? null : Number(row.doc_city),
+        doc_two_sides: Number(row.doc_two_sides || 0),
+        side: row.side || "single",
         doc_number: row.doc_number,
         doc_expiry_date: row.doc_expiry_date,
         file_url: row.file_url,

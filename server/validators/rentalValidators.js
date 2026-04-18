@@ -92,3 +92,19 @@ export const assignRentalValidator = [
     body("driver_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("driver_id must be a positive integer").toInt(),
     body("vehicle_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("vehicle_id must be a positive integer").toInt(),
 ];
+
+export const rentalVehicleIdParamValidator = [
+    param("vehicleId").isInt({ min: 1 }).withMessage("vehicleId must be a positive integer").toInt(),
+];
+
+export const setVehiclePackagesValidator = [
+    ...rentalVehicleIdParamValidator,
+    body("package_ids").isArray().withMessage("package_ids must be an array"),
+    body("package_ids.*").isInt({ min: 1 }).withMessage("each package_id must be a positive integer").toInt(),
+];
+
+export const notifyDriversValidator = [
+    ...rentalIdParamValidator,
+    body("start_datetime").isISO8601().withMessage("start_datetime must be a valid ISO datetime"),
+    body("end_datetime").isISO8601().withMessage("end_datetime must be a valid ISO datetime"),
+];

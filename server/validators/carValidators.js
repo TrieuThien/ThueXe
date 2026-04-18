@@ -59,6 +59,11 @@ const sharedCarValidators = [
         .customSanitizer(normalizeBooleanLike)
         .isInt({ min: 0, max: 1 })
         .withMessage("avail must be a boolean or 0/1"),
+    body("provide_rental")
+        .optional({ values: "falsy" })
+        .customSanitizer(normalizeBooleanLike)
+        .isInt({ min: 0, max: 1 })
+        .withMessage("provide_rental must be a boolean or 0/1"),
 ];
 
 export const createCarValidator = [...sharedCarValidators, validateRideImage(true)];

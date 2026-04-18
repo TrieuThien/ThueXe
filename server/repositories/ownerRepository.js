@@ -418,7 +418,7 @@ export async function listOwnerVehicles(ownerId, { search, status, page = 1, pag
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
                 v.date_added, v.notes, vt.type_name
          FROM vehicles v
-         INNER JOIN vehicle_types vt ON vt.type_id = v.type_id
+         LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
          WHERE ${whereSql}
          ORDER BY v.vehicle_id DESC
          LIMIT ? OFFSET ?`,
@@ -476,7 +476,7 @@ export async function updateOwnerVehicle(ownerId, vehicleId, payload, conn = nul
 
 export async function listVehicleDocumentTypes() {
     const [rows] = await sqldb.query(
-        `SELECT id, title, doc_desc, doc_expiry, doc_id_num, doc_id_num_title
+        `SELECT id, title, doc_desc, doc_expiry, doc_id_num, doc_id_num_title, doc_two_sides
          FROM documents
          WHERE status = 1 AND doc_user = 2 AND doc_type = 1
          ORDER BY id ASC`
@@ -486,14 +486,14 @@ export async function listVehicleDocumentTypes() {
 
 export async function listVehicleDocuments(vehicleId) {
     const [rows] = await sqldb.query(
-        `SELECT vd.id, vd.vehicle_id, vd.document_id, vd.doc_number, vd.doc_expiry_date,
+        `SELECT vd.id, vd.vehicle_id, vd.document_id, vd.side, vd.doc_number, vd.doc_expiry_date,
                 vd.file_url, vd.mime_type, vd.file_size, vd.verified, vd.status, vd.review_note,
                 vd.date_submitted, vd.updated_at,
-                d.title AS document_title
+                d.title AS document_title, d.doc_two_sides
          FROM vehicle_documents vd
          INNER JOIN documents d ON d.id = vd.document_id
          WHERE vd.vehicle_id = ?
-         ORDER BY vd.id DESC`,
+         ORDER BY vd.document_id ASC, FIELD(vd.side, 'single', 'front', 'back')`,
         [vehicleId]
     );
     return rows;
@@ -501,9 +501,10 @@ export async function listVehicleDocuments(vehicleId) {
 
 export async function upsertVehicleDocument(vehicleId, payload, conn = null) {
     const db = dbConnection(conn);
+    const side = payload.side || 'single';
     const [existingRows] = await db.query(
-        `SELECT id FROM vehicle_documents WHERE vehicle_id = ? AND document_id = ? LIMIT 1`,
-        [vehicleId, payload.document_id]
+        `SELECT id FROM vehicle_documents WHERE vehicle_id = ? AND document_id = ? AND side = ? LIMIT 1`,
+        [vehicleId, payload.document_id, side]
     );
 
     if (existingRows[0]) {
@@ -526,11 +527,12 @@ export async function upsertVehicleDocument(vehicleId, payload, conn = null) {
 
     const [result] = await db.query(
         `INSERT INTO vehicle_documents
-         (vehicle_id, document_id, doc_number, doc_expiry_date, file_url, mime_type, file_size, verified, status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
+         (vehicle_id, document_id, side, doc_number, doc_expiry_date, file_url, mime_type, file_size, verified, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'pending')`,
         [
             vehicleId,
             payload.document_id,
+            side,
             payload.doc_number || null,
             payload.doc_expiry_date || null,
             payload.file_url || null,

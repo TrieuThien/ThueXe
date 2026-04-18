@@ -50,7 +50,7 @@ export const ownerVehicleUpsertValidator = [
     body("brand").isString().trim().isLength({ min: 1, max: 50 }),
     body("model").isString().trim().isLength({ min: 1, max: 50 }),
     body("productionYear").optional({ values: "falsy" }).isInt({ min: 1900, max: 2100 }).toInt(),
-    body("color").optional({ values: "falsy" }).isString().trim().isLength({ max: 20 }),
+    body("color").optional({ values: "falsy" }).isString().trim().isLength({ max: 100 }),
     body("plateNumber").isString().trim().isLength({ min: 4, max: 15 }),
     body("vin").optional({ values: "falsy" }).isString().trim().isLength({ max: 30 }),
     body("seats").isInt({ min: 1, max: 60 }).toInt(),
@@ -106,4 +106,9 @@ export const ownerRevenueTopupValidator = [
 export const ownerRevenueWithdrawalValidator = [
     body("amount").isFloat({ gt: 0 }).toFloat(),
     body("note").optional({ values: "falsy" }).isString().trim().isLength({ max: 255 }),
+];
+
+export const ownerSetVehiclePackagesValidator = [
+    body("package_ids").isArray().withMessage("package_ids must be an array"),
+    body("package_ids.*").isInt({ min: 1 }).withMessage("each package_id must be a positive integer").toInt(),
 ];

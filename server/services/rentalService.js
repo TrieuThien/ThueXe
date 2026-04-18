@@ -3,20 +3,28 @@ import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import {
     assignRentalDriverVehicle,
+    countExistingRentalNotificationsForDrivers,
     createRentalBooking,
     createRentalPackage,
+    findAvailableDriversForRental,
     findDriverById,
     findRentalBookingById,
     findRentalByIdForUpdate,
     findRentalPackageById,
     findVehicleById,
+    insertDriverNotificationsBatch,
     listRentalBookings,
     listRentalDrivers,
     listRentalPackages,
     listRentalVehicles,
+    listVehiclePackages,
+    replaceVehiclePackages,
     updateRentalPackage,
     updateRentalStatus,
 } from "../repositories/rentalRepository.js";
+
+// n_type = 10 cho thông báo "yêu cầu thuê tài xế" trong driver_notifications
+const DRIVER_RENTAL_NOTIFY_TYPE = 10;
 
 const RENTAL_STATUSES = ["scheduled", "pending", "in_progress", "completed", "cancelled"];
 const PAYMENT_STATUSES = ["pending", "paid", "refunded"];
@@ -246,6 +254,20 @@ export async function createRentalBookingService({ payload, auth }) {
         );
 
         const created = await findRentalBookingById(rentalId, conn);
+
+        // Sau khi commit, nếu đơn là thuê tài xế (service_type=2) và chưa gán driver cụ thể,
+        // tìm và thông báo cho các tài xế phù hợp (bất đồng bộ, không ảnh hưởng response)
+        if (serviceType === 2 && !driverId) {
+            const startStr = start.toISOString().slice(0, 19).replace("T", " ");
+            const endStr = end.toISOString().slice(0, 19).replace("T", " ");
+            notifyAvailableDriversService({
+                rentalId,
+                startDatetime: startStr,
+                endDatetime: endStr,
+                packageInfo: rentalPackage,
+            }).catch(() => {});
+        }
+
         return { rental: created };
     });
 }
@@ -390,6 +412,108 @@ export async function assignRentalService({ rentalId, payload }) {
 
         return { rental: await findRentalBookingById(numericRentalId, conn) };
     });
+}
+
+// ─── Owner: xem gói thuê chuẩn dành cho xe (service_type=1, active=1) ─────────
+
+export async function listOwnerRentalPackagesService() {
+    return {
+        items: await listRentalPackages({ serviceType: 1, active: 1 }),
+    };
+}
+
+// ─── Owner: xem gói thuê đã gán cho xe ────────────────────────────────────────
+
+export async function getVehiclePackagesService({ ownerId, vehicleId }) {
+    const numericVehicleId = Number(vehicleId);
+    if (!Number.isInteger(numericVehicleId) || numericVehicleId < 1) {
+        throw new AppError("Invalid vehicle id.", 422, "INVALID_VEHICLE_ID");
+    }
+    const vehicle = await findVehicleById(numericVehicleId);
+    if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
+    if (Number(vehicle.owner_id) !== Number(ownerId)) {
+        throw new AppError("Forbidden", 403, "FORBIDDEN");
+    }
+    const packages = await listVehiclePackages(numericVehicleId);
+    return { vehicle_id: numericVehicleId, packages };
+}
+
+// ─── Owner: gán gói thuê vào xe ───────────────────────────────────────────────
+
+export async function setVehiclePackagesService({ ownerId, vehicleId, packageIds }) {
+    const numericVehicleId = Number(vehicleId);
+    if (!Number.isInteger(numericVehicleId) || numericVehicleId < 1) {
+        throw new AppError("Invalid vehicle id.", 422, "INVALID_VEHICLE_ID");
+    }
+    if (!Array.isArray(packageIds)) {
+        throw new AppError("package_ids must be an array.", 422, "INVALID_PACKAGE_IDS");
+    }
+
+    return runInTransaction(async (conn) => {
+        const vehicle = await findVehicleById(numericVehicleId, conn);
+        if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
+        if (Number(vehicle.owner_id) !== Number(ownerId)) {
+            throw new AppError("Forbidden", 403, "FORBIDDEN");
+        }
+
+        // Loại trùng, bỏ giá trị không hợp lệ
+        const uniqueIds = [...new Set(packageIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+
+        for (const pid of uniqueIds) {
+            const pkg = await findRentalPackageById(pid, conn);
+            if (!pkg) {
+                throw new AppError(`Rental package #${pid} not found.`, 404, "RENTAL_PACKAGE_NOT_FOUND");
+            }
+            if (pkg.active !== 1) {
+                throw new AppError(`Rental package #${pid} is inactive.`, 409, "RENTAL_PACKAGE_INACTIVE");
+            }
+            if (pkg.service_type !== 1) {
+                throw new AppError(`Rental package #${pid} is not for vehicle rental (service_type must be 1).`, 422, "INVALID_PACKAGE_SERVICE_TYPE");
+            }
+            // Nếu gói có ràng buộc type_id thì phải khớp với loại xe
+            if (pkg.type_id !== null && pkg.type_id !== vehicle.type_id) {
+                throw new AppError(
+                    `Rental package #${pid} is not compatible with this vehicle type (required type_id=${pkg.type_id}, vehicle type_id=${vehicle.type_id}).`,
+                    422,
+                    "PACKAGE_TYPE_MISMATCH"
+                );
+            }
+        }
+
+        await replaceVehiclePackages(numericVehicleId, uniqueIds, conn);
+        const packages = await listVehiclePackages(numericVehicleId, conn);
+        return { vehicle_id: numericVehicleId, packages };
+    });
+}
+
+// ─── Gửi thông báo cho tài xế phù hợp khi có đơn thuê tài xế ────────────────
+
+export async function notifyAvailableDriversService({ rentalId, startDatetime, endDatetime, packageInfo }) {
+    // Tránh tạo thông báo trùng cho cùng 1 đơn
+    const existing = await countExistingRentalNotificationsForDrivers(rentalId);
+    if (existing > 0) return { notified: 0, skipped: true };
+
+    const drivers = await findAvailableDriversForRental(startDatetime, endDatetime);
+    if (!drivers.length) return { notified: 0, skipped: false };
+
+    const content = JSON.stringify({
+        rental_id: rentalId,
+        package_name: packageInfo?.package_name || null,
+        price: packageInfo?.price || null,
+        start_datetime: startDatetime,
+        end_datetime: endDatetime,
+        duration_hours: packageInfo?.duration_hours || null,
+    });
+
+    const notifications = drivers.map((d) => ({
+        driver_id: d.driver_id,
+        content,
+        rental_id: rentalId,
+        n_type: DRIVER_RENTAL_NOTIFY_TYPE,
+    }));
+
+    await insertDriverNotificationsBatch(notifications);
+    return { notified: notifications.length };
 }
 
 export { PAYMENT_STATUSES, RENTAL_STATUSES };

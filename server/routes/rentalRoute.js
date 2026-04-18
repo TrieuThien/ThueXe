@@ -6,10 +6,15 @@ import {
     assignRentalHandler,
     createRentalBookingHandler,
     createRentalPackageHandler,
+    getVehiclePackagesHandler,
     getRentalBookingDetailHandler,
+    listOwnerRentalPackagesHandler,
     listRentalBookingsHandler,
     listRentalPackagesHandler,
+    listVehicleTypesHandler,
+    notifyDriversForRentalHandler,
     rentalMetaHandler,
+    setVehiclePackagesHandler,
     updateRentalPackageHandler,
     updateRentalStatusHandler,
 } from "../controllers/rentalController.js";
@@ -17,15 +22,25 @@ import {
     assignRentalValidator,
     createRentalBookingValidator,
     createRentalPackageValidator,
+    notifyDriversValidator,
     rentalBookingListValidator,
     rentalIdParamValidator,
     rentalMetaValidator,
     rentalPackageListValidator,
+    rentalVehicleIdParamValidator,
+    setVehiclePackagesValidator,
     updateRentalPackageValidator,
     updateRentalStatusValidator,
 } from "../validators/rentalValidators.js";
 
 const router = Router();
+
+router.get(
+    "/api/rentals/vehicle-types",
+    requireAuth,
+    requireRole("admin"),
+    listVehicleTypesHandler
+);
 
 router.get(
     "/api/rentals/packages",
@@ -49,6 +64,42 @@ router.patch(
     updateRentalPackageValidator,
     validateRequest,
     updateRentalPackageHandler
+);
+
+// Owner: gói thuê xe đang active (service_type=1)
+router.get(
+    "/api/rentals/owner/packages",
+    requireAuth,
+    requireRole("owner"),
+    listOwnerRentalPackagesHandler
+);
+
+// Owner: xem/gán gói thuê cho xe của mình
+router.get(
+    "/api/rentals/owner/vehicles/:vehicleId/packages",
+    requireAuth,
+    requireRole("owner"),
+    rentalVehicleIdParamValidator,
+    validateRequest,
+    getVehiclePackagesHandler
+);
+router.put(
+    "/api/rentals/owner/vehicles/:vehicleId/packages",
+    requireAuth,
+    requireRole("owner"),
+    setVehiclePackagesValidator,
+    validateRequest,
+    setVehiclePackagesHandler
+);
+
+// Admin: kích hoạt thủ công gửi thông báo cho tài xế của 1 đơn thuê
+router.post(
+    "/api/rentals/bookings/:rentalId/notify-drivers",
+    requireAuth,
+    requireRole("admin", "dispatcher"),
+    notifyDriversValidator,
+    validateRequest,
+    notifyDriversForRentalHandler
 );
 
 router.get(

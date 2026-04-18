@@ -2,7 +2,14 @@ import { Router } from "express";
 import requireAuth from "../middlewares/authMiddleware.js";
 import requireRole from "../middlewares/roleMiddleware.js";
 import validateRequest from "../middlewares/validateRequest.js";
-import { ownerDocUploadSingle } from "../middlewares/ownerUpload.js";
+import { ownerDocUploadSingle, ownerDocUploadAny } from "../middlewares/ownerUpload.js";
+
+function parseDocumentsJson(req, res, next) {
+    if (typeof req.body.documents === "string") {
+        try { req.body.documents = JSON.parse(req.body.documents); } catch { /* validator will catch */ }
+    }
+    next();
+}
 import {
     ownerAccountChangePasswordHandler,
     ownerAccountProfileHandler,
@@ -32,6 +39,7 @@ import {
     ownerMaintenanceVehiclesHandler,
     ownerRefreshHandler,
     ownerRegisterHandler,
+    ownerRentalPackagesListHandler,
     ownerRevenueByVehicleHandler,
     ownerRevenueCreateWithdrawalHandler,
     ownerRevenueLedgerHandler,
@@ -45,6 +53,8 @@ import {
     ownerVehicleDocumentTypesHandler,
     ownerVehicleDocumentsUpsertHandler,
     ownerVehicleListHandler,
+    ownerVehicleRentalPackagesGetHandler,
+    ownerVehicleRentalPackagesSetHandler,
     ownerVehicleTypesHandler,
     ownerVehicleUpdateHandler,
     ownerVehicleVerificationStatusHandler,
@@ -70,6 +80,7 @@ import {
     ownerRegisterValidator,
     ownerRevenueTopupValidator,
     ownerRevenueWithdrawalValidator,
+    ownerSetVehiclePackagesValidator,
     ownerVehicleDocumentsUpsertValidator,
     ownerVehicleIdParamValidator,
     ownerVehicleUpsertValidator,
@@ -117,13 +128,15 @@ router.get("/api/owner/dashboard", ...ownerAuth, ownerDashboardHandler);
 
 router.get("/api/owner/vehicle-management/vehicle-types", ...ownerAuth, ownerVehicleTypesHandler);
 router.get("/api/owner/vehicle-management/document-types", ...ownerAuth, ownerVehicleDocumentTypesHandler);
-router.post("/api/owner/vehicle-management/vehicles", ...ownerAuth, ownerVehicleUpsertValidator, validateRequest, ownerVehicleCreateHandler);
+router.post("/api/owner/vehicle-management/vehicles", ...ownerAuth, ownerDocUploadAny(), parseDocumentsJson, ownerVehicleUpsertValidator, validateRequest, ownerVehicleCreateHandler);
 router.get("/api/owner/vehicle-management/vehicles", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerVehicleListHandler);
 router.get("/api/owner/vehicle-management/vehicles/:vehicleId", ...ownerAuth, ownerVehicleIdParamValidator, validateRequest, ownerVehicleDetailHandler);
 router.put("/api/owner/vehicle-management/vehicles/:vehicleId", ...ownerAuth, ownerVehicleIdParamValidator, ownerVehicleUpsertValidator, validateRequest, ownerVehicleUpdateHandler);
 router.post(
     "/api/owner/vehicle-management/vehicles/:vehicleId/documents",
     ...ownerAuth,
+    ownerDocUploadAny(),
+    parseDocumentsJson,
     ownerVehicleIdParamValidator,
     ownerVehicleDocumentsUpsertValidator,
     validateRequest,
@@ -168,5 +181,23 @@ router.get("/api/owner/owner-revenue/payments", ...ownerAuth, ownerPaginationVal
 router.get("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerRevenueWithdrawalsHandler);
 router.post("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerRevenueWithdrawalValidator, validateRequest, ownerRevenueCreateWithdrawalHandler);
 router.post("/api/owner/owner-revenue/topup", ...ownerAuth, ownerRevenueTopupValidator, validateRequest, ownerRevenueTopupHandler);
+
+// Rental packages (owner-facing) — gói thuê chuẩn cho xe
+router.get("/api/owner/rental-packages", ...ownerAuth, ownerRentalPackagesListHandler);
+router.get(
+    "/api/owner/vehicle-management/vehicles/:vehicleId/rental-packages",
+    ...ownerAuth,
+    ownerVehicleIdParamValidator,
+    validateRequest,
+    ownerVehicleRentalPackagesGetHandler
+);
+router.put(
+    "/api/owner/vehicle-management/vehicles/:vehicleId/rental-packages",
+    ...ownerAuth,
+    ownerVehicleIdParamValidator,
+    ownerSetVehiclePackagesValidator,
+    validateRequest,
+    ownerVehicleRentalPackagesSetHandler
+);
 
 export default router;
