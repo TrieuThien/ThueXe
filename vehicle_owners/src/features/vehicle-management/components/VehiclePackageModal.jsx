@@ -37,9 +37,9 @@ export default function VehiclePackageModal({ open, vehicle, onClose, onSaved })
 
   // Tải các gói hiện đang gán cho xe
   const vehiclePackagesQuery = useQuery({
-    queryKey: ['owner-vehicle-packages', vehicle?.vehicle_id],
-    queryFn: () => rentalPackageService.getVehiclePackages(vehicle.vehicle_id),
-    enabled: open && Boolean(vehicle?.vehicle_id),
+    queryKey: ['owner-vehicle-packages', vehicle?.id],
+    queryFn: () => rentalPackageService.getVehiclePackages(vehicle.id),
+    enabled: open && Boolean(vehicle?.id),
     select: (data) => data?.packages ?? [],
   });
 
@@ -51,7 +51,7 @@ export default function VehiclePackageModal({ open, vehicle, onClose, onSaved })
   }, [vehiclePackagesQuery.data]);
 
   const setMutation = useMutation({
-    mutationFn: (ids) => rentalPackageService.setVehiclePackages(vehicle.vehicle_id, ids),
+    mutationFn: (ids) => rentalPackageService.setVehiclePackages(vehicle.id, ids),
     onSuccess: () => {
       toast.success('Đã cập nhật gói thuê cho xe.');
       onSaved?.();
@@ -80,10 +80,10 @@ export default function VehiclePackageModal({ open, vehicle, onClose, onSaved })
 
   // Lọc gói phù hợp: type_id null = áp dụng mọi loại xe; type_id !== null = chỉ xe cùng loại
   const compatiblePackages = allPackages.filter(
-    (p) => p.type_id === null || p.type_id === vehicle?.type_id
+    (p) => p.type_id === null || Number(p.type_id) === vehicle?.typeId
   );
   const incompatiblePackages = allPackages.filter(
-    (p) => p.type_id !== null && p.type_id !== vehicle?.type_id
+    (p) => p.type_id !== null && Number(p.type_id) !== vehicle?.typeId
   );
 
   return (
@@ -97,7 +97,7 @@ export default function VehiclePackageModal({ open, vehicle, onClose, onSaved })
               <h3 className="text-base font-semibold text-slate-900">Gói thuê cho xe</h3>
             </div>
             <p className="mt-0.5 text-sm text-slate-500">
-              {vehicle?.brand} {vehicle?.model} · {vehicle?.license_plate}
+              {vehicle?.brand} {vehicle?.model} · {vehicle?.plateNumber}
             </p>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1 hover:bg-slate-100">

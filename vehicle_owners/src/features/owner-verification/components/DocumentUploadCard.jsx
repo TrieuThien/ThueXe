@@ -1,4 +1,12 @@
 ﻿import { CalendarDays, FileCheck2, FileText, ImageIcon, UploadCloud } from 'lucide-react';
+
+const statusConfig = {
+  verified: { label: 'Đã xác thực', cls: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+  pending: { label: 'Đang chờ duyệt', cls: 'border-amber-200 bg-amber-50 text-amber-700' },
+  rejected: { label: 'Bị từ chối', cls: 'border-rose-200 bg-rose-50 text-rose-700' },
+  expired: { label: 'Hết hạn', cls: 'border-slate-200 bg-slate-100 text-slate-600' },
+  missing: { label: 'Chưa có', cls: 'border-slate-200 bg-slate-50 text-slate-500' },
+};
 import { useEffect, useMemo } from 'react';
 
 const formatSize = (bytes = 0) => {
@@ -67,11 +75,21 @@ export default function DocumentUploadCard({
           <h3 className="text-sm font-extrabold text-slate-900 md:text-base">{documentType.title}</h3>
           <p className="mt-1 text-xs text-slate-600 md:text-sm">{documentType.description}</p>
         </div>
-        {documentType.required ? (
-          <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">
-            Bắt buộc
-          </span>
-        ) : null}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {documentType.required ? (
+            <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">
+              Bắt buộc
+            </span>
+          ) : null}
+          {value?.status ? (() => {
+            const cfg = statusConfig[value.status] || { label: value.status, cls: 'border-slate-200 bg-slate-50 text-slate-500' };
+            return (
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${cfg.cls}`}>
+                {cfg.label}
+              </span>
+            );
+          })() : null}
+        </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">

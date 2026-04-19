@@ -36,7 +36,7 @@ export default function RentalPackagesPage() {
   });
 
   const selectedVehicle = vehiclesQuery.data?.find(
-    (v) => String(v.vehicle_id) === String(packageVehicleId)
+    (v) => String(v.id) === String(packageVehicleId)
   ) ?? null;
 
   const packages = packagesQuery.data ?? [];
@@ -45,7 +45,7 @@ export default function RentalPackagesPage() {
   return (
     <section className="space-y-6">
       <PageHeader
-        title="Gói thuê chuẩn"
+        title="Cài đặt gói cho thuê xe"
         description="Xem các gói thuê do hệ thống cung cấp và gán gói phù hợp cho từng xe của bạn."
       />
 
@@ -127,26 +127,26 @@ export default function RentalPackagesPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {vehicles.map((v) => (
-                  <tr key={v.vehicle_id} className="hover:bg-slate-50/60">
+                  <tr key={v.id} className="hover:bg-slate-50/60">
                     <td className="px-4 py-3 font-medium text-slate-800">
-                      {v.brand} {v.model} {v.year ? `(${v.year})` : ''}
+                      {v.brand} {v.model} {v.productionYear ? `(${v.productionYear})` : ''}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">{v.license_plate}</td>
+                    <td className="px-4 py-3 text-slate-600">{v.plateNumber}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          v.status === 'available'
+                          v.usageStatus === 'available'
                             ? 'bg-emerald-100 text-emerald-700'
                             : 'bg-slate-100 text-slate-500'
                         }`}
                       >
-                        {v.status}
+                        {v.usageStatus}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => setPackageVehicleId(String(v.vehicle_id))}
+                        onClick={() => setPackageVehicleId(String(v.id))}
                         className="inline-flex items-center gap-1.5 rounded-xl border border-sky-200 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-50"
                       >
                         <Package className="h-3.5 w-3.5" />
@@ -168,7 +168,6 @@ export default function RentalPackagesPage() {
         onClose={() => setPackageVehicleId('')}
         onSaved={() => {
           queryClient.invalidateQueries({ queryKey: ['owner-vehicle-packages', Number(packageVehicleId)] });
-          setPackageVehicleId('');
         }}
       />
     </section>

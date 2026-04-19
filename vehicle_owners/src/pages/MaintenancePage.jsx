@@ -43,38 +43,38 @@ export default function MaintenancePage() {
   const createMutation = useMutation({
     mutationFn: vehicleMaintenanceService.createMaintenanceRecord,
     onSuccess: () => {
-      toast.success('Thêm phieu bao tri thành công.');
+      toast.success('Thêm phiếu bảo trì thành công.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-records'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-stats'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-management-list'] });
       setModalOpen(false);
       setEditingRecord(null);
     },
-    onError: (error) => toast.error(error.message || 'Không thể Thêm phieu bao tri.'),
+    onError: (error) => toast.error(error.message || 'Không thể thêm phiếu bảo trì.'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }) => vehicleMaintenanceService.updateMaintenanceRecord(id, payload),
     onSuccess: () => {
-      toast.success('Cập nhật phieu bao tri thành công.');
+      toast.success('Cập nhật phiếu bảo trì thành công.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-records'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-stats'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-management-list'] });
       setModalOpen(false);
       setEditingRecord(null);
     },
-    onError: (error) => toast.error(error.message || 'Không thể Cập nhật phieu bao tri.'),
+    onError: (error) => toast.error(error.message || 'Không thể cập nhật phiếu bảo trì.'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: vehicleMaintenanceService.deleteMaintenanceRecord,
     onSuccess: () => {
-      toast.success('Da Xóa phieu bao tri.');
+      toast.success('Đã xóa phiếu bảo trì.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-records'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-maintenance-stats'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-management-list'] });
     },
-    onError: (error) => toast.error(error.message || 'Không thể Xóa phieu bao tri.'),
+    onError: (error) => toast.error(error.message || 'Không thể xóa phiếu bảo trì.'),
   });
 
   return (
