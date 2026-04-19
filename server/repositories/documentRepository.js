@@ -290,7 +290,8 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
             ? "LEFT JOIN drivers d ON d.driver_id = s.driver_id"
             : "LEFT JOIN users u ON u.user_id = s.user_id";
         return `SELECT '${kind}' AS actor_type, s.id, s.${resolved.actorColumn} AS actor_id, s.document_id, s.doc_number, s.doc_expiry_date, s.verified, s.date_submitted,
-                       d2.title, ${actorNameExpr} AS actor_name
+                       d2.title, ${actorNameExpr} AS actor_name,
+                       NULL AS file_url, NULL AS mime_type, NULL AS status, NULL AS review_note
                 FROM ${resolved.table} s
                 LEFT JOIN documents d2 ON d2.id = s.document_id
                 ${joinSql}
@@ -313,7 +314,8 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
         }
         const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
         return `SELECT 'owner' AS actor_type, s.id, s.owner_id AS actor_id, s.document_id, s.doc_number, s.doc_expiry_date, s.verified, s.date_submitted,
-                       d2.title, COALESCE(vo.fullname, '') AS actor_name
+                       d2.title, COALESCE(vo.fullname, '') AS actor_name,
+                       s.file_url, s.mime_type, s.status, s.review_note
                 FROM vehicle_owner_documents s
                 LEFT JOIN documents d2 ON d2.id = s.document_id
                 LEFT JOIN vehicle_owners vo ON vo.owner_id = s.owner_id
@@ -338,19 +340,23 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
         doc_number: row.doc_number,
         doc_expiry_date: row.doc_expiry_date,
         verified: Number(row.verified || 0),
+        status: row.status || null,
+        review_note: row.review_note || null,
+        file_url: row.file_url || null,
+        mime_type: row.mime_type || null,
         date_submitted: row.date_submitted,
     }));
 }
 
-export async function setOwnerSubmissionVerification({ submissionId, verified }, conn) {
+export async function setOwnerSubmissionVerification({ submissionId, verified, reviewNote }, conn) {
     const db = dbConnection(conn);
     const status = verified === 1 ? "verified" : "rejected";
     await db.query(
         `UPDATE vehicle_owner_documents
-         SET verified = ?, status = ?
+         SET verified = ?, status = ?, review_note = ?
          WHERE id = ?
          LIMIT 1`,
-        [verified, status, submissionId]
+        [verified, status, reviewNote || null, submissionId]
     );
 }
 

@@ -20,6 +20,8 @@ import {
 } from "../repositories/documentRepository.js";
 import {
     listVehicleDocuments,
+    listOwnerDocuments,
+    updateOwnerVerificationState,
     updateVehicleVerificationStatus,
 } from "../repositories/ownerRepository.js";
 
@@ -265,7 +267,28 @@ export async function reviewDocumentSubmission({ actorType, submissionId, payloa
         if (!existing) {
             throw new AppError("Submission not found.", 404, "SUBMISSION_NOT_FOUND");
         }
-        await setOwnerSubmissionVerification({ submissionId: numericSubmissionId, verified });
+        const reviewNote = String(payload.review_note || "").trim() || null;
+        await setOwnerSubmissionVerification({ submissionId: numericSubmissionId, verified, reviewNote });
+
+        const ownerId = existing.actor_id;
+        if (status === "rejected") {
+            await updateOwnerVerificationState(ownerId, {
+                verification_status: "rejected",
+                verification_submitted_at: null,
+                verification_admin_note: reviewNote,
+            });
+        } else if (status === "approved") {
+            const allDocs = await listOwnerDocuments(ownerId);
+            const allVerified = allDocs.length > 0 && allDocs.every((d) => d.status === "verified");
+            if (allVerified) {
+                await updateOwnerVerificationState(ownerId, {
+                    verification_status: "verified",
+                    verification_submitted_at: null,
+                    verification_admin_note: null,
+                });
+            }
+        }
+
         return {
             submission: await findOwnerSubmissionById(numericSubmissionId),
             review_status: status,

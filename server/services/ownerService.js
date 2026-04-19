@@ -653,8 +653,12 @@ function mapVehicleListItem(row, documentRows) {
     const missingDocumentCount = documentRows.filter((item) => !item.file_url).length;
     return {
         id: Number(row.vehicle_id),
+        typeId: Number(row.type_id),
         plateNumber: row.license_plate,
         vehicleType: row.type_name,
+        brand: row.brand || "",
+        model: row.model || "",
+        productionYear: row.year ? Number(row.year) : null,
         usageStatus: row.status,
         verificationStatus: row.verification_status || (Number(row.is_verified) === 1 ? "verified" : "pending_review"),
         addedAt: row.date_added,
