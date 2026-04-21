@@ -48,7 +48,7 @@ export default function RentalBookingDetailPage() {
         description="Xem thông tin đầy đủ don thue, timeline, hop dong va Cập nhật Trạng thái theo quy tac."
         actions={
           <Link className="btn" to={OWNER_ROUTES.BOOKINGS}>
-            Quay lai danh sach
+            Quay lại danh sách
           </Link>
         }
       />
