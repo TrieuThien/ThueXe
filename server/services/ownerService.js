@@ -100,6 +100,21 @@ const BOOKING_TRANSITIONS = {
     completed: [],
     canceled: [],
 };
+const AVAILABILITY_TYPE_MAP = {
+    booking: "booking",
+    booked: "booking",
+    maintenance: "maintenance",
+    manual_block: "manual_block",
+    unavailable: "manual_block",
+    manual_available: "manual_available",
+    available: "manual_available",
+};
+const AVAILABILITY_TYPE_TO_CLIENT_MAP = {
+    booking: "booked",
+    maintenance: "maintenance",
+    manual_block: "unavailable",
+    manual_available: "available",
+};
 
 function normalizeIdentifier(identifier) {
     const value = String(identifier || "").trim();
@@ -131,6 +146,20 @@ function buildOwnerRegisterVerifyToken() {
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
     return { rawToken, tokenHash };
+}
+
+function normalizeAvailabilityType(typeInput) {
+    if (!typeInput) return null;
+    const normalized = AVAILABILITY_TYPE_MAP[String(typeInput).trim()];
+    if (!normalized) {
+        throw new AppError("Invalid availability type.", 422, "VALIDATION_ERROR");
+    }
+    return normalized;
+}
+
+function mapAvailabilityTypeToClient(typeInput) {
+    if (!typeInput) return "unavailable";
+    return AVAILABILITY_TYPE_TO_CLIENT_MAP[String(typeInput).trim()] || "unavailable";
 }
 
 function buildOwnerVerifyEmailLink(rawToken) {
@@ -966,7 +995,7 @@ export async function getOwnerVehicleAvailability(auth, vehicleIdInput, query) {
         to: query.to || null,
         blocks: items.map((item) => ({
             id: Number(item.block_id),
-            type: item.block_type,
+            type: mapAvailabilityTypeToClient(item.block_type),
             startAt: item.start_at,
             endAt: item.end_at,
             note: item.note || "",
@@ -982,13 +1011,14 @@ export async function createOwnerAvailabilityBlock(auth, vehicleIdInput, payload
     const startAt = ensureValidDate(payload.startAt, "startAt");
     const endAt = ensureValidDate(payload.endAt, "endAt");
     if (new Date(endAt) <= new Date(startAt)) throw new AppError("Invalid time range.", 422, "VALIDATION_ERROR");
+    const blockType = normalizeAvailabilityType(payload.type) || "manual_block";
     const id = await createAvailabilityBlock(ownerId, vehicleId, {
-        block_type: payload.type || "manual_block",
+        block_type: blockType,
         start_at: startAt,
         end_at: endAt,
         note: payload.note || null,
     });
-    return { id, type: payload.type || "manual_block", startAt, endAt, note: payload.note || "" };
+    return { id, type: mapAvailabilityTypeToClient(blockType), startAt, endAt, note: payload.note || "" };
 }
 
 export async function updateOwnerAvailabilityBlock(auth, vehicleIdInput, blockIdInput, payload) {
@@ -1000,14 +1030,14 @@ export async function updateOwnerAvailabilityBlock(auth, vehicleIdInput, blockId
     const startAt = ensureValidDate(payload.startAt || block.start_at, "startAt");
     const endAt = ensureValidDate(payload.endAt || block.end_at, "endAt");
     if (new Date(endAt) <= new Date(startAt)) throw new AppError("Invalid time range.", 422, "VALIDATION_ERROR");
-    const type = payload.type || block.block_type;
+    const type = normalizeAvailabilityType(payload.type) || block.block_type;
     await updateAvailabilityBlock(ownerId, vehicleId, blockId, {
         block_type: type,
         start_at: startAt,
         end_at: endAt,
         note: payload.note ?? block.note,
     });
-    return { id: blockId, type, startAt, endAt, note: payload.note ?? block.note ?? "" };
+    return { id: blockId, type: mapAvailabilityTypeToClient(type), startAt, endAt, note: payload.note ?? block.note ?? "" };
 }
 
 export async function deleteOwnerAvailabilityBlock(auth, vehicleIdInput, blockIdInput) {
@@ -1033,7 +1063,7 @@ export async function getOwnerTimeline(auth, query) {
             status: vehicle.status,
             blocks: blocks.map((b) => ({
                 id: Number(b.block_id),
-                type: b.block_type,
+                type: mapAvailabilityTypeToClient(b.block_type),
                 startAt: b.start_at,
                 endAt: b.end_at,
                 note: b.note || "",

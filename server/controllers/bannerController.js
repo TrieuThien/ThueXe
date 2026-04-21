@@ -37,7 +37,7 @@ export async function getAdminBannerDetailHandler(req, res, next) {
 
 export async function createAdminBannerHandler(req, res, next) {
     try {
-        const result = await createBannerByAdmin(req.body, req.auth);
+        const result = await createBannerByAdmin(req.body, req.file, req.auth);
         return successResponse(res, result, "Create banner successfully.", 201);
     } catch (error) {
         return next(error);
@@ -46,7 +46,7 @@ export async function createAdminBannerHandler(req, res, next) {
 
 export async function updateAdminBannerHandler(req, res, next) {
     try {
-        const result = await updateBannerByAdmin(req.params.id, req.body, req.auth);
+        const result = await updateBannerByAdmin(req.params.id, req.body, req.file, req.auth);
         return successResponse(res, result, "Update banner successfully.");
     } catch (error) {
         return next(error);

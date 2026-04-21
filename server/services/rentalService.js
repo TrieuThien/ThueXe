@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
+import { isPointInCoverage, getDistanceKm } from "../utils/locationUtils.js";
 import {
     assignRentalDriverVehicle,
     countExistingRentalNotificationsForDrivers,
@@ -13,6 +14,8 @@ import {
     findRentalPackageById,
     findVehicleById,
     insertDriverNotificationsBatch,
+    listActivePackagesWithGeo,
+    listPackageCars,
     listRentalBookings,
     listRentalDrivers,
     listRentalPackages,
@@ -92,12 +95,44 @@ export async function getRentalPackageList({ query }) {
     };
 }
 
+/** Trích xuất và validate dữ liệu GIS từ payload */
+function extractGeoPayload(payload) {
+    const coverageType = payload.coverage_type || null;
+    if (coverageType && !['polygon', 'circle', 'rectangle'].includes(coverageType)) {
+        throw new AppError("coverage_type must be polygon, circle, or rectangle.", 422, "INVALID_COVERAGE_TYPE");
+    }
+
+    // circle: bắt buộc có center + radius
+    if (coverageType === 'circle') {
+        if (payload.center_lat == null || payload.center_lng == null || payload.radius_km == null) {
+            throw new AppError("center_lat, center_lng, radius_km are required for circle coverage.", 422, "MISSING_CIRCLE_PARAMS");
+        }
+    }
+
+    // polygon / rectangle: bắt buộc có GeoJSON
+    if (coverageType === 'polygon' || coverageType === 'rectangle') {
+        if (!payload.coverage_geojson) {
+            throw new AppError("coverage_geojson is required for polygon/rectangle coverage.", 422, "MISSING_GEOJSON");
+        }
+    }
+
+    return {
+        coverage_type: coverageType,
+        coverage_geojson: coverageType && coverageType !== 'circle' ? (payload.coverage_geojson || null) : null,
+        center_lat: coverageType === 'circle' ? toNumber(payload.center_lat, null) : null,
+        center_lng: coverageType === 'circle' ? toNumber(payload.center_lng, null) : null,
+        radius_km: coverageType === 'circle' ? toNumber(payload.radius_km, null) : null,
+        is_geo_enabled: payload.is_geo_enabled !== undefined ? Number(payload.is_geo_enabled) : 1,
+    };
+}
+
 export async function createRentalPackageService({ payload }) {
     const serviceType = ensureServiceType(payload.service_type);
     const price = toNumber(payload.price, NaN);
     if (!(price >= 0)) {
         throw new AppError("price must be a non-negative number.", 422, "INVALID_PRICE");
     }
+    const geoData = extractGeoPayload(payload);
 
     const packageId = await createRentalPackage({
         type_id: payload.type_id === undefined || payload.type_id === null || payload.type_id === "" ? null : Number(payload.type_id),
@@ -112,6 +147,7 @@ export async function createRentalPackageService({ payload }) {
         deposit_amount: toNumber(payload.deposit_amount, 0),
         description: toNullableString(payload.description),
         active: payload.active === undefined ? 1 : Number(payload.active),
+        ...geoData,
     });
 
     const created = await findRentalPackageById(packageId);
@@ -129,6 +165,33 @@ export async function updateRentalPackageService({ packageId, payload }) {
     }
 
     const serviceType = ensureServiceType(payload.service_type ?? existing.service_type);
+
+    // Merge GIS data: nếu gửi coverage_type mới thì dùng extractGeoPayload,
+    // nếu không gửi thì giữ dữ liệu cũ.
+    let geoData;
+    if (payload.coverage_type !== undefined || payload.is_geo_enabled !== undefined) {
+        // Admin đang cập nhật vùng → validate lại hoàn toàn
+        const mergedPayload = {
+            coverage_type: payload.coverage_type ?? existing.coverage_type,
+            coverage_geojson: payload.coverage_geojson ?? existing.coverage_geojson,
+            center_lat: payload.center_lat ?? existing.center_lat,
+            center_lng: payload.center_lng ?? existing.center_lng,
+            radius_km: payload.radius_km ?? existing.radius_km,
+            is_geo_enabled: payload.is_geo_enabled ?? existing.is_geo_enabled,
+        };
+        geoData = extractGeoPayload(mergedPayload);
+    } else {
+        // Không chạm GIS → giữ nguyên
+        geoData = {
+            coverage_type: existing.coverage_type,
+            coverage_geojson: existing.coverage_geojson,
+            center_lat: existing.center_lat,
+            center_lng: existing.center_lng,
+            radius_km: existing.radius_km,
+            is_geo_enabled: existing.is_geo_enabled,
+        };
+    }
+
     const data = {
         type_id: payload.type_id ?? existing.type_id,
         service_type: serviceType,
@@ -142,6 +205,7 @@ export async function updateRentalPackageService({ packageId, payload }) {
         deposit_amount: payload.deposit_amount !== undefined ? toNumber(payload.deposit_amount, 0) : existing.deposit_amount,
         description: payload.description !== undefined ? toNullableString(payload.description) : existing.description,
         active: payload.active !== undefined ? Number(payload.active) : existing.active,
+        ...geoData,
     };
     if (!(data.price >= 0)) throw new AppError("price must be non-negative.", 422, "INVALID_PRICE");
 
@@ -514,6 +578,58 @@ export async function notifyAvailableDriversService({ rentalId, startDatetime, e
 
     await insertDriverNotificationsBatch(notifications);
     return { notified: notifications.length };
+}
+
+// ─── Mobile: tìm gói thuê gần vị trí người dùng ─────────────────────────────
+
+/**
+ * Lấy tất cả gói đang active, lọc theo vị trí người dùng bằng thuật toán GIS.
+ * Nếu gói chưa cấu hình vùng (is_geo_enabled=0 hoặc không có coverage_type)
+ * thì vẫn trả về (áp dụng toàn quốc).
+ */
+export async function getNearbyPackagesService({ lat, lng, serviceType }) {
+    const latitude = Number(lat);
+    const longitude = Number(lng);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+        throw new AppError("lat and lng must be valid numbers.", 422, "INVALID_COORDINATES");
+    }
+
+    const allPackages = await listActivePackagesWithGeo();
+
+    // Lọc theo service_type nếu được truyền
+    const filtered = serviceType !== undefined
+        ? allPackages.filter((p) => p.service_type === Number(serviceType))
+        : allPackages;
+
+    // Kiểm tra từng gói: vị trí người dùng có nằm trong vùng phủ không
+    const nearby = filtered.filter((pkg) => isPointInCoverage(latitude, longitude, pkg));
+
+    // Tính khoảng cách từ user đến tâm vùng (nếu là circle) hoặc để null
+    const items = nearby.map((pkg) => {
+        let distanceKm = null;
+        if (pkg.coverage_type === 'circle' && pkg.center_lat != null && pkg.center_lng != null) {
+            distanceKm = Number(getDistanceKm(latitude, longitude, pkg.center_lat, pkg.center_lng).toFixed(2));
+        }
+        return { ...pkg, distance_km: distanceKm };
+    });
+
+    return { items, total: items.length };
+}
+
+// ─── Mobile: lấy xe theo gói thuê ────────────────────────────────────────────
+
+export async function getPackageCarsService({ packageId }) {
+    const numericId = Number(packageId);
+    if (!Number.isInteger(numericId) || numericId < 1) {
+        throw new AppError("Invalid package id.", 422, "INVALID_PACKAGE_ID");
+    }
+
+    const pkg = await findRentalPackageById(numericId);
+    if (!pkg) throw new AppError("Rental package not found.", 404, "RENTAL_PACKAGE_NOT_FOUND");
+    if (pkg.active !== 1) throw new AppError("Rental package is inactive.", 409, "RENTAL_PACKAGE_INACTIVE");
+
+    const cars = await listPackageCars(numericId);
+    return { package_id: numericId, package_name: pkg.package_name, cars };
 }
 
 export { PAYMENT_STATUSES, RENTAL_STATUSES };

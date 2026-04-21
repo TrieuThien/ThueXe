@@ -77,7 +77,15 @@ export const ownerVehicleDocumentsUpsertValidator = [
 ];
 
 export const ownerAvailabilityUpsertValidator = [
-    body("type").optional({ values: "falsy" }).isIn(["booking", "maintenance", "manual_block", "manual_available"]),
+    body("type").optional({ values: "falsy" }).isIn([
+        "booking",
+        "maintenance",
+        "manual_block",
+        "manual_available",
+        "booked",
+        "available",
+        "unavailable",
+    ]),
     body("startAt").isISO8601(),
     body("endAt").isISO8601(),
     body("note").optional({ values: "falsy" }).isString().trim().isLength({ max: 255 }),

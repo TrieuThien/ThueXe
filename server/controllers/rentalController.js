@@ -3,9 +3,11 @@ import {
     assignRentalService,
     createRentalBookingService,
     createRentalPackageService,
+    getPackageCarsService,
     getVehiclePackagesService,
     getRentalBookingDetailService,
     getRentalPackageList,
+    getNearbyPackagesService,
     listOwnerRentalPackagesService,
     listRentalBookingsService,
     notifyAvailableDriversService,
@@ -171,6 +173,32 @@ export async function listVehicleTypesHandler(req, res, next) {
             seat_count: Number(row.seat_count || 0),
         }));
         return successResponse(res, { items }, "Vehicle types fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+// ─── Mobile: tìm gói thuê gần vị trí ────────────────────────────────────────
+
+export async function getNearbyPackagesHandler(req, res, next) {
+    try {
+        const result = await getNearbyPackagesService({
+            lat: req.query.lat,
+            lng: req.query.lng,
+            serviceType: req.query.service_type,
+        });
+        return successResponse(res, result, "Nearby rental packages fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+// ─── Mobile: lấy xe theo gói thuê ────────────────────────────────────────────
+
+export async function getPackageCarsHandler(req, res, next) {
+    try {
+        const result = await getPackageCarsService({ packageId: req.params.packageId });
+        return successResponse(res, result, "Package cars fetched successfully");
     } catch (error) {
         return next(error);
     }

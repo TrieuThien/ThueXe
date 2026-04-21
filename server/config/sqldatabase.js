@@ -17,6 +17,8 @@ function buildPoolConfig() {
   for (const [key, value] of url.searchParams.entries()) {
     extraParams[key] = value;
   }
+  // Enforce UTC at app level; do not allow URL params to override timezone.
+  delete extraParams.timezone;
 
   return {
     host: url.hostname,
@@ -24,6 +26,10 @@ function buildPoolConfig() {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, ""),
+
+    // Use UTC timezone to avoid DST drift and keep date parsing consistent.
+    timezone: "Z",
+    dateStrings: false,
 
     // Pool sizing
     waitForConnections: true,
@@ -35,12 +41,21 @@ function buildPoolConfig() {
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000, // send first keepalive after 10 s
 
-    // Forward any extra query-string params (e.g. ssl, charset, timezone).
+    // Forward remaining query-string params (e.g. ssl, charset).
     ...extraParams,
   };
 }
 
 export const pool = mysql.createPool(buildPoolConfig());
+
+// Normalize each DB session to UTC regardless of server/global timezone.
+pool.on("connection", (connection) => {
+  connection.query("SET time_zone = '+00:00'", (err) => {
+    if (err) {
+      console.error("[DB timezone init error]", err.message);
+    }
+  });
+});
 
 // Emit pool-level errors to stderr instead of crashing the process.
 // Individual query errors are still propagated to callers via rejected promises.

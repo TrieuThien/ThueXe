@@ -65,8 +65,8 @@ const createValidators = [
     body("feature_img")
         .optional()
         .trim()
-        .isLength({ max: 30 })
-        .withMessage("feature_img must not exceed 30 characters"),
+        .isLength({ max: 2048 })
+        .withMessage("feature_img must not exceed 2048 characters"),
     body("visibility")
         .optional({ values: "falsy" })
         .isInt({ min: 0, max: 2 })
@@ -108,8 +108,8 @@ const updateValidators = [
     body("feature_img")
         .optional()
         .trim()
-        .isLength({ max: 30 })
-        .withMessage("feature_img must not exceed 30 characters"),
+        .isLength({ max: 2048 })
+        .withMessage("feature_img must not exceed 2048 characters"),
     body("visibility")
         .optional()
         .isInt({ min: 0, max: 2 })

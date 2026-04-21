@@ -10,6 +10,7 @@ import {
 import requireAuth from "../middlewares/authMiddleware.js";
 import requireAdminAccountType from "../middlewares/adminAccountTypeMiddleware.js";
 import requireRole from "../middlewares/roleMiddleware.js";
+import { uploadSingleMemoryImage } from "../middlewares/uploadMemoryImage.js";
 import validateRequest from "../middlewares/validateRequest.js";
 import {
     createAdminBannerValidator,
@@ -57,6 +58,7 @@ router.post(
     requireAuth,
     requireRole("admin"),
     requireAdminAccountType,
+    uploadSingleMemoryImage("feature_img_file"),
     createAdminBannerValidator,
     validateRequest,
     createAdminBannerHandler
@@ -67,6 +69,7 @@ router.patch(
     requireAuth,
     requireRole("admin"),
     requireAdminAccountType,
+    uploadSingleMemoryImage("feature_img_file"),
     updateAdminBannerValidator,
     validateRequest,
     updateAdminBannerHandler

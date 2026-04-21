@@ -4,6 +4,38 @@ function dbConnection(conn) {
     return conn || sqldb;
 }
 
+/** Ánh xạ row DB → object package (bao gồm các cột GIS) */
+function mapPackageRow(row) {
+    return {
+        package_id: Number(row.package_id),
+        type_id: row.type_id === null ? null : Number(row.type_id),
+        service_type: Number(row.service_type || 1),
+        package_name: row.package_name,
+        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
+        duration_days: row.duration_days === null ? null : Number(row.duration_days),
+        price: Number(row.price || 0),
+        distance_limit_km: Number(row.distance_limit_km || 0),
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        extra_hour_fee: Number(row.extra_hour_fee || 0),
+        deposit_amount: Number(row.deposit_amount || 0),
+        description: row.description,
+        // ── GIS fields ────────────────────────────────────────────────
+        coverage_type: row.coverage_type || null,
+        coverage_geojson: row.coverage_geojson
+            ? (typeof row.coverage_geojson === 'string'
+                ? (() => { try { return JSON.parse(row.coverage_geojson); } catch { return null; } })()
+                : row.coverage_geojson)
+            : null,
+        center_lat: row.center_lat === null || row.center_lat === undefined ? null : Number(row.center_lat),
+        center_lng: row.center_lng === null || row.center_lng === undefined ? null : Number(row.center_lng),
+        radius_km: row.radius_km === null || row.radius_km === undefined ? null : Number(row.radius_km),
+        is_geo_enabled: Number(row.is_geo_enabled ?? 1),
+        // ─────────────────────────────────────────────────────────────
+        active: Number(row.active || 0),
+        date_created: row.date_created,
+    };
+}
+
 export async function listRentalPackages(filters = {}) {
     const whereClauses = [];
     const params = [];
@@ -22,111 +54,242 @@ export async function listRentalPackages(filters = {}) {
     }
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
 
-    const [rows] = await sqldb.query(
-        `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
-                distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active, date_created
-         FROM rental_packages
-         ${whereSql}
-         ORDER BY package_id DESC`,
-        params
-    );
-    return rows.map((row) => ({
-        package_id: Number(row.package_id),
-        type_id: row.type_id === null ? null : Number(row.type_id),
-        service_type: Number(row.service_type || 1),
-        package_name: row.package_name,
-        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
-        duration_days: row.duration_days === null ? null : Number(row.duration_days),
-        price: Number(row.price || 0),
-        distance_limit_km: Number(row.distance_limit_km || 0),
-        extra_km_fee: Number(row.extra_km_fee || 0),
-        extra_hour_fee: Number(row.extra_hour_fee || 0),
-        deposit_amount: Number(row.deposit_amount || 0),
-        description: row.description,
-        active: Number(row.active || 0),
-        date_created: row.date_created,
-    }));
+    try {
+        const [rows] = await sqldb.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    coverage_type, coverage_geojson, center_lat, center_lng, radius_km, is_geo_enabled,
+                    active, date_created
+             FROM rental_packages
+             ${whereSql}
+             ORDER BY package_id DESC`,
+            params
+        );
+        return rows.map(mapPackageRow);
+    } catch {
+        // Fallback: cột GIS chưa tồn tại
+        const [rows] = await sqldb.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    active, date_created
+             FROM rental_packages
+             ${whereSql}
+             ORDER BY package_id DESC`,
+            params
+        );
+        return rows.map((row) => mapPackageRow({
+            ...row, coverage_type: null, coverage_geojson: null,
+            center_lat: null, center_lng: null, radius_km: null, is_geo_enabled: 0,
+        }));
+    }
 }
 
 export async function findRentalPackageById(packageId, conn) {
     const db = dbConnection(conn);
-    const [rows] = await db.query(
-        `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
-                distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active, date_created
-         FROM rental_packages
-         WHERE package_id = ?
-         LIMIT 1`,
-        [packageId]
-    );
-    const row = rows[0];
-    if (!row) return null;
-    return {
-        package_id: Number(row.package_id),
-        type_id: row.type_id === null ? null : Number(row.type_id),
-        service_type: Number(row.service_type || 1),
-        package_name: row.package_name,
-        duration_hours: row.duration_hours === null ? null : Number(row.duration_hours),
-        duration_days: row.duration_days === null ? null : Number(row.duration_days),
-        price: Number(row.price || 0),
-        distance_limit_km: Number(row.distance_limit_km || 0),
-        extra_km_fee: Number(row.extra_km_fee || 0),
-        extra_hour_fee: Number(row.extra_hour_fee || 0),
-        deposit_amount: Number(row.deposit_amount || 0),
-        description: row.description,
-        active: Number(row.active || 0),
-        date_created: row.date_created,
-    };
+    try {
+        const [rows] = await db.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    coverage_type, coverage_geojson, center_lat, center_lng, radius_km, is_geo_enabled,
+                    active, date_created
+             FROM rental_packages
+             WHERE package_id = ?
+             LIMIT 1`,
+            [packageId]
+        );
+        const row = rows[0];
+        if (!row) return null;
+        return mapPackageRow(row);
+    } catch {
+        // Fallback: cột GIS chưa tồn tại
+        const [rows] = await db.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    active, date_created
+             FROM rental_packages
+             WHERE package_id = ?
+             LIMIT 1`,
+            [packageId]
+        );
+        const row = rows[0];
+        if (!row) return null;
+        return mapPackageRow({
+            ...row, coverage_type: null, coverage_geojson: null,
+            center_lat: null, center_lng: null, radius_km: null, is_geo_enabled: 0,
+        });
+    }
 }
 
 export async function createRentalPackage(payload, conn) {
     const db = dbConnection(conn);
-    const [result] = await db.query(
-        `INSERT INTO rental_packages
-         (type_id, service_type, package_name, duration_hours, duration_days, price, distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-            payload.type_id || null,
-            payload.service_type,
-            payload.package_name,
-            payload.duration_hours || null,
-            payload.duration_days || null,
-            payload.price,
-            payload.distance_limit_km,
-            payload.extra_km_fee,
-            payload.extra_hour_fee,
-            payload.deposit_amount,
-            payload.description || null,
-            payload.active,
-        ]
-    );
-    return Number(result.insertId);
+    const geojsonStr = payload.coverage_geojson
+        ? JSON.stringify(payload.coverage_geojson)
+        : null;
+    try {
+        const [result] = await db.query(
+            `INSERT INTO rental_packages
+             (type_id, service_type, package_name, duration_hours, duration_days, price, distance_limit_km,
+              extra_km_fee, extra_hour_fee, deposit_amount, description,
+              coverage_type, coverage_geojson, center_lat, center_lng, radius_km, is_geo_enabled, active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                payload.type_id || null, payload.service_type, payload.package_name,
+                payload.duration_hours || null, payload.duration_days || null, payload.price,
+                payload.distance_limit_km, payload.extra_km_fee, payload.extra_hour_fee,
+                payload.deposit_amount, payload.description || null,
+                payload.coverage_type || null, geojsonStr,
+                payload.center_lat ?? null, payload.center_lng ?? null,
+                payload.radius_km ?? null, payload.is_geo_enabled ?? 1, payload.active,
+            ]
+        );
+        return Number(result.insertId);
+    } catch {
+        // Fallback: cột GIS chưa tồn tại → insert không có GIS
+        const [result] = await db.query(
+            `INSERT INTO rental_packages
+             (type_id, service_type, package_name, duration_hours, duration_days, price, distance_limit_km,
+              extra_km_fee, extra_hour_fee, deposit_amount, description, active)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                payload.type_id || null, payload.service_type, payload.package_name,
+                payload.duration_hours || null, payload.duration_days || null, payload.price,
+                payload.distance_limit_km, payload.extra_km_fee, payload.extra_hour_fee,
+                payload.deposit_amount, payload.description || null, payload.active,
+            ]
+        );
+        return Number(result.insertId);
+    }
 }
 
 export async function updateRentalPackage(packageId, payload, conn) {
     const db = dbConnection(conn);
-    await db.query(
-        `UPDATE rental_packages
-         SET type_id = ?, service_type = ?, package_name = ?, duration_hours = ?, duration_days = ?,
-             price = ?, distance_limit_km = ?, extra_km_fee = ?, extra_hour_fee = ?, deposit_amount = ?,
-             description = ?, active = ?
-         WHERE package_id = ?
-         LIMIT 1`,
-        [
-            payload.type_id || null,
-            payload.service_type,
-            payload.package_name,
-            payload.duration_hours || null,
-            payload.duration_days || null,
-            payload.price,
-            payload.distance_limit_km,
-            payload.extra_km_fee,
-            payload.extra_hour_fee,
-            payload.deposit_amount,
-            payload.description || null,
-            payload.active,
-            packageId,
-        ]
+    const geojsonStr = payload.coverage_geojson
+        ? JSON.stringify(payload.coverage_geojson)
+        : null;
+    try {
+        await db.query(
+            `UPDATE rental_packages
+             SET type_id = ?, service_type = ?, package_name = ?, duration_hours = ?, duration_days = ?,
+                 price = ?, distance_limit_km = ?, extra_km_fee = ?, extra_hour_fee = ?, deposit_amount = ?,
+                 description = ?,
+                 coverage_type = ?, coverage_geojson = ?, center_lat = ?, center_lng = ?, radius_km = ?, is_geo_enabled = ?,
+                 active = ?
+             WHERE package_id = ?
+             LIMIT 1`,
+            [
+                payload.type_id || null, payload.service_type, payload.package_name,
+                payload.duration_hours || null, payload.duration_days || null, payload.price,
+                payload.distance_limit_km, payload.extra_km_fee, payload.extra_hour_fee,
+                payload.deposit_amount, payload.description || null,
+                payload.coverage_type || null, geojsonStr,
+                payload.center_lat ?? null, payload.center_lng ?? null,
+                payload.radius_km ?? null, payload.is_geo_enabled ?? 1,
+                payload.active, packageId,
+            ]
+        );
+    } catch {
+        // Fallback: cột GIS chưa tồn tại → update không có GIS
+        await db.query(
+            `UPDATE rental_packages
+             SET type_id = ?, service_type = ?, package_name = ?, duration_hours = ?, duration_days = ?,
+                 price = ?, distance_limit_km = ?, extra_km_fee = ?, extra_hour_fee = ?, deposit_amount = ?,
+                 description = ?, active = ?
+             WHERE package_id = ?
+             LIMIT 1`,
+            [
+                payload.type_id || null, payload.service_type, payload.package_name,
+                payload.duration_hours || null, payload.duration_days || null, payload.price,
+                payload.distance_limit_km, payload.extra_km_fee, payload.extra_hour_fee,
+                payload.deposit_amount, payload.description || null,
+                payload.active, packageId,
+            ]
+        );
+    }
+}
+
+/**
+ * Lấy tất cả gói thuê đang active kèm thông tin GIS,
+ * dùng cho API nearby (kiểm tra phía JS thay vì MySQL spatial).
+ * Nếu cột GIS chưa tồn tại (migration chưa chạy), fallback về query cơ bản
+ * và coi mọi gói là "áp dụng toàn quốc" (is_geo_enabled = 0).
+ */
+export async function listActivePackagesWithGeo() {
+    try {
+        const [rows] = await sqldb.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    coverage_type, coverage_geojson, center_lat, center_lng, radius_km, is_geo_enabled,
+                    active, date_created
+             FROM rental_packages
+             WHERE active = 1
+             ORDER BY package_id DESC`
+        );
+        return rows.map(mapPackageRow);
+    } catch {
+        // Fallback: cột GIS chưa được migration → trả về không có giới hạn vùng
+        const [rows] = await sqldb.query(
+            `SELECT package_id, type_id, service_type, package_name, duration_hours, duration_days, price,
+                    distance_limit_km, extra_km_fee, extra_hour_fee, deposit_amount, description,
+                    active, date_created
+             FROM rental_packages
+             WHERE active = 1
+             ORDER BY package_id DESC`
+        );
+        return rows.map((row) => mapPackageRow({
+            ...row,
+            coverage_type: null,
+            coverage_geojson: null,
+            center_lat: null,
+            center_lng: null,
+            radius_km: null,
+            is_geo_enabled: 0,
+        }));
+    }
+}
+
+/**
+ * Lấy danh sách xe đã đăng ký gói thuê (qua vehicle_rental_packages),
+ * trả về thông tin xe kèm chủ xe và điểm đánh giá trung bình.
+ */
+export async function listPackageCars(packageId) {
+    const [rows] = await sqldb.query(
+        `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color,
+                v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status,
+                vt.type_name,
+                vo.fullname AS owner_name, vo.phone AS owner_phone,
+                ROUND(AVG(rv.rating), 1) AS avg_rating,
+                COUNT(rv.id)            AS rating_count
+         FROM vehicle_rental_packages vrp
+         INNER JOIN vehicles v       ON v.vehicle_id = vrp.vehicle_id
+         LEFT JOIN vehicle_types vt  ON vt.type_id   = v.type_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id  = v.owner_id
+         LEFT JOIN ratings_vehicles rv ON rv.vehicle_id = v.vehicle_id
+         WHERE vrp.package_id = ?
+           AND v.status = 'available'
+           AND v.is_verified = 1
+         GROUP BY v.vehicle_id, vt.type_name, vo.fullname, vo.phone
+         ORDER BY avg_rating DESC, v.vehicle_id ASC`,
+        [packageId]
     );
+    return rows.map((row) => ({
+        vehicle_id: Number(row.vehicle_id),
+        owner_id: Number(row.owner_id),
+        type_id: Number(row.type_id),
+        type_name: row.type_name,
+        brand: row.brand,
+        model: row.model,
+        year: row.year,
+        color: row.color,
+        license_plate: row.license_plate,
+        seat_count: Number(row.seat_count || 0),
+        transmission: row.transmission,
+        fuel_type: row.fuel_type,
+        status: row.status,
+        owner_name: row.owner_name,
+        owner_phone: row.owner_phone,
+        avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
+        rating_count: Number(row.rating_count || 0),
+    }));
 }
 
 export async function listRentalVehicles({ typeId, ownerId } = {}) {

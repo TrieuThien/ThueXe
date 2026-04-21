@@ -6,8 +6,10 @@ import {
     assignRentalHandler,
     createRentalBookingHandler,
     createRentalPackageHandler,
+    getPackageCarsHandler,
     getVehiclePackagesHandler,
     getRentalBookingDetailHandler,
+    getNearbyPackagesHandler,
     listOwnerRentalPackagesHandler,
     listRentalBookingsHandler,
     listRentalPackagesHandler,
@@ -22,7 +24,9 @@ import {
     assignRentalValidator,
     createRentalBookingValidator,
     createRentalPackageValidator,
+    nearbyPackagesValidator,
     notifyDriversValidator,
+    packageIdParamValidator,
     rentalBookingListValidator,
     rentalIdParamValidator,
     rentalMetaValidator,
@@ -148,6 +152,27 @@ router.patch(
     assignRentalValidator,
     validateRequest,
     assignRentalHandler
+);
+
+// ─── Mobile: tìm gói thuê gần vị trí người dùng ─────────────────────────────
+// Yêu cầu đăng nhập (passenger), truyền ?lat=&lng= để lọc theo vùng GIS
+router.get(
+    "/api/mobile/rental-packages/nearby",
+    requireAuth,
+    requireRole("customer", "admin", "dispatcher"),
+    nearbyPackagesValidator,
+    validateRequest,
+    getNearbyPackagesHandler
+);
+
+// ─── Mobile: danh sách xe khả dụng của gói thuê ──────────────────────────────
+router.get(
+    "/api/mobile/rental-packages/:packageId/cars",
+    requireAuth,
+    requireRole("customer", "admin", "dispatcher"),
+    packageIdParamValidator,
+    validateRequest,
+    getPackageCarsHandler
 );
 
 export default router;

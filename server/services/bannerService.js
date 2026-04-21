@@ -1,4 +1,5 @@
 import sqldb from "../config/sqldatabase.js";
+import { deleteCloudinaryImage, uploadBufferToCloudinary } from "../config/cloudinary.js";
 import {
     countAdminBanners,
     findAdminBanners,
@@ -13,6 +14,7 @@ import AppError from "../utils/appError.js";
 
 const BANNER_VISIBILITY_VALUES = [0, 1, 2];
 const BANNER_STATUS_VALUES = [0, 1];
+const BANNER_IMAGE_FOLDER = "thuexe/banners";
 
 function assertAdmin(auth) {
     if (!auth || Number(auth.accountType) !== 3) {
@@ -78,7 +80,7 @@ function normalizeCreatePayload(payload = {}) {
     const excerpt = normalizeText(payload.excerpt, { maxLength: 255, fallback: null });
     const content = normalizeText(payload.content, { fallback: null });
     const city = normalizeInt(payload.city, { fallback: 0 });
-    const feature_img = normalizeText(payload.feature_img, { maxLength: 30, fallback: "" }) || "";
+    const feature_img = normalizeText(payload.feature_img, { maxLength: 2048, fallback: "" }) || "";
     const visibility = normalizeInt(payload.visibility, { fallback: 1 });
     const status = normalizeInt(payload.status, { fallback: 1 });
 
@@ -115,6 +117,34 @@ function normalizeCreatePayload(payload = {}) {
         visibility,
         status,
     };
+}
+
+async function uploadBannerImage(file) {
+    if (!file?.buffer) {
+        return null;
+    }
+
+    try {
+        const uploaded = await uploadBufferToCloudinary(file.buffer, {
+            folder: BANNER_IMAGE_FOLDER,
+            resource_type: "image",
+        });
+        return uploaded.secure_url || null;
+    } catch {
+        throw new AppError("Failed to upload banner image.", 502, "BANNER_IMAGE_UPLOAD_FAILED");
+    }
+}
+
+async function cleanupBannerImage(imageUrl) {
+    if (!imageUrl || !imageUrl.includes(`/${BANNER_IMAGE_FOLDER}/`)) {
+        return;
+    }
+
+    try {
+        await deleteCloudinaryImage(imageUrl);
+    } catch {
+        // ignore cleanup failure to avoid interrupting successful writes
+    }
 }
 
 function normalizeUpdatePayload(payload = {}, currentBanner) {
@@ -188,10 +218,14 @@ export async function getBannerDetailByAdmin(bannerIdInput, auth) {
     return { banner };
 }
 
-export async function createBannerByAdmin(payload, auth) {
+export async function createBannerByAdmin(payload, file, auth) {
     assertAdmin(auth);
 
     const normalized = normalizeCreatePayload(payload);
+    const uploadedFeatureImage = file ? await uploadBannerImage(file) : null;
+    if (uploadedFeatureImage) {
+        normalized.feature_img = uploadedFeatureImage;
+    }
     await ensureRouteExists(normalized.city);
 
     const connection = await sqldb.getConnection();
@@ -202,13 +236,16 @@ export async function createBannerByAdmin(payload, auth) {
         return getBannerDetailByAdmin(bannerId, { accountType: 3 });
     } catch (error) {
         await connection.rollback();
+        if (uploadedFeatureImage) {
+            await cleanupBannerImage(uploadedFeatureImage);
+        }
         throw error;
     } finally {
         connection.release();
     }
 }
 
-export async function updateBannerByAdmin(bannerIdInput, payload, auth) {
+export async function updateBannerByAdmin(bannerIdInput, payload, file, auth) {
     assertAdmin(auth);
 
     const bannerId = normalizeBannerId(bannerIdInput);
@@ -218,6 +255,10 @@ export async function updateBannerByAdmin(bannerIdInput, payload, auth) {
     }
 
     const normalized = normalizeUpdatePayload(payload, currentBanner);
+    const uploadedFeatureImage = file ? await uploadBannerImage(file) : null;
+    if (uploadedFeatureImage) {
+        normalized.feature_img = uploadedFeatureImage;
+    }
     await ensureRouteExists(normalized.city);
 
     const connection = await sqldb.getConnection();
@@ -225,9 +266,15 @@ export async function updateBannerByAdmin(bannerIdInput, payload, auth) {
         await connection.beginTransaction();
         await updateBanner(bannerId, normalized, connection);
         await connection.commit();
+        if (uploadedFeatureImage && currentBanner.feature_img && currentBanner.feature_img !== uploadedFeatureImage) {
+            await cleanupBannerImage(currentBanner.feature_img);
+        }
         return getBannerDetailByAdmin(bannerId, { accountType: 3 });
     } catch (error) {
         await connection.rollback();
+        if (uploadedFeatureImage) {
+            await cleanupBannerImage(uploadedFeatureImage);
+        }
         throw error;
     } finally {
         connection.release();

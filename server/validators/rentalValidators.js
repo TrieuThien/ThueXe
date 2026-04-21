@@ -6,6 +6,42 @@ export const rentalPackageListValidator = [
     query("search").optional({ values: "falsy" }).trim().isLength({ max: 100 }).withMessage("search must not exceed 100 characters"),
 ];
 
+/** Validators chung cho các trường GIS (tái dùng ở create & update) */
+const geoFieldValidators = [
+    body("coverage_type")
+        .optional({ values: "falsy" })
+        .isIn(["polygon", "circle", "rectangle"])
+        .withMessage("coverage_type must be polygon, circle, or rectangle"),
+    body("coverage_geojson")
+        .optional({ nullable: true })
+        .custom((val) => {
+            if (val === null || val === undefined || val === "") return true;
+            if (typeof val === "object") return true;
+            try { JSON.parse(val); return true; } catch { return false; }
+        })
+        .withMessage("coverage_geojson must be a valid JSON object"),
+    body("center_lat")
+        .optional({ nullable: true })
+        .isFloat({ min: -90, max: 90 })
+        .withMessage("center_lat must be a valid latitude")
+        .toFloat(),
+    body("center_lng")
+        .optional({ nullable: true })
+        .isFloat({ min: -180, max: 180 })
+        .withMessage("center_lng must be a valid longitude")
+        .toFloat(),
+    body("radius_km")
+        .optional({ nullable: true })
+        .isFloat({ min: 0 })
+        .withMessage("radius_km must be non-negative")
+        .toFloat(),
+    body("is_geo_enabled")
+        .optional({ values: "falsy" })
+        .isIn([0, 1, "0", "1"])
+        .withMessage("is_geo_enabled must be 0 or 1")
+        .toInt(),
+];
+
 export const createRentalPackageValidator = [
     body("type_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("type_id must be a positive integer").toInt(),
     body("service_type").isIn([1, 2, 3, "1", "2", "3"]).withMessage("service_type must be 1,2,3").toInt(),
@@ -19,6 +55,7 @@ export const createRentalPackageValidator = [
     body("deposit_amount").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("deposit_amount must be non-negative").toFloat(),
     body("description").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("description must not exceed 255 characters"),
     body("active").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("active must be 0 or 1").toInt(),
+    ...geoFieldValidators,
 ];
 
 export const updateRentalPackageValidator = [
@@ -35,6 +72,19 @@ export const updateRentalPackageValidator = [
     body("deposit_amount").optional({ values: "falsy" }).isFloat({ min: 0 }).withMessage("deposit_amount must be non-negative").toFloat(),
     body("description").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("description must not exceed 255 characters"),
     body("active").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("active must be 0 or 1").toInt(),
+    ...geoFieldValidators,
+];
+
+/** Validator cho API nearby (mobile) */
+export const nearbyPackagesValidator = [
+    query("lat").isFloat({ min: -90, max: 90 }).withMessage("lat must be a valid latitude").toFloat(),
+    query("lng").isFloat({ min: -180, max: 180 }).withMessage("lng must be a valid longitude").toFloat(),
+    query("service_type").optional({ values: "falsy" }).isIn([1, 2, 3, "1", "2", "3"]).withMessage("service_type must be 1,2,3").toInt(),
+];
+
+/** Validator cho packageId param (mobile cars endpoint) */
+export const packageIdParamValidator = [
+    param("packageId").isInt({ min: 1 }).withMessage("packageId must be a positive integer").toInt(),
 ];
 
 export const rentalMetaValidator = [
