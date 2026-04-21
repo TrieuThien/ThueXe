@@ -1,12 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { QUERY_KEYS } from "../../constants";
+import { QUERY_KEY_FACTORY, QUERY_KEYS } from "../../constants";
 import {
   CreateRentalBookingRequest,
   RentalPricingRequest,
   RentalSearchCriteria,
 } from "../../types";
 import { rentalFlowService } from "../../services/rental/rentalFlowService";
+import { rentalApi } from "../../services/api/modules/rentalApi";
 
 export function useRentalPackagesQuery(criteria?: RentalSearchCriteria) {
   return useQuery({
@@ -40,5 +41,36 @@ export function useRentalPricingQuery(payload?: RentalPricingRequest) {
 export function useCreateRentalBookingMutation() {
   return useMutation({
     mutationFn: (payload: CreateRentalBookingRequest) => rentalFlowService.createRentalBooking(payload),
+  });
+}
+
+/** Tìm gói thuê gần vị trí người dùng (GIS filter phía server) */
+export function useNearbyPackagesQuery(params: { lat: number; lng: number; service_type?: number } | null) {
+  return useQuery<{ items: any[]; total: number }>({
+    queryKey: QUERY_KEY_FACTORY.rentalPackages.nearby(
+      params?.lat ?? 0,
+      params?.lng ?? 0,
+      params?.service_type
+    ),
+    queryFn: async () => {
+      const res = await rentalApi
+        .getNearbyPackages({ lat: params!.lat, lng: params!.lng, service_type: params?.service_type as 1 | 2 | 3 | undefined });
+      return res.data as { items: any[]; total: number };
+    },
+    enabled: Boolean(params && Number.isFinite(params.lat) && Number.isFinite(params.lng)),
+    staleTime: 30_000, // 30s cache — vị trí không thay đổi quá nhanh
+  });
+}
+
+/** Lấy danh sách xe khả dụng của 1 gói thuê */
+export function usePackageCarsQuery(packageId: number | string | null) {
+  return useQuery({
+    queryKey: QUERY_KEY_FACTORY.rentalPackages.cars(packageId ?? 0),
+    queryFn: () =>
+      rentalApi
+        .getPackageCars(packageId!)
+        .then((res) => res.data),
+    enabled: Boolean(packageId),
+    staleTime: 60_000,
   });
 }

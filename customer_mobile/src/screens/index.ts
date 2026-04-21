@@ -12,6 +12,7 @@ export * from "./booking/BookingDetailScreen";
 export * from "./booking/RentalServiceChooserScreen";
 export * from "./booking/RentalBookingFormScreen";
 export * from "./booking/RentalPackageListScreen";
+export * from "./booking/RentalPackageCarsScreen";
 export * from "./booking/RentalBookingConfirmScreen";
 export * from "./booking/RentalBookingSuccessScreen";
 export * from "./booking/RideLocationPickerScreen";

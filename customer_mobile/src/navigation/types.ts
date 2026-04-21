@@ -28,6 +28,8 @@ export type BookingStackParamList = {
   RentalServiceChooser: undefined;
   RentalBookingForm: undefined;
   RentalPackageList: undefined;
+  /** Danh sách xe khả dụng của gói thuê, sau khi chọn gói trên màn hình nearby */
+  RentalPackageCars: { packageId: number; packageName: string };
   RentalBookingConfirm: undefined;
   RentalBookingSuccess: { bookingId: string; status: "PENDING" | "SCHEDULED"; message: string };
   RideLocationPicker: undefined;

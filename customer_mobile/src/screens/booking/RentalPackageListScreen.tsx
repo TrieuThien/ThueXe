@@ -1,101 +1,293 @@
-﻿import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+/**
+ * RentalPackageListScreen
+ * Hiển thị danh sách gói thuê gần vị trí hiện tại của người dùng (GIS filter).
+ *
+ * Flow:
+ *  1. Xin quyền vị trí → lấy lat/lng
+ *  2. Gọi GET /api/mobile/rental-packages/nearby?lat=&lng=
+ *  3. Hiển thị danh sách gói phù hợp
+ *  4. Chọn gói → đến RentalPackageCars để xem xe
+ */
+import { useCallback, useEffect } from "react";
+import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   AppHeader,
   EmptyState,
   ErrorState,
+  HeaderTextButton,
   LoadingState,
-  PrimaryButton,
-  RentalPackageCard,
 } from "../../components";
-import { useRentalPackagesQuery } from "../../hooks";
+import { useCurrentLocation, useNearbyPackagesQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
-import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
 
 type Props = NativeStackScreenProps<BookingStackParamList, "RentalPackageList">;
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function formatVnd(value: number) {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(value);
+}
+
+// ── Package Card ───────────────────────────────────────────────────────────────
+
+interface NearbyPackage {
+  package_id: number;
+  package_name: string;
+  price: number;
+  description: string | null;
+  service_type: number;
+  coverage_type: string | null;
+  distance_km: number | null;
+  duration_hours: number | null;
+  duration_days: number | null;
+  distance_limit_km: number;
+}
+
+interface PackageCardProps {
+  item: NearbyPackage;
+  onPress: () => void;
+}
+
+function PackageCard({ item, onPress }: PackageCardProps) {
+  const { theme } = useTheme();
+
+  const durationText = [
+    item.duration_hours ? `${item.duration_hours} giờ` : null,
+    item.duration_days ? `${item.duration_days} ngày` : null,
+  ].filter(Boolean).join(" / ") || null;
+
+  return (
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+      onPress={onPress}
+      activeOpacity={0.75}
+    >
+      {/* Tên gói */}
+      <Text style={[styles.packageName, { color: theme.colors.text }]} numberOfLines={1}>
+        {item.package_name}
+      </Text>
+
+      {/* Mô tả */}
+      {item.description ? (
+        <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={2}>
+          {item.description}
+        </Text>
+      ) : null}
+
+      {/* Thông tin phụ */}
+      <View style={styles.metaRow}>
+        {durationText ? (
+          <View style={styles.metaChip}>
+            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>⏱ {durationText}</Text>
+          </View>
+        ) : null}
+        {item.distance_limit_km > 0 ? (
+          <View style={styles.metaChip}>
+            <Text style={[styles.metaText, { color: theme.colors.textMuted }]}>
+              🚗 {item.distance_limit_km} km
+            </Text>
+          </View>
+        ) : null}
+        {item.distance_km !== null ? (
+          <View style={styles.metaChip}>
+            <Text style={[styles.metaText, { color: theme.colors.primary ?? "#2563eb" }]}>
+              📍 Cách {item.distance_km} km
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Giá + nút */}
+      <View style={styles.cardFooter}>
+        <Text style={[styles.price, { color: theme.colors.primary ?? "#2563eb" }]}>
+          {formatVnd(item.price)}
+        </Text>
+        <View style={[styles.viewBtn, { backgroundColor: (theme.colors.primary ?? "#2563eb") + "18" }]}>
+          <Text style={[styles.viewBtnText, { color: theme.colors.primary ?? "#2563eb" }]}>
+            Xem xe →
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Screen ─────────────────────────────────────────────────────────────────────
+
 export function RentalPackageListScreen({ navigation }: Props) {
   const { theme } = useTheme();
-  const criteria = useRentalFlowStore((state) => state.criteria);
-  const selectedPackage = useRentalFlowStore((state) => state.selectedPackage);
-  const setSelectedPackage = useRentalFlowStore((state) => state.setSelectedPackage);
 
-  const query = useRentalPackagesQuery(criteria ?? undefined);
-  const packages = Array.isArray(query.data?.packages) ? query.data.packages : [];
-  const suggestions = Array.isArray(query.data?.suggestions) ? query.data.suggestions : [];
+  // Lấy vị trí GPS của người dùng (hook đã có sẵn trong project)
+  const location = useCurrentLocation(true);
 
-  if (!criteria) {
+  const locationParams =
+    location.data && Number.isFinite(location.data.latitude) && Number.isFinite(location.data.longitude)
+      ? { lat: location.data.latitude, lng: location.data.longitude }
+      : null;
+
+  const query = useNearbyPackagesQuery(locationParams);
+
+  // Log errors for debugging
+  useEffect(() => {
+    if (query.isError && query.error) {
+      console.error("[RentalPackageList] Query error:", query.error);
+    }
+  }, [query.isError, query.error]);
+
+  const items: NearbyPackage[] = Array.isArray((query.data as any)?.items) ? (query.data as any).items : [];
+
+  const onRefresh = useCallback(() => {
+    location.fetchLocation();
+    query.refetch();
+  }, [location, query]);
+
+  // ── Trạng thái đang xin quyền / lấy vị trí ──────────────────────────────
+  if (location.loading && !location.data) {
     return (
       <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-        <AppHeader title="Gói thuê" />
-        <EmptyState title="Thiếu thông tin" description="Vui lòng nhập thông tin thuê trước." />
+        <AppHeader title="Gói thuê gần bạn" leftAction={<HeaderTextButton label="Quay lại" onPress={() => navigation.goBack()} />} />
+        <LoadingState message="Đang lấy vị trí của bạn..." />
+      </SafeAreaView>
+    );
+  }
+
+  // ── Lỗi vị trí ────────────────────────────────────────────────────────────
+  if (location.error && !location.data) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
+        <AppHeader title="Gói thuê gần bạn" leftAction={<HeaderTextButton label="Quay lại" onPress={() => navigation.goBack()} />} />
+        <ErrorState
+          description="Không lấy được vị trí. Vui lòng cấp quyền truy cập vị trí và thử lại."
+          onRetry={location.fetchLocation}
+        />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <AppHeader title="Chọn gói thuê" />
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Danh sách gói phù hợp</Text>
+      <AppHeader title="Gói thuê gần bạn" leftAction={<HeaderTextButton label="Quay lại" onPress={() => navigation.goBack()} />} />
 
-        {query.isLoading ? <LoadingState message="Đang tìm gói thuê..." /> : null}
-        {query.isError ? <ErrorState description="Không tải được danh sách gói" onRetry={query.refetch} /> : null}
-
-        {query.data && packages.length === 0 ? (
-          <View style={styles.emptyWrap}>
-            <EmptyState title="Không có gói phù hợp" description="Thử điều chỉnh thời gian hoặc khu vực điểm đón." />
-            {suggestions.map((item) => (
-              <Text key={item} style={[styles.suggestion, { color: theme.colors.textMuted }]}>
-                - {item}
-              </Text>
-            ))}
-            <PrimaryButton title="Sửa thông tin" onPress={() => navigation.navigate("RentalBookingForm")} />
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={query.isFetching && !query.isLoading}
+            onRefresh={onRefresh}
+            tintColor={theme.colors.primary}
+          />
+        }
+      >
+        {/* Thông tin vị trí */}
+        {location.data?.address ? (
+          <View style={[styles.locationBanner, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <Text style={[styles.locationLabel, { color: theme.colors.textMuted }]}>📍 Vị trí của bạn</Text>
+            <Text style={[styles.locationAddress, { color: theme.colors.text }]} numberOfLines={1}>
+              {location.data.address}
+            </Text>
           </View>
         ) : null}
 
-        {packages.map((pkg) => (
-          <RentalPackageCard
-            key={pkg.packageId}
+        <Text style={[styles.title, { color: theme.colors.text }]}>Gói thuê phù hợp</Text>
+
+        {/* Loading state */}
+        {query.isLoading ? <LoadingState message="Đang tìm gói thuê..." /> : null}
+
+        {/* Error state */}
+        {query.isError && !query.isLoading ? (
+          <ErrorState
+            description={query.error?.message || "Không tải được danh sách gói thuê. Vui lòng kiểm tra kết nối mạng và thử lại."}
+            onRetry={query.refetch}
+          />
+        ) : null}
+
+        {/* Empty state */}
+        {!query.isLoading && !query.isError && items.length === 0 ? (
+          <EmptyState
+            title="Không có gói thuê nào"
+            description="Hiện chưa có gói thuê nào áp dụng cho khu vực của bạn. Vui lòng thử lại sau."
+          />
+        ) : null}
+
+        {/* Danh sách gói */}
+        {items.map((pkg) => (
+          <PackageCard
+            key={pkg.package_id}
             item={pkg}
-            selected={selectedPackage?.packageId === pkg.packageId}
-            onSelect={() => setSelectedPackage(pkg)}
+            onPress={() =>
+              navigation.navigate("RentalPackageCars", {
+                packageId: pkg.package_id,
+                packageName: pkg.package_name,
+              })
+            }
           />
         ))}
-
-        {packages.length ? (
-          <>
-            <PrimaryButton title="Sửa thông tin" onPress={() => navigation.navigate("RentalBookingForm")} />
-            <PrimaryButton
-              title="Tiếp tục xác nhận"
-              onPress={() => navigation.navigate("RentalBookingConfirm")}
-              disabled={!selectedPackage}
-            />
-          </>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   container: {
     padding: 16,
     gap: 12,
-    paddingBottom: 28,
+    paddingBottom: 32,
   },
-  title: {
-    fontSize: 19,
-    fontWeight: "800",
+  locationBanner: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 2,
   },
-  emptyWrap: {
+  locationLabel: { fontSize: 11, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
+  locationAddress: { fontSize: 13, fontWeight: "500" },
+
+  title: { fontSize: 19, fontWeight: "800", marginTop: 4 },
+
+  card: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
     gap: 8,
   },
-  suggestion: {
-    fontSize: 13,
+  packageName: { fontSize: 16, fontWeight: "700" },
+  description: { fontSize: 13, lineHeight: 18 },
+
+  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  metaChip: {
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
+  metaText: { fontSize: 12 },
+
+  cardFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  price: { fontSize: 18, fontWeight: "800" },
+  viewBtn: {
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  viewBtnText: { fontSize: 13, fontWeight: "700" },
 });

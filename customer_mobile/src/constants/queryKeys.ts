@@ -43,6 +43,9 @@ export const QUERY_KEY_FACTORY = {
   },
   rentalPackages: {
     list: (serviceType: string | number) => ["rentalPackages", serviceType] as const,
+    nearby: (lat: number, lng: number, serviceType?: number) =>
+      ["rentalPackages", "nearby", lat, lng, serviceType ?? "all"] as const,
+    cars: (packageId: number | string) => ["rentalPackages", "cars", packageId] as const,
   },
   coupons: {
     available: () => ["coupons", "available"] as const,
