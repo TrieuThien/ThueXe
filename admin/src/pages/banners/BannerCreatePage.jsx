@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { buildRolePath } from "../../config/roleRoutes";
 import { createAdminBanner, getBannerMeta } from "../../services/bannerService";
 import BannerForm from "./BannerForm";
 import {
-    buildBannerSubmitPayload,
+    buildBannerSubmitFormData,
     DEFAULT_BANNER_FORM,
     hasBannerErrors,
     validateBannerForm,
@@ -22,13 +22,25 @@ export default function BannerCreatePage() {
     const [submitting, setSubmitting] = useState(false);
     const [message, setMessage] = useState("");
 
+    const selectedImagePreviewUrl = useMemo(
+        () => (form.feature_img_file ? URL.createObjectURL(form.feature_img_file) : ""),
+        [form.feature_img_file]
+    );
+
+    useEffect(() => {
+        if (!form.feature_img_file || !selectedImagePreviewUrl.startsWith("blob:")) {
+            return undefined;
+        }
+        return () => URL.revokeObjectURL(selectedImagePreviewUrl);
+    }, [form.feature_img_file, selectedImagePreviewUrl]);
+
     useEffect(() => {
         getBannerMeta()
             .then((data) => {
                 setCities(data.cities || []);
             })
             .catch((error) => {
-                setMessage(error?.response?.data?.message || "Không tải được dữ liệu form.");
+                setMessage(error?.response?.data?.message || "Khong tai duoc du lieu form.");
             })
             .finally(() => setLoading(false));
     }, []);
@@ -38,13 +50,18 @@ export default function BannerCreatePage() {
         setErrors((prev) => ({ ...prev, [field]: "" }));
     }
 
+    function handleFileChange(file) {
+        setForm((prev) => ({ ...prev, feature_img_file: file }));
+        setErrors((prev) => ({ ...prev, feature_img_file: "" }));
+    }
+
     async function handleSubmit(event) {
         event.preventDefault();
         const nextErrors = validateBannerForm(form);
         setErrors(nextErrors);
 
         if (hasBannerErrors(nextErrors)) {
-            setMessage("Vui lòng kiểm tra lại thông tin trước khi lưu.");
+            setMessage("Vui long kiem tra lai thong tin truoc khi luu.");
             return;
         }
 
@@ -52,7 +69,7 @@ export default function BannerCreatePage() {
         setMessage("");
 
         try {
-            const payload = buildBannerSubmitPayload(form);
+            const payload = buildBannerSubmitFormData(form);
             await createAdminBanner(payload);
             navigate(buildRolePath(role, "banners"));
         } catch (error) {
@@ -63,7 +80,7 @@ export default function BannerCreatePage() {
     }
 
     if (loading) {
-        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Đang tải dữ liệu form...</div>;
+        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Dang tai du lieu form...</div>;
     }
 
     return (
@@ -71,8 +88,8 @@ export default function BannerCreatePage() {
             <div className="flex flex-col justify-between gap-4 rounded-[28px] bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-6 py-6 text-white md:flex-row md:items-center">
                 <div>
                     <p className="text-sm uppercase tracking-[0.35em] text-blue-200">Banners</p>
-                    <h1 className="mt-2 text-3xl font-bold">Tạo banner mobile mới</h1>
-                    <p className="mt-2 text-sm text-slate-200">Banner này sẽ hiển thị theo khu vực và visibility bạn đã chọn.</p>
+                    <h1 className="mt-2 text-3xl font-bold">Tạo banner mới</h1>
+                    <p className="mt-2 text-sm text-slate-200">Banner này sẽ hiển thị theo khu vực và .</p>
                 </div>
 
                 <button
@@ -80,7 +97,7 @@ export default function BannerCreatePage() {
                     onClick={() => navigate(buildRolePath(role, "banners"))}
                     className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100"
                 >
-                    Quay lại quản lý banner
+                    Quay lai quan ly banner
                 </button>
             </div>
 
@@ -91,8 +108,11 @@ export default function BannerCreatePage() {
                 errors={errors}
                 cities={cities}
                 submitting={submitting}
-                submitLabel="Tạo banner"
+                submitLabel="Tao banner"
+                currentImageUrl={form.feature_img || ""}
+                selectedImagePreviewUrl={selectedImagePreviewUrl}
                 onChange={handleChange}
+                onFileChange={handleFileChange}
                 onSubmit={handleSubmit}
             />
         </div>

@@ -239,6 +239,16 @@ export default function BannerListPage() {
 
                 return (
                   <article key={item.id} className="rounded-2xl border border-slate-200 p-4">
+                    {item.feature_img ? (
+                      <img
+                        src={item.feature_img}
+                        alt={item.title || "banner"}
+                        className="mb-3 h-32 w-full rounded-xl border border-slate-200 object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : null}
                     <p className="text-sm font-semibold text-slate-900">#{item.id} - {item.title}</p>
                     <p className="mt-1 text-xs text-slate-500">{item.excerpt}</p>
 
@@ -308,6 +318,16 @@ export default function BannerListPage() {
                       <tr key={item.id} className="hover:bg-slate-50/80">
                         <td className="px-6 py-4 text-sm font-semibold text-slate-900">#{item.id}</td>
                         <td className="px-6 py-4 text-sm text-slate-700">
+                          {item.feature_img ? (
+                            <img
+                              src={item.feature_img}
+                              alt={item.title || "banner"}
+                              className="mb-2 h-14 w-24 rounded-lg border border-slate-200 object-cover"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : null}
                           <p className="font-semibold text-slate-900">{item.title}</p>
                           <p className="text-xs text-slate-500">{item.excerpt}</p>
                         </td>

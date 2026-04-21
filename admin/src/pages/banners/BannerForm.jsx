@@ -14,7 +14,10 @@ export default function BannerForm({
     cities,
     submitting,
     submitLabel,
+    currentImageUrl,
+    selectedImagePreviewUrl,
     onChange,
+    onFileChange,
     onSubmit,
 }) {
     return (
@@ -29,7 +32,7 @@ export default function BannerForm({
                             type="text"
                             value={form.title}
                             onChange={(event) => onChange("title", event.target.value)}
-                            placeholder="Ưu đãi cuối tuần"
+                            placeholder="Ví dụ: Ưu đãi cuối tuần"
                             maxLength={255}
                             className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                         />
@@ -37,12 +40,12 @@ export default function BannerForm({
                     </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Mô tả ngắn (excerpt)</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Mô tả ngắn</label>
                         <input
                             type="text"
                             value={form.excerpt}
                             onChange={(event) => onChange("excerpt", event.target.value)}
-                            placeholder="Giảm giá 20% cho chuyến đầu"
+                            placeholder="Ví dụ: Giảm giá 20% cho chuyến đi"
                             maxLength={255}
                             className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                         />
@@ -50,7 +53,7 @@ export default function BannerForm({
                     </div>
 
                     <div className="md:col-span-2">
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Nội dung chi tiết (content)</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Nội dung chi tiết</label>
                         <textarea
                             value={form.content}
                             onChange={(event) => onChange("content", event.target.value)}
@@ -68,7 +71,7 @@ export default function BannerForm({
                             onChange={(event) => onChange("city", event.target.value)}
                             className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
                         >
-                            <option value="0">Toàn hệ thống (city = 0)</option>
+                            <option value="0">Toàn hệ thống</option>
                             {cities.map((city) => (
                                 <option key={city.id} value={city.id}>
                                     {city.r_title}
@@ -78,21 +81,59 @@ export default function BannerForm({
                         <FieldError error={errors.city} />
                     </div>
 
-                    <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">feature_img (tối đa 30 ký tự)</label>
+                    <div className="md:col-span-2">
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Ảnh banner</label>
                         <input
-                            type="text"
-                            value={form.feature_img}
-                            onChange={(event) => onChange("feature_img", event.target.value)}
-                            placeholder="banner_01.jpg"
-                            maxLength={30}
-                            className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            onChange={(event) => onFileChange(event.target.files?.[0] || null)}
+                            className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100 focus:border-blue-500"
                         />
+                        <FieldError error={errors.feature_img_file} />
                         <FieldError error={errors.feature_img} />
-                    </div>
+
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Ảnh hiện tại
+                                </p>
+                                {currentImageUrl ? (
+                                    <img
+                                        src={currentImageUrl}
+                                        alt="Current banner"
+                                        className="h-60 w-full rounded-2xl border border-slate-200 object-cover"
+                                        onError={(event) => {
+                                            event.currentTarget.style.display = "none";
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-sm text-slate-500">
+                                        Chưa có ảnh
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Ảnh vừa chọn
+                                </p>
+                                {selectedImagePreviewUrl ? (
+                                    <img
+                                        src={selectedImagePreviewUrl}
+                                        alt="Selected banner"
+                                        className="h-60 w-full rounded-2xl border border-blue-200 object-cover"
+                                    />
+                                ) : (
+                                    <div className="flex h-60 items-center justify-center rounded-2xl border border-dashed border-slate-300 text-sm text-slate-500">
+                                        Chưa chọn ảnh mới
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        </div>
 
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Visibility</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Hiển thị</label>
                         <select
                             value={form.visibility}
                             onChange={(event) => onChange("visibility", Number(event.target.value))}

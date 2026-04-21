@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Package, Plus, RefreshCw, Search, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    ChevronLeft,
+    ChevronRight,
+    Loader2,
+    MapPin,
+    Package,
+    Plus,
+    RefreshCw,
+    Search,
+    X,
+} from "lucide-react";
 import {
     createRentalPackage,
     fetchVehicleTypes,
@@ -7,8 +17,17 @@ import {
     toggleRentalPackageActive,
     updateRentalPackage,
 } from "../../services/rentalPackageService";
+import CoverageMapEditor from "../../components/maps/CoverageMapEditor";
+
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const SERVICE_TYPE_LABEL = { 1: "Thuê xe", 2: "Thuê tài xế", 3: "Xe + Tài xế" };
+
+const COVERAGE_TYPE_LABEL = {
+    polygon: "Đa giác",
+    circle: "Hình tròn",
+    rectangle: "Hình chữ nhật",
+};
 
 const EMPTY_FORM = {
     service_type: "1",
@@ -23,15 +42,24 @@ const EMPTY_FORM = {
     deposit_amount: "",
     description: "",
     active: "1",
+    // GIS fields
+    is_geo_enabled: "1",
+    coverage_type: "",
 };
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatVnd(value) {
     return new Intl.NumberFormat("vi-VN").format(Number(value || 0));
 }
 
+// ── PackageFormModal ──────────────────────────────────────────────────────────
+
 function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
     const isEdit = Boolean(initial?.package_id);
-    const [form, setForm] = useState(
+
+    // Khởi tạo form state từ dữ liệu cũ (khi edit) hoặc EMPTY_FORM (khi tạo mới)
+    const [form, setForm] = useState(() =>
         isEdit
             ? {
                   service_type: String(initial.service_type ?? 1),
@@ -46,21 +74,73 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
                   deposit_amount: String(initial.deposit_amount ?? 0),
                   description: initial.description ?? "",
                   active: String(initial.active ?? 1),
+                  is_geo_enabled: String(initial.is_geo_enabled ?? 1),
+                  coverage_type: initial.coverage_type ?? "",
               }
             : { ...EMPTY_FORM }
     );
+
+    // Dữ liệu GIS từ bản đồ (được CoverageMapEditor callback về)
+    const [geoShape, setGeoShape] = useState(() =>
+        isEdit
+            ? {
+                  geojson: initial.coverage_geojson || null,
+                  center_lat: initial.center_lat ?? null,
+                  center_lng: initial.center_lng ?? null,
+                  radius_km: initial.radius_km ?? null,
+              }
+            : { geojson: null, center_lat: null, center_lng: null, radius_km: null }
+    );
+
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+
+    // initialData ổn định để truyền vào CoverageMapEditor (tránh re-render vô tận)
+    const mapInitialData = useMemo(
+        () => ({
+            geojson: initial?.coverage_geojson || null,
+            center_lat: initial?.center_lat ?? null,
+            center_lng: initial?.center_lng ?? null,
+            radius_km: initial?.radius_km ?? null,
+        }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        []
+    );
 
     function set(field) {
         return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
     }
 
+    // Callback từ CoverageMapEditor
+    const handleMapChange = useCallback((shapeData) => {
+        setGeoShape(shapeData);
+    }, []);
+
+    // Validate + submit
     async function handleSubmit(e) {
         e.preventDefault();
         setError("");
+
         if (!form.package_name.trim()) { setError("Tên gói không được để trống."); return; }
         if (!form.price || Number(form.price) < 0) { setError("Giá phải >= 0."); return; }
+
+        const isGeoEnabled = Number(form.is_geo_enabled);
+        const coverageType = form.coverage_type || null;
+
+        // Validate GIS nếu bật giới hạn vùng
+        if (isGeoEnabled && coverageType) {
+            if (coverageType === "circle") {
+                if (geoShape.center_lat == null || geoShape.center_lng == null || !geoShape.radius_km) {
+                    setError("Vui lòng vẽ vùng tròn trên bản đồ (tâm + bán kính).");
+                    return;
+                }
+            } else if (coverageType === "polygon" || coverageType === "rectangle") {
+                if (!geoShape.geojson) {
+                    setError(`Vui lòng vẽ vùng ${COVERAGE_TYPE_LABEL[coverageType]} trên bản đồ.`);
+                    return;
+                }
+            }
+        }
 
         const data = {
             service_type: Number(form.service_type),
@@ -75,6 +155,13 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
             deposit_amount: Number(form.deposit_amount) || 0,
             description: form.description.trim() || null,
             active: Number(form.active),
+            // GIS
+            is_geo_enabled: isGeoEnabled,
+            coverage_type: isGeoEnabled ? coverageType : null,
+            coverage_geojson: isGeoEnabled && coverageType !== "circle" ? geoShape.geojson : null,
+            center_lat: isGeoEnabled && coverageType === "circle" ? geoShape.center_lat : null,
+            center_lng: isGeoEnabled && coverageType === "circle" ? geoShape.center_lng : null,
+            radius_km: isGeoEnabled && coverageType === "circle" ? geoShape.radius_km : null,
         };
 
         setSubmitting(true);
@@ -86,7 +173,7 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
             }
             onSaved();
         } catch (err) {
-            setError(err?.response?.data?.message || "Lưu thất bại.");
+            setError(err?.response?.data?.message || "Lưu thất bại. Vui lòng thử lại.");
         } finally {
             setSubmitting(false);
         }
@@ -105,9 +192,12 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
         </div>
     );
 
+    const showMap = form.is_geo_enabled === "1" && Boolean(form.coverage_type);
+
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-8">
             <div className="w-full max-w-2xl rounded-[24px] bg-white shadow-2xl">
+                {/* Header */}
                 <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <h3 className="text-base font-semibold text-slate-900">
                         {isEdit ? `Sửa gói #${initial.package_id}` : "Tạo gói thuê mới"}
@@ -117,73 +207,144 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="grid gap-4 px-6 py-5 sm:grid-cols-2">
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Loại dịch vụ</label>
-                        <select
-                            value={form.service_type}
-                            onChange={set("service_type")}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                        >
-                            <option value="1">Thuê xe (service_type=1)</option>
-                            <option value="2">Thuê tài xế (service_type=2)</option>
-                            <option value="3">Xe + Tài xế (service_type=3)</option>
-                        </select>
+                <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+                    {/* ── Thông tin cơ bản ───────────────────────────────── */}
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Loại dịch vụ</label>
+                            <select
+                                value={form.service_type}
+                                onChange={set("service_type")}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                            >
+                                <option value="1">Thuê xe</option>
+                                <option value="2">Thuê tài xế</option>
+                                <option value="3">Xe + Tài xế</option>
+                            </select>
+                        </div>
+
+                        {field("Tên gói *", "package_name")}
+
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Loại xe áp dụng</label>
+                            <select
+                                value={form.type_id}
+                                onChange={set("type_id")}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                            >
+                                <option value="">Tất cả loại xe</option>
+                                {(vehicleTypes || []).map((vt) => (
+                                    <option key={vt.type_id} value={String(vt.type_id)}>
+                                        {vt.type_name} ({vt.seat_count} chỗ)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {field("Thời lượng (giờ)", "duration_hours", "number", { min: 1 })}
+                        {field("Thời lượng (ngày)", "duration_days", "number", { min: 1 })}
+                        {field("Giá (VND) *", "price", "number", { min: 0 })}
+                        {field("Giới hạn km", "distance_limit_km", "number", { min: 0 })}
+                        {field("Phí km vượt (VND/km)", "extra_km_fee", "number", { min: 0 })}
+                        {field("Phí giờ vượt (VND/giờ)", "extra_hour_fee", "number", { min: 0 })}
+                        {field("Tiền đặt cọc (VND)", "deposit_amount", "number", { min: 0 })}
+
+                        <div className="sm:col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Mô tả</label>
+                            <textarea
+                                value={form.description}
+                                onChange={set("description")}
+                                rows={2}
+                                maxLength={255}
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="mb-1 block text-xs font-medium text-slate-600">Trạng thái</label>
+                            <select
+                                value={form.active}
+                                onChange={set("active")}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                            >
+                                <option value="1">Đang hoạt động</option>
+                                <option value="0">Tạm dừng</option>
+                            </select>
+                        </div>
                     </div>
 
-                    {field("Tên gói *", "package_name")}
+                    {/* ── Cấu hình khu vực áp dụng ──────────────────────── */}
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm font-semibold text-slate-800">Khu vực áp dụng</span>
+                        </div>
 
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Loại xe áp dụng</label>
-                        <select
-                            value={form.type_id}
-                            onChange={set("type_id")}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                        >
-                            <option value="">Tất cả loại xe</option>
-                            {(vehicleTypes || []).map((vt) => (
-                                <option key={vt.type_id} value={String(vt.type_id)}>
-                                    {vt.type_name} ({vt.seat_count} chỗ)
-                                </option>
-                            ))}
-                        </select>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Giới hạn vùng</label>
+                                <select
+                                    value={form.is_geo_enabled}
+                                    onChange={set("is_geo_enabled")}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                                >
+                                    <option value="1">Có giới hạn vùng</option>
+                                    <option value="0">Toàn quốc (không giới hạn)</option>
+                                </select>
+                            </div>
+
+                            {form.is_geo_enabled === "1" && (
+                                <div>
+                                    <label className="mb-1 block text-xs font-medium text-slate-600">Loại vùng</label>
+                                    <select
+                                        value={form.coverage_type}
+                                        onChange={(e) => {
+                                            // Khi đổi loại vùng, reset shape cũ
+                                            setGeoShape({ geojson: null, center_lat: null, center_lng: null, radius_km: null });
+                                            set("coverage_type")(e);
+                                        }}
+                                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                                    >
+                                        <option value="">-- Chọn loại vùng --</option>
+                                        <option value="polygon">Đa giác (Polygon)</option>
+                                        <option value="circle">Hình tròn (Circle)</option>
+                                        <option value="rectangle">Hình chữ nhật (Rectangle)</option>
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Thông tin tóm tắt shape hiện tại */}
+                        {showMap && form.coverage_type === "circle" && geoShape.center_lat != null && (
+                            <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-800">
+                                Tâm: ({geoShape.center_lat?.toFixed(5)}, {geoShape.center_lng?.toFixed(5)})
+                                — Bán kính: {geoShape.radius_km} km
+                            </div>
+                        )}
+
+                        {/* Bản đồ vẽ vùng */}
+                        {showMap && (
+                            <CoverageMapEditor
+                                coverageType={form.coverage_type}
+                                initialData={mapInitialData}
+                                onChange={handleMapChange}
+                            />
+                        )}
+
+                        {form.is_geo_enabled === "0" && (
+                            <p className="text-xs text-slate-500">
+                                Gói thuê sẽ hiển thị với tất cả người dùng, không phân biệt vị trí.
+                            </p>
+                        )}
                     </div>
-                    {field("Thời lượng (giờ)", "duration_hours", "number", { min: 1 })}
-                    {field("Thời lượng (ngày)", "duration_days", "number", { min: 1 })}
-                    {field("Giá (VND) *", "price", "number", { min: 0 })}
-                    {field("Giới hạn km", "distance_limit_km", "number", { min: 0 })}
-                    {field("Phí km vượt (VND/km)", "extra_km_fee", "number", { min: 0 })}
-                    {field("Phí giờ vượt (VND/giờ)", "extra_hour_fee", "number", { min: 0 })}
-                    {field("Tiền đặt cọc (VND)", "deposit_amount", "number", { min: 0 })}
 
-                    <div className="sm:col-span-2">
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Mô tả</label>
-                        <textarea
-                            value={form.description}
-                            onChange={set("description")}
-                            rows={2}
-                            maxLength={255}
-                            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                        />
-                    </div>
+                    {/* Error */}
+                    {error && (
+                        <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+                    )}
 
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Trạng thái</label>
-                        <select
-                            value={form.active}
-                            onChange={set("active")}
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
-                        >
-                            <option value="1">Đang hoạt động</option>
-                            <option value="0">Tạm dừng</option>
-                        </select>
-                    </div>
-
-                    {error ? (
-                        <p className="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-                    ) : null}
-
-                    <div className="flex gap-3 sm:col-span-2">
+                    {/* Actions */}
+                    <div className="flex gap-3">
                         <button
                             type="button"
                             onClick={onClose}
@@ -204,6 +365,8 @@ function PackageFormModal({ initial, onClose, onSaved, vehicleTypes }) {
         </div>
     );
 }
+
+// ── RentalPackagesPage ────────────────────────────────────────────────────────
 
 export default function RentalPackagesPage() {
     const [items, setItems] = useState([]);
@@ -237,8 +400,6 @@ export default function RentalPackagesPage() {
         setErrorMessage("");
         try {
             const data = await listRentalPackages(query);
-            // listRentalPackages trả về { items: [...] } — không có pagination từ server
-            // nên ta tự phân trang phía client
             setItems(data.items || []);
             setPagination((prev) => ({ ...prev, totalPages: 1 }));
         } catch (err) {
@@ -275,7 +436,7 @@ export default function RentalPackagesPage() {
                     </p>
                     <h1 className="mt-2 text-2xl font-bold sm:text-3xl">Quản lý gói thuê chuẩn</h1>
                     <p className="mt-1 text-sm text-slate-300">
-                        Gói thuê xe (service_type=1) · Gói thuê tài xế (service_type=2)
+                        Gói thuê xe · Gói thuê tài xế · Khu vực áp dụng
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -366,6 +527,7 @@ export default function RentalPackagesPage() {
                                     <th className="px-5 py-3">Giá (VND)</th>
                                     <th className="px-5 py-3">Đặt cọc</th>
                                     <th className="px-5 py-3">Km giới hạn</th>
+                                    <th className="px-5 py-3">Vùng áp dụng</th>
                                     <th className="px-5 py-3">Trạng thái</th>
                                     <th className="px-5 py-3">Hành động</th>
                                 </tr>
@@ -377,9 +539,21 @@ export default function RentalPackagesPage() {
                                     const duration = [
                                         pkg.duration_hours ? `${pkg.duration_hours}h` : null,
                                         pkg.duration_days ? `${pkg.duration_days}d` : null,
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" / ") || "--";
+                                    ].filter(Boolean).join(" / ") || "--";
+
+                                    // Badge vùng áp dụng
+                                    let geoLabel = "--";
+                                    let geoBadgeClass = "bg-slate-100 text-slate-500";
+                                    if (!pkg.is_geo_enabled) {
+                                        geoLabel = "Toàn quốc";
+                                        geoBadgeClass = "bg-sky-100 text-sky-700";
+                                    } else if (pkg.coverage_type) {
+                                        geoLabel = COVERAGE_TYPE_LABEL[pkg.coverage_type] ?? pkg.coverage_type;
+                                        geoBadgeClass = "bg-blue-100 text-blue-700";
+                                        if (pkg.coverage_type === "circle" && pkg.radius_km) {
+                                            geoLabel += ` (${pkg.radius_km} km)`;
+                                        }
+                                    }
 
                                     return (
                                         <tr key={pkg.package_id} className="hover:bg-slate-50/70">
@@ -400,9 +574,13 @@ export default function RentalPackagesPage() {
                                             <td className="px-5 py-3 text-sm text-slate-600">{formatVnd(pkg.deposit_amount)}</td>
                                             <td className="px-5 py-3 text-sm text-slate-600">{pkg.distance_limit_km} km</td>
                                             <td className="px-5 py-3">
-                                                <span
-                                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}
-                                                >
+                                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${geoBadgeClass}`}>
+                                                    {pkg.coverage_type && <MapPin className="h-3 w-3" />}
+                                                    {geoLabel}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
                                                     {isActive ? "Hoạt động" : "Tạm dừng"}
                                                 </span>
                                             </td>

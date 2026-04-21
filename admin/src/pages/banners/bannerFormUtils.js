@@ -15,6 +15,7 @@ export const DEFAULT_BANNER_FORM = {
     content: "",
     city: "0",
     feature_img: "",
+    feature_img_file: null,
     visibility: 1,
     status: 1,
 };
@@ -26,9 +27,35 @@ export function hydrateBannerForm(banner) {
         content: banner?.content || "",
         city: String(banner?.city ?? 0),
         feature_img: banner?.feature_img || "",
+        feature_img_file: null,
         visibility: Number(banner?.visibility ?? 1),
         status: Number(banner?.status ?? 1),
     };
+}
+
+export function validateBannerImageFile(file, { required = false } = {}) {
+    if (!file) {
+        return required ? "Vui lòng chọn ảnh banner." : "";
+    }
+
+    const allowedTypes = new Set([
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    ]);
+
+    if (!allowedTypes.has(file.type)) {
+        return "Ảnh phải là jpeg, jpg, png, webp hoặc gif.";
+    }
+
+    const maxBytes = 2 * 1024 * 1024;
+    if (Number(file.size || 0) > maxBytes) {
+        return "Dung lượng ảnh không được vượt quá 2MB.";
+    }
+
+    return "";
 }
 
 export function validateBannerForm(form) {
@@ -50,8 +77,13 @@ export function validateBannerForm(form) {
         errors.city = "Khu vực hiển thị không hợp lệ.";
     }
 
-    if (String(form.feature_img || "").trim().length > 30) {
-        errors.feature_img = "feature_img tối đa 30 ký tự theo schema DB.";
+    if (String(form.feature_img || "").trim().length > 2048) {
+        errors.feature_img = "feature_img tối đa 2048 ký tự.";
+    }
+
+    const imageFileError = validateBannerImageFile(form.feature_img_file);
+    if (imageFileError) {
+        errors.feature_img_file = imageFileError;
     }
 
     if (![0, 1, 2].includes(Number(form.visibility))) {
@@ -69,16 +101,21 @@ export function hasBannerErrors(errors) {
     return Boolean(errors && Object.keys(errors).length);
 }
 
-export function buildBannerSubmitPayload(form) {
-    return {
-        title: String(form.title || "").trim(),
-        excerpt: String(form.excerpt || "").trim(),
-        content: String(form.content || "").trim(),
-        city: Number(form.city || 0),
-        feature_img: String(form.feature_img || "").trim(),
-        visibility: Number(form.visibility),
-        status: Number(form.status),
-    };
+export function buildBannerSubmitFormData(form) {
+    const formData = new FormData();
+    formData.append("title", String(form.title || "").trim());
+    formData.append("excerpt", String(form.excerpt || "").trim());
+    formData.append("content", String(form.content || "").trim());
+    formData.append("city", String(Number(form.city || 0)));
+    formData.append("feature_img", String(form.feature_img || "").trim());
+    formData.append("visibility", String(Number(form.visibility)));
+    formData.append("status", String(Number(form.status)));
+
+    if (form.feature_img_file) {
+        formData.append("feature_img_file", form.feature_img_file);
+    }
+
+    return formData;
 }
 
 export function getBannerStatusBadge(banner) {

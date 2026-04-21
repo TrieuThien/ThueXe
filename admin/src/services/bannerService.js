@@ -23,12 +23,18 @@ export async function getAdminBannerDetail(id) {
 }
 
 export async function createAdminBanner(payload) {
-    const response = await apiClient.post("/api/admin/banners", payload);
+    const config = payload instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const response = await apiClient.post("/api/admin/banners", payload, config);
     return extractPayload(response);
 }
 
 export async function updateAdminBanner(id, payload) {
-    const response = await apiClient.patch(`/api/admin/banners/${id}`, payload);
+    const config = payload instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const response = await apiClient.patch(`/api/admin/banners/${id}`, payload, config);
     return extractPayload(response);
 }
 
