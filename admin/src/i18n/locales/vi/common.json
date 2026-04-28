@@ -227,7 +227,7 @@
                                          "desc":  "Theo dõi số dư và khóa/mở khóa ví khi cần."
                                      },
                          "payouts":  {
-                                         "badge":  "Chi trả",
+                                         "badge":  "Thanh toán",
                                          "title":  "Duyệt yêu cầu thanh toán",
                                          "desc":  "Xử lý yêu cầu chi trả cho tài xế, chủ xe và khách hàng."
                                      },

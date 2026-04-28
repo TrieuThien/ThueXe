@@ -105,7 +105,7 @@ export default function BannerEditPage() {
                 errors={errors}
                 cities={cities}
                 submitting={submitting}
-                submitLabel="Luu cap nhat"
+                submitLabel="Lưu cập nhật"
                 currentImageUrl={form.feature_img || ""}
                 selectedImagePreviewUrl={selectedImagePreviewUrl}
                 onChange={handleChange}

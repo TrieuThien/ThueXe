@@ -302,6 +302,7 @@ export default function BannerListPage() {
                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-[0.2em] text-slate-500">
                   <tr>
                     <th className="px-6 py-4">ID</th>
+                    <th className="px-6 py-4">Ảnh</th>
                     <th className="px-6 py-4">Tiêu đề</th>
                     <th className="px-6 py-4">Khu vực</th>
                     <th className="px-6 py-4">Badge</th>
@@ -327,12 +328,14 @@ export default function BannerListPage() {
                                 event.currentTarget.style.display = "none";
                               }}
                             />
-                          ) : null}
+                          ) : null}  
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-700">
                           <p className="font-semibold text-slate-900">{item.title}</p>
                           <p className="text-xs text-slate-500">{item.excerpt}</p>
                         </td>
                         <td className="px-6 py-4 text-sm text-slate-700">
-                          {Number(item.city) === 0 ? "Toan he thong" : (item.city_name || `#${item.city}`)}
+                          {Number(item.city) === 0 ? "Toàn hệ thống" : (item.city_name || `#${item.city}`)}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex flex-wrap gap-2">

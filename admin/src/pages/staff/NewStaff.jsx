@@ -158,9 +158,9 @@ export default function NewStaff() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label className="mb-2 block text-sm font-semibold text-slate-700">Thành phố phụ trách</label>
+                            <label className="mb-2 block text-sm font-semibold text-slate-700">Khu vực phụ trách</label>
                             <select value={form.route_id} onChange={(event) => updateField("route_id", event.target.value)} disabled={loadingRoutes || routeOptions.length === 0} className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-indigo-500 disabled:bg-slate-100">
-                                <option value="">{loadingRoutes ? "Đang tải..." : "Chọn thành phố"}</option>
+                                <option value="">{loadingRoutes ? "Đang tải..." : "Chọn khu vực"}</option>
                                 {routeOptions.map((route) => <option key={route.id} value={route.id}>{route.r_title}</option>)}
                             </select>
                             {routesError ? <p className="mt-2 text-sm text-red-600">{routesError}</p> : null}
@@ -235,7 +235,7 @@ export default function NewStaff() {
                             Reset biểu mẫu
                         </button>
                         <button type="button" onClick={loadRoutes} className="inline-flex items-center gap-2 rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-white">
-                            <RefreshCw className="h-4 w-4" /> Tải thêm thành phố
+                            <RefreshCw className="h-4 w-4" /> Tải thêm khu vực
                         </button>
                     </div>
                 </section>

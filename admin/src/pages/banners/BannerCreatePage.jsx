@@ -22,17 +22,17 @@ export default function BannerCreatePage() {
     const [submitting, setSubmitting] = useState(false);
     const [message, setMessage] = useState("");
 
-    const selectedImagePreviewUrl = useMemo(
-        () => (form.feature_img_file ? URL.createObjectURL(form.feature_img_file) : ""),
-        [form.feature_img_file]
+    const imagePreviewUrl = useMemo(
+        () => (form.feature_img_file ? URL.createObjectURL(form.feature_img_file) : form.feature_img || ""),
+        [form.feature_img_file, form.feature_img]
     );
 
     useEffect(() => {
-        if (!form.feature_img_file || !selectedImagePreviewUrl.startsWith("blob:")) {
+        if (!form.feature_img_file || !imagePreviewUrl.startsWith("blob:")) {
             return undefined;
         }
-        return () => URL.revokeObjectURL(selectedImagePreviewUrl);
-    }, [form.feature_img_file, selectedImagePreviewUrl]);
+        return () => URL.revokeObjectURL(imagePreviewUrl);
+    }, [form.feature_img_file, imagePreviewUrl]);
 
     useEffect(() => {
         getBannerMeta()
@@ -40,7 +40,7 @@ export default function BannerCreatePage() {
                 setCities(data.cities || []);
             })
             .catch((error) => {
-                setMessage(error?.response?.data?.message || "Khong tai duoc du lieu form.");
+                setMessage(error?.response?.data?.message || "Không tải được dữ liệu form.");
             })
             .finally(() => setLoading(false));
     }, []);
@@ -61,7 +61,7 @@ export default function BannerCreatePage() {
         setErrors(nextErrors);
 
         if (hasBannerErrors(nextErrors)) {
-            setMessage("Vui long kiem tra lai thong tin truoc khi luu.");
+            setMessage("Vui lòng kiểm tra lại thông tin trước khi lưu.");
             return;
         }
 
@@ -80,7 +80,7 @@ export default function BannerCreatePage() {
     }
 
     if (loading) {
-        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Dang tai du lieu form...</div>;
+        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Đang tải dữ liệu form...</div>;
     }
 
     return (
@@ -89,7 +89,7 @@ export default function BannerCreatePage() {
                 <div>
                     <p className="text-sm uppercase tracking-[0.35em] text-blue-200">Banners</p>
                     <h1 className="mt-2 text-3xl font-bold">Tạo banner mới</h1>
-                    <p className="mt-2 text-sm text-slate-200">Banner này sẽ hiển thị theo khu vực và .</p>
+                    <p className="mt-2 text-sm text-slate-200">Banner này sẽ hiển thị theo khu vực và chế độ hiển thị được chọn.</p>
                 </div>
 
                 <button
@@ -97,7 +97,7 @@ export default function BannerCreatePage() {
                     onClick={() => navigate(buildRolePath(role, "banners"))}
                     className="inline-flex min-h-11 items-center rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100"
                 >
-                    Quay lai quan ly banner
+                    Quay lại quản lý banner
                 </button>
             </div>
 
@@ -108,9 +108,9 @@ export default function BannerCreatePage() {
                 errors={errors}
                 cities={cities}
                 submitting={submitting}
-                submitLabel="Tao banner"
-                currentImageUrl={form.feature_img || ""}
-                selectedImagePreviewUrl={selectedImagePreviewUrl}
+                submitLabel="Tạo banner"
+                currentImageUrl=""
+                selectedImagePreviewUrl={imagePreviewUrl}
                 onChange={handleChange}
                 onFileChange={handleFileChange}
                 onSubmit={handleSubmit}

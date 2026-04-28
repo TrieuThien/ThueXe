@@ -57,6 +57,7 @@ import DriverReportPage from "../pages/reports/DriverReportPage";
 import CustomerReportPage from "../pages/reports/CustomerReportPage";
 import PaymentReportPage from "../pages/reports/PaymentReportPage";
 import RentalPackagesPage from "../pages/rentals/RentalPackagesPage";
+import RentalBookingListPage from "../pages/rental-bookings/RentalBookingListPage";
 
 function getElementByRoleAndPath(role, path) {
     const sharedMap = {
@@ -109,6 +110,7 @@ function getElementByRoleAndPath(role, path) {
             "reports/customers": <CustomerReportPage />,
             "reports/payments": <PaymentReportPage />,
             "rental-packages": <RentalPackagesPage />,
+            "rental-bookings": <RentalBookingListPage />,
         };
 
         if (adminMap[path]) {
@@ -120,6 +122,7 @@ function getElementByRoleAndPath(role, path) {
         const dispatcherMap = {
             "customer/create": <NewCustomer />,
             "customers": <CustomerList />,
+            "rental-bookings": <RentalBookingListPage />,
         };
 
         if (dispatcherMap[path]) {

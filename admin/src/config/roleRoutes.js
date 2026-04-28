@@ -123,6 +123,7 @@ export const MENU_BY_ROLE = {
         { label: "Theo dõi vị trí", path: "map-tracking", icon: MapPinned },
         { label: "Quảng cáo di động", path: "banners", icon: Megaphone },
         { label: "Gói thuê chuẩn", path: "rental-packages", icon: Package },
+        { label: "Đơn thuê xe / tài xế", path: "rental-bookings", icon: ScrollText },
         { label: "Mã giảm giá", path: "coupons", icon: TicketPercent },
         { label: "Chương trình tích điểm", path: "reward-points", icon: ShieldCheck },
         { label: "Giao dịch", path: "transactions", icon: Receipt },
@@ -170,6 +171,7 @@ export const MENU_BY_ROLE = {
             icon: MapPinned,
             path: "map-tracking"
         },
+        { label: "Đơn thuê xe / tài xế", path: "rental-bookings", icon: ScrollText },
         {
             label: "Support Chat",
             path: "chat-support",

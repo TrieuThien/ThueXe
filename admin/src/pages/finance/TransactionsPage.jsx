@@ -162,11 +162,11 @@ export default function TransactionsPage() {
                             </table>
                         </div>
                         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm">
-                            <span>Total: {meta.total}</span>
+                            <span>Tổng: {meta.total}</span>
                             <div className="flex items-center gap-2">
-                                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)} className="rounded-xl border px-3 py-1.5 disabled:opacity-40">Prev</button>
+                                <button type="button" disabled={page <= 1} onClick={() => setPage((prev) => prev - 1)} className="rounded-xl border px-3 py-1.5 disabled:opacity-40">Trước</button>
                                 <span>{page}/{meta.totalPages}</span>
-                                <button type="button" disabled={page >= meta.totalPages} onClick={() => setPage((prev) => prev + 1)} className="rounded-xl border px-3 py-1.5 disabled:opacity-40">Next</button>
+                                <button type="button" disabled={page >= meta.totalPages} onClick={() => setPage((prev) => prev + 1)} className="rounded-xl border px-3 py-1.5 disabled:opacity-40">Sau</button>
                             </div>
                         </div>
                     </>

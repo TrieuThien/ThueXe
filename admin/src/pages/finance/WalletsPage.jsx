@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, SlidersHorizontal, ToggleLeft, ToggleRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { RefreshCw, Search, SlidersHorizontal, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import PageHeader from "../../components/common/PageHeader";
 import SkeletonBlock from "../../components/common/SkeletonBlock";
+import useDebouncedValue from "../../hooks/useDebouncedValue";
 import { adjustWallet, getWallets, updateWalletStatus } from "../../services/adminService";
 
 const ACTOR_TYPE_LABEL = { 0: "Người dùng", 1: "Tài xế", 2: "Chủ xe", 3: "Nhân viên" };
@@ -135,26 +136,53 @@ export default function WalletsPage() {
     const { t } = useTranslation();
     const [loading, setLoading] = useState(true);
     const [rows, setRows] = useState([]);
+    const [page, setPage] = useState(1);
+    const [meta, setMeta] = useState({ total: 0, totalPages: 1, limit: 10 });
     const [error, setError] = useState("");
     const [adjustTarget, setAdjustTarget] = useState(null);
     const [togglingId, setTogglingId] = useState(null);
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [actorTypeFilter, setActorTypeFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const debouncedSearch = useDebouncedValue(searchKeyword);
 
-    async function loadData() {
+    const queryParams = useMemo(
+        () => ({
+            page,
+            limit: 10,
+            search: debouncedSearch.trim() || undefined,
+            actor_type: actorTypeFilter === "" ? undefined : Number(actorTypeFilter),
+            status: statusFilter === "" ? undefined : Number(statusFilter),
+        }),
+        [actorTypeFilter, debouncedSearch, page, statusFilter]
+    );
+
+    const hasFilters = Boolean(searchKeyword.trim() || actorTypeFilter || statusFilter);
+
+    const loadData = useCallback(async () => {
         setLoading(true);
         setError("");
         try {
-            const response = await getWallets({ page: 1, limit: 50 });
+            const response = await getWallets(queryParams);
             setRows(response.items || []);
+            const total = Number(response.totalItems || 0);
+            const limit = Number(response.limit || 10);
+            const currentPage = Number(response.page || page);
+            const totalPages = total === 0 ? 1 : Math.ceil(total / limit);
+            setMeta({ total, totalPages, limit });
+            if (currentPage !== page) {
+                setPage(currentPage);
+            }
         } catch (loadError) {
             setError(loadError?.response?.data?.message || t("adminModules.loadFailed"));
         } finally {
             setLoading(false);
         }
-    }
+    }, [queryParams, t]);
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [loadData]);
 
     async function handleToggleStatus(wallet) {
         const newStatus = Number(wallet.status) === 1 ? 0 : 1;
@@ -195,6 +223,77 @@ export default function WalletsPage() {
             />
 
             <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white">
+                <div className="border-b border-slate-100 p-5">
+                    <div className="grid gap-3 md:grid-cols-4">
+                        <label className="md:col-span-2">
+                            <span className="mb-2 block text-sm font-medium text-slate-600">Tìm kiếm</span>
+                            <div className="flex items-center rounded-2xl border border-slate-300 px-3 py-2.5">
+                                <Search className="h-4 w-4 text-slate-400" />
+                                <input
+                                    value={searchKeyword}
+                                    onChange={(event) => {
+                                        setPage(1);
+                                        setSearchKeyword(event.target.value);
+                                    }}
+                                    className="w-full bg-transparent px-2 outline-none"
+                                    placeholder="ID ví, ID chủ sở hữu, số điện thoại..."
+                                />
+                            </div>
+                        </label>
+                        <label>
+                            <span className="mb-2 block text-sm font-medium text-slate-600">Loại tài khoản</span>
+                            <select
+                                value={actorTypeFilter}
+                                onChange={(event) => {
+                                    setPage(1);
+                                    setActorTypeFilter(event.target.value);
+                                }}
+                                className="w-full rounded-2xl border border-slate-300 px-3 py-2.5"
+                            >
+                                <option value="">Tất cả</option>
+                                <option value="0">Người dùng</option>
+                                <option value="1">Tài xế</option>
+                                <option value="2">Chủ xe</option>
+                                <option value="3">Nhân viên</option>
+                            </select>
+                        </label>
+                        <label>
+                            <span className="mb-2 block text-sm font-medium text-slate-600">Trạng thái ví</span>
+                            <select
+                                value={statusFilter}
+                                onChange={(event) => {
+                                    setPage(1);
+                                    setStatusFilter(event.target.value);
+                                }}
+                                className="w-full rounded-2xl border border-slate-300 px-3 py-2.5"
+                            >
+                                <option value="">Tất cả</option>
+                                <option value="1">Hoạt động</option>
+                                <option value="0">Đã khóa</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-sm text-slate-500">
+                            Tổng <span className="font-semibold text-slate-700">{meta.total}</span> ví
+                        </p>
+                        {hasFilters ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPage(1);
+                                    setSearchKeyword("");
+                                    setActorTypeFilter("");
+                                    setStatusFilter("");
+                                }}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Xóa bộ lọc
+                            </button>
+                        ) : null}
+                    </div>
+                </div>
                 {loading ? (
                     <div className="space-y-3 p-5">
                         <SkeletonBlock className="h-16" />
@@ -277,6 +376,28 @@ export default function WalletsPage() {
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm">
+                            <span>Tổng: {meta.total}</span>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    disabled={page <= 1}
+                                    onClick={() => setPage((prev) => prev - 1)}
+                                    className="rounded-xl border px-3 py-1.5 disabled:opacity-40"
+                                >
+                                    Trước
+                                </button>
+                                <span>{page}/{meta.totalPages}</span>
+                                <button
+                                    type="button"
+                                    disabled={page >= meta.totalPages}
+                                    onClick={() => setPage((prev) => prev + 1)}
+                                    className="rounded-xl border px-3 py-1.5 disabled:opacity-40"
+                                >
+                                    Sau
+                                </button>
+                            </div>
                         </div>
                     </>
                 )}
