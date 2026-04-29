@@ -27,6 +27,9 @@ export type BookingStackParamList = {
   TripHistoryDetail: { bookingId: string };
   RentalServiceChooser: undefined;
   RentalBookingForm: undefined;
+  RentalLocationPickup: undefined;
+  RentalLocationDropoff: { pickupLocation: { address: string; coordinate: { latitude: number; longitude: number } } };
+  RentalLocationMapPicker: { addressType: "pickup" | "dropoff" };
   RentalPackageList: undefined;
   /** Danh sách xe khả dụng của gói thuê, sau khi chọn gói trên màn hình nearby */
   RentalPackageCars: { packageId: number; packageName: string; packageBasePrice?: number; packageDurationHours?: number };
@@ -48,6 +51,8 @@ export type BookingStackParamList = {
       owner_phone: string | null;
       avg_rating: number | null;
       rating_count: number;
+      photo_url?: string | null;
+      interior_photo_urls?: string[];
     };
     packageId: number;
     packageName: string;
@@ -72,6 +77,8 @@ export type BookingStackParamList = {
       owner_phone: string | null;
       avg_rating: number | null;
       rating_count: number;
+      photo_url?: string | null;
+      interior_photo_urls?: string[];
     };
     packageId: number;
     packageName: string;

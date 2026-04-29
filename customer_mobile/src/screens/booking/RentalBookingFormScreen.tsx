@@ -1,19 +1,17 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { AddressSuggestion } from "../../hooks";
 
 import { AppHeader, AuthErrorNotice, PrimaryButton, TextField } from "../../components";
-import { getRentalFlowErrorMessage, useAddressAutocomplete, useCurrentLocation } from "../../hooks";
+import { getRentalFlowErrorMessage } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
 import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
-import { reverseGeocodeToDisplayAddress } from "../../utils/address";
-import { RentalBookingFormValues, rentalBookingFormSchema } from "../../validation/rentalSchemas";
+import { RentalBookingDateTimeFormValues, rentalBookingDateTimeSchema } from "../../validation/rentalSchemas";
 
 type Props = NativeStackScreenProps<BookingStackParamList, "RentalBookingForm">;
 
@@ -28,10 +26,8 @@ function formatDateTimeInput(date: Date): string {
 
 export function RentalBookingFormScreen({ navigation }: Props) {
   const { theme } = useTheme();
-  const location = useCurrentLocation(true);
   const selectedServiceType = useRentalFlowStore((state) => state.selectedServiceType);
   const setCriteria = useRentalFlowStore((state) => state.setCriteria);
-  const setExtraInfo = useRentalFlowStore((state) => state.setExtraInfo);
 
   const initialStartAt = new Date();
   initialStartAt.setMinutes(0, 0, 0);
@@ -40,68 +36,24 @@ export function RentalBookingFormScreen({ navigation }: Props) {
   const [startAtDate, setStartAtDate] = useState<Date>(initialStartAt);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
-  const [showPickupSuggestions, setShowPickupSuggestions] = useState(true);
-  const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(true);
-  const pickupAutoFilledRef = useRef(false);
-  // Tọa độ của địa chỉ đón được chọn từ autocomplete (không phải GPS hiện tại)
-  const [selectedPickupCoord, setSelectedPickupCoord] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const {
     control,
     handleSubmit,
     setError,
     setValue,
-    getValues,
-    watch,
     formState: { errors },
-  } = useForm<RentalBookingFormValues>({
-    resolver: zodResolver(rentalBookingFormSchema),
+  } = useForm<RentalBookingDateTimeFormValues>({
+    resolver: zodResolver(rentalBookingDateTimeSchema),
     defaultValues: {
       startAtText: "",
       durationHours: "4",
-      pickupAddress: "",
-      dropoffAddress: "",
-      couponCode: "",
-      note: "",
     },
   });
 
   useEffect(() => {
     setValue("startAtText", formatDateTimeInput(startAtDate), { shouldValidate: true });
   }, [setValue, startAtDate]);
-
-  useEffect(() => {
-    if (location.data?.address) {
-      const currentPickup = getValues("pickupAddress");
-      if (!currentPickup || pickupAutoFilledRef.current) {
-        setValue("pickupAddress", location.data.address, { shouldValidate: true });
-        pickupAutoFilledRef.current = true;
-      }
-    }
-  }, [location.data?.address, setValue, getValues]);
-
-  const pickupInput = watch("pickupAddress");
-  const dropoffInput = watch("dropoffAddress");
-
-  const pickupAutocomplete = useAddressAutocomplete(
-    pickupInput ?? "",
-    location.data
-      ? {
-          latitude: location.data.latitude,
-          longitude: location.data.longitude,
-        }
-      : undefined,
-  );
-
-  const dropoffAutocomplete = useAddressAutocomplete(
-    dropoffInput ?? "",
-    location.data
-      ? {
-          latitude: location.data.latitude,
-          longitude: location.data.longitude,
-        }
-      : undefined,
-  );
 
   const onDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -133,36 +85,22 @@ export function RentalBookingFormScreen({ navigation }: Props) {
 
     try {
       const startAt = new Date(values.startAtText.replace(" ", "T")).toISOString();
+      // Store the date/time/duration in the rental flow store
       setCriteria({
         serviceType: selectedServiceType,
         startAt,
         durationHours: Number(values.durationHours),
-        pickupAddress: values.pickupAddress,
-        dropoffAddress: values.dropoffAddress || undefined,
-        // Ưu tiên tọa độ của địa chỉ đón được chọn; fallback GPS nếu địa chỉ auto-fill từ GPS
-        pickupCoordinate: selectedPickupCoord ?? (location.data
-          ? { latitude: location.data.latitude, longitude: location.data.longitude }
-          : undefined),
+        pickupAddress: "",
+        dropoffAddress: undefined,
+        pickupCoordinate: undefined,
       });
-      setExtraInfo(values.couponCode || undefined, values.note || undefined);
-      navigation.navigate("RentalPackageList");
+      // Navigate to pickup location screen
+      navigation.navigate("RentalLocationPickup");
     } catch (error) {
+      console.error("Booking form error:", error);
       setError("root", { message: getRentalFlowErrorMessage(error) });
     }
   });
-
-  const resolveSuggestionLabel = async (item: AddressSuggestion): Promise<string> => {
-    if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
-      return item.label;
-    }
-
-    try {
-      const resolved = await reverseGeocodeToDisplayAddress(item.latitude, item.longitude);
-      return resolved ?? item.label;
-    } catch {
-      return item.label;
-    }
-  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -220,128 +158,9 @@ export function RentalBookingFormScreen({ navigation }: Props) {
           )}
         />
 
-        <Controller
-          control={control}
-          name="pickupAddress"
-          render={({ field, fieldState }) => (
-            <View style={styles.addressBlock}>
-              <TextField
-                label="Điểm đón"
-                value={field.value}
-                onChangeText={(text) => {
-                  pickupAutoFilledRef.current = false;
-                  setShowPickupSuggestions(true);
-                  setSelectedPickupCoord(null); // xóa tọa độ cũ khi người dùng tự gõ
-                  field.onChange(text);
-                }}
-                errorMessage={fieldState.error?.message}
-              />
-
-              {pickupAutocomplete.loading ? <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Đang gợi ý địa chỉ...</Text> : null}
-              {!pickupAutocomplete.loading &&
-              showPickupSuggestions &&
-              (pickupInput ?? "").trim().length >= 2 &&
-              pickupAutocomplete.suggestions.length === 0 ? (
-                <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
-              ) : null}
-
-              {showPickupSuggestions && pickupAutocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
-                  {pickupAutocomplete.suggestions.map((item, index) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={async () => {
-                        pickupAutoFilledRef.current = false;
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("pickupAddress", nextLabel, { shouldValidate: true });
-                        // Lưu tọa độ của địa chỉ được chọn để dùng cho GIS filter
-                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                          setSelectedPickupCoord({ latitude: item.latitude, longitude: item.longitude });
-                        }
-                        setShowPickupSuggestions(false);
-                      }}
-                      style={[
-                        styles.suggestionItem,
-                        index === pickupAutocomplete.suggestions.length - 1 ? styles.suggestionItemLast : null,
-                        { borderBottomColor: theme.colors.border },
-                      ]}
-                    >
-                      <Text style={[styles.suggestionText, { color: theme.colors.text }]} numberOfLines={1}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="dropoffAddress"
-          render={({ field, fieldState }) => (
-            <View style={styles.addressBlock}>
-              <TextField
-                label="Điểm trả (tùy chọn)"
-                value={field.value}
-                onChangeText={(text) => {
-                  setShowDropoffSuggestions(true);
-                  field.onChange(text);
-                }}
-                errorMessage={fieldState.error?.message}
-              />
-
-              {dropoffAutocomplete.loading ? <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Đang gợi ý địa chỉ...</Text> : null}
-              {!dropoffAutocomplete.loading &&
-              showDropoffSuggestions &&
-              (dropoffInput ?? "").trim().length >= 2 &&
-              dropoffAutocomplete.suggestions.length === 0 ? (
-                <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
-              ) : null}
-
-              {showDropoffSuggestions && dropoffAutocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
-                  {dropoffAutocomplete.suggestions.map((item, index) => (
-                    <Pressable
-                      key={item.id}
-                      onPress={async () => {
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("dropoffAddress", nextLabel, { shouldValidate: true });
-                        setShowDropoffSuggestions(false);
-                      }}
-                      style={[
-                        styles.suggestionItem,
-                        index === dropoffAutocomplete.suggestions.length - 1 ? styles.suggestionItemLast : null,
-                        { borderBottomColor: theme.colors.border },
-                      ]}
-                    >
-                      <Text style={[styles.suggestionText, { color: theme.colors.text }]} numberOfLines={1}>
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-            </View>
-          )}
-        />
-
-        <Controller
-          control={control}
-          name="couponCode"
-          render={({ field }) => <TextField label="Mã giảm giá (tùy chọn)" value={field.value} onChangeText={field.onChange} />}
-        />
-
-        <Controller
-          control={control}
-          name="note"
-          render={({ field }) => <TextField label="Ghi chú (tùy chọn)" value={field.value} onChangeText={field.onChange} />}
-        />
-
         <AuthErrorNotice message={errors.root?.message} />
 
-        <PrimaryButton title="Tìm gói phù hợp" onPress={onSubmit} />
+        <PrimaryButton title="Tiếp tục" onPress={onSubmit} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -372,27 +191,5 @@ const styles = StyleSheet.create({
   dateTimeButtonText: {
     fontSize: 14,
     fontWeight: "700",
-  },
-  addressBlock: {
-    gap: 6,
-  },
-  suggestionHint: {
-    fontSize: 12,
-  },
-  suggestionList: {
-    borderWidth: 1,
-    borderRadius: 10,
-    overflow: "hidden",
-  },
-  suggestionItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-  },
-  suggestionItemLast: {
-    borderBottomWidth: 0,
-  },
-  suggestionText: {
-    fontSize: 13,
   },
 });

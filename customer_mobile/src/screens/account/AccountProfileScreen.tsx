@@ -6,6 +6,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Picker } from "@react-native-picker/picker";
 
 import { AppHeader, PrimaryButton, TextField } from "../../components";
+import { getAuthErrorMessage, useAuth } from "../../hooks";
 import { AccountStackParamList } from "../../navigation";
 import { useAuthStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -36,6 +37,7 @@ export function AccountProfileScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const currentUser = useAuthStore((state) => state.currentUser);
   const setProfile = useAuthStore((state) => state.setProfile);
+  const { updateProfileMutation } = useAuth();
   const fullNameParts = useMemo(() => splitFullName(currentUser?.fullName), [currentUser?.fullName]);
 
   const [firstName, setFirstName] = useState(currentUser?.firstName ?? fullNameParts.firstName);
@@ -69,30 +71,47 @@ export function AccountProfileScreen({ navigation }: Props) {
     }
   };
 
-  const onSaveProfile = () => {
+  const onSaveProfile = async () => {
     if (!currentUser) {
       return;
     }
 
-    const mergedFullName = `${firstName} ${lastName}`.trim() || currentUser.fullName;
-    const mappedGender: User["gender"] = gender || undefined;
+    const nextFirstName = firstName.trim();
+    const nextLastName = lastName.trim();
+    const nextPhone = phoneNumber.trim();
+    const nextEmail = email.trim();
+    const nextAddress = address.trim();
 
-    setProfile({
-      ...currentUser,
-      fullName: mergedFullName,
-      firstName: firstName.trim() || undefined,
-      lastName: lastName.trim() || undefined,
-      phoneNumber: phoneNumber.trim() || currentUser.phoneNumber,
-      email: email.trim() || undefined,
-      address: address.trim() || undefined,
-      gender: mappedGender,
-      country: country.trim() || undefined,
-      avatarUrl: avatarUrl.trim() || undefined,
-      updatedAt: new Date().toISOString(),
-    });
+    const payload: Partial<User> = {};
+    if (nextFirstName !== (currentUser.firstName ?? "").trim()) payload.firstName = nextFirstName;
+    if (nextLastName !== (currentUser.lastName ?? "").trim()) payload.lastName = nextLastName;
+    if (nextPhone !== (currentUser.phoneNumber ?? "").trim()) payload.phoneNumber = nextPhone;
+    if (nextEmail !== (currentUser.email ?? "").trim()) payload.email = nextEmail;
+    if (nextAddress !== (currentUser.address ?? "").trim()) payload.address = nextAddress;
 
-    Alert.alert("Hồ sơ", "Đã lưu thông tin cá nhân");
-    navigation.goBack();
+    if (Object.keys(payload).length === 0) {
+      Alert.alert("Hồ sơ", "Không có thay đổi để lưu.");
+      return;
+    }
+
+    try {
+      const updated = await updateProfileMutation.mutateAsync(payload);
+      const mappedGender: User["gender"] = gender || undefined;
+
+      setProfile({
+        ...updated,
+        fullName: `${updated.firstName ?? ""} ${updated.lastName ?? ""}`.trim() || updated.fullName,
+        gender: mappedGender,
+        country: country.trim() || updated.country,
+        avatarUrl: avatarUrl.trim() || updated.avatarUrl,
+        updatedAt: new Date().toISOString(),
+      });
+
+      Alert.alert("Hồ sơ", "Đã lưu thông tin cá nhân");
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert("Không thể lưu hồ sơ", getAuthErrorMessage(error));
+    }
   };
 
   return (
@@ -141,7 +160,7 @@ export function AccountProfileScreen({ navigation }: Props) {
         <TextField label="Địa chỉ" value={address} onChangeText={setAddress} placeholder="123 Đường ABC, TP.HCM" />
         <TextField label="Quốc gia" value={country} onChangeText={setCountry} placeholder="Vietnam" />
 
-        <PrimaryButton title="Lưu thay đổi" onPress={onSaveProfile} />
+        <PrimaryButton title="Lưu thay đổi" onPress={onSaveProfile} loading={updateProfileMutation.isPending} />
       </ScrollView>
     </SafeAreaView>
   );

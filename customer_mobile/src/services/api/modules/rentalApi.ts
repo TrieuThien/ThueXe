@@ -29,6 +29,7 @@ export interface PackageCar {
   owner_name: string | null;
   owner_phone: string | null;
   photo_url: string | null;
+  interior_photo_urls: string[];
   avg_rating: number | null;
   rating_count: number;
 }

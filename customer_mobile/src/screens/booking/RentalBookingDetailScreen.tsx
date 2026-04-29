@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader, ErrorState, LoadingState } from "../../components";
+import { AppHeader, ErrorState, HeaderTextButton, LoadingState } from "../../components";
 import { QUERY_KEY_FACTORY } from "../../constants";
 import { BookingStackParamList } from "../../navigation";
 import { rentalApi } from "../../services";
@@ -117,7 +117,7 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <AppHeader title="Chi tiết đơn thuê" onBack={() => navigation.goBack()} />
+      <AppHeader title="Chi tiết đơn thuê" leftAction={<HeaderTextButton label="Quay lại" onPress={() => navigation.goBack()} />} />
 
       {query.isLoading ? <LoadingState /> : null}
       {query.isError ? <ErrorState onRetry={query.refetch} description="Không tải được chi tiết đơn thuê" /> : null}

@@ -10,6 +10,7 @@ export interface RentalSearchCriteria {
   pickupAddress: string;
   dropoffAddress?: string;
   pickupCoordinate?: Coordinate;
+  dropoffCoordinate?: Coordinate;
 }
 
 export interface RentalPackageConditions {

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, ViewStyle } from "react-native";
+import { Pressable, StyleSheet, Text, ViewStyle, TextStyle } from "react-native";
 
 import { useTheme } from "../../theme";
 
@@ -8,9 +8,10 @@ interface PrimaryButtonProps {
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
+  textStyle?: TextStyle;
 }
 
-export function PrimaryButton({ title, onPress, disabled = false, loading = false, style }: PrimaryButtonProps) {
+export function PrimaryButton({ title, onPress, disabled = false, loading = false, style, textStyle }: PrimaryButtonProps) {
   const { theme } = useTheme();
   const isDisabled = disabled || loading;
 
@@ -26,7 +27,7 @@ export function PrimaryButton({ title, onPress, disabled = false, loading = fals
       onPress={onPress}
       disabled={isDisabled}
     >
-      <Text style={[styles.text, { color: theme.colors.badgeText }]}>{loading ? "Đang xử lý..." : title}</Text>
+      <Text style={[styles.text, { color: theme.colors.badgeText }, textStyle]}>{loading ? "Đang xử lý..." : title}</Text>
     </Pressable>
   );
 }

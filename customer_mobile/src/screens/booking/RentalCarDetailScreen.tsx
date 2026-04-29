@@ -91,6 +91,7 @@ export function RentalCarDetailScreen({ navigation, route }: Props) {
   const { car, packageId, packageName, packageBasePrice, packageDurationHours } = route.params;
 
   const vehicleName = [car.brand, car.model, car.year].filter(Boolean).join(" ");
+  const interiorPhotos = Array.isArray(car.interior_photo_urls) ? car.interior_photo_urls.filter(Boolean) : [];
 
   function handleRentNow() {
     navigation.navigate("RentalVehicleConfirm", { car, packageId, packageName, packageBasePrice, packageDurationHours });
@@ -162,6 +163,27 @@ export function RentalCarDetailScreen({ navigation, route }: Props) {
             </Text>
           </View>
         </View>
+
+        {/* ── Ảnh nội thất ─────────────────────────────────────────────────── */}
+        {interiorPhotos.length > 0 ? (
+          <>
+            <SectionTitle label="Nội thất xe" />
+            <View style={styles.interiorList}>
+              {interiorPhotos.map((photoUrl, index) => (
+                <View
+                  key={`${photoUrl}-${index}`}
+                  style={[styles.interiorCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                >
+                  <Image
+                    source={{ uri: photoUrl }}
+                    style={styles.interiorPhoto}
+                    resizeMode="cover"
+                  />
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {/* ── Thông số kỹ thuật ────────────────────────────────────────────── */}
         <SectionTitle label="Thông số kỹ thuật" />
@@ -280,6 +302,20 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   packageBadgeText: { fontSize: 13, fontWeight: "600" },
+
+  // Interior photo
+  interiorCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  interiorList: {
+    gap: 10,
+  },
+  interiorPhoto: {
+    width: "100%",
+    height: 180,
+  },
 
   // Section title
   sectionTitle: {
