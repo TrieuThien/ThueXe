@@ -48,6 +48,16 @@ export async function findOwnerByEmail(email, conn = null) {
     return rows[0] || null;
 }
 
+export async function findOwnerEmailById(ownerId, conn = null) {
+    if (!ownerId) return null;
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT email, fullname FROM vehicle_owners WHERE owner_id = ? LIMIT 1`,
+        [ownerId]
+    );
+    return rows[0] || null;
+}
+
 export async function findOwnerByPhone(phone, conn = null) {
     if (!phone) return null;
     const db = dbConnection(conn);
@@ -371,8 +381,8 @@ export async function createOwnerVehicle(ownerId, payload, conn = null) {
     const [result] = await db.query(
         `INSERT INTO vehicles
          (owner_id, type_id, brand, model, year, color, license_plate, vin, seat_count, transmission,
-          fuel_type, odometer_km, status, is_verified, verification_status, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+          fuel_type, odometer_km, status, is_verified, verification_status, notes, photo_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
         [
             ownerId,
             payload.type_id,
@@ -389,9 +399,18 @@ export async function createOwnerVehicle(ownerId, payload, conn = null) {
             payload.status || "unavailable",
             payload.verification_status || "missing_documents",
             payload.notes || null,
+            payload.photo_url || null,
         ]
     );
     return Number(result.insertId);
+}
+
+export async function updateVehiclePhotoUrl(vehicleId, photoUrl, conn = null) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE vehicles SET photo_url = ? WHERE vehicle_id = ?`,
+        [photoUrl || null, vehicleId]
+    );
 }
 
 export async function listOwnerVehicles(ownerId, { search, status, page = 1, pageSize = 10 } = {}) {
@@ -416,7 +435,7 @@ export async function listOwnerVehicles(ownerId, { search, status, page = 1, pag
     const [rows] = await sqldb.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.vin,
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
-                v.date_added, v.notes, vt.type_name
+                v.date_added, v.notes, v.photo_url, vt.type_name
          FROM vehicles v
          LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
          WHERE ${whereSql}
@@ -436,7 +455,7 @@ export async function findOwnerVehicleById(ownerId, vehicleId, conn = null) {
     const [rows] = await db.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.vin,
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
-                v.current_long, v.current_lat, v.date_added, v.notes,
+                v.current_long, v.current_lat, v.date_added, v.notes, v.photo_url,
                 vt.type_name
          FROM vehicles v
          INNER JOIN vehicle_types vt ON vt.type_id = v.type_id
@@ -545,74 +564,71 @@ export async function upsertVehicleDocument(vehicleId, payload, conn = null) {
 
 export async function updateVehicleVerificationStatus(vehicleId, status, conn = null) {
     const db = dbConnection(conn);
+    const isVerified = status === "verified" ? 1 : 0;
+    const vehicleStatus = status === "verified" ? "available" : "unavailable";
     await db.query(
         `UPDATE vehicles
-         SET verification_status = ?, is_verified = ?
+         SET verification_status = ?, is_verified = ?, status = ?
          WHERE vehicle_id = ?`,
-        [status, status === "verified" ? 1 : 0, vehicleId]
+        [status, isVerified, vehicleStatus, vehicleId]
     );
 }
 
-export async function listVehicleAvailabilityBlocks(ownerId, vehicleId, { from, to } = {}) {
-    const params = [vehicleId, ownerId];
-    let sql = `SELECT block_id, vehicle_id, block_type, start_at, end_at, note, created_at, updated_at
-               FROM vehicle_availability_blocks
-               WHERE vehicle_id = ? AND created_by_owner_id = ?`;
-    if (from) {
-        sql += ` AND end_at >= ?`;
-        params.push(from);
-    }
-    if (to) {
-        sql += ` AND start_at <= ?`;
-        params.push(to);
-    }
-    sql += ` ORDER BY start_at ASC`;
+export async function updateVehicleOperationStatus(ownerId, vehicleId, newStatus, conn = null) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `UPDATE vehicles SET status = ? WHERE owner_id = ? AND vehicle_id = ? AND is_verified = 1`,
+        [newStatus, ownerId, vehicleId]
+    );
+    return result.affectedRows > 0;
+}
 
+export async function listOwnerVehicleMaintenanceForCalendar(ownerId, vehicleId, { from, to } = {}) {
+    const params = [vehicleId, ownerId];
+    let sql = `SELECT vm.maintenance_id AS block_id, vm.start_date AS start_at,
+                      COALESCE(vm.end_date, vm.start_date) AS end_at,
+                      vm.description AS note
+               FROM vehicle_maintenance vm
+               INNER JOIN vehicles v ON v.vehicle_id = vm.vehicle_id
+               WHERE vm.vehicle_id = ?
+                 AND v.owner_id = ?
+                 AND vm.status IN ('scheduled', 'in_progress')`;
+    if (from) { sql += ` AND COALESCE(vm.end_date, vm.start_date) >= ?`; params.push(from); }
+    if (to)   { sql += ` AND vm.start_date <= ?`; params.push(to); }
+    sql += ` ORDER BY vm.start_date ASC`;
     const [rows] = await sqldb.query(sql, params);
     return rows;
 }
 
-export async function createAvailabilityBlock(ownerId, vehicleId, payload, conn = null) {
+export async function deleteOwnerVehicleMaintenance(ownerId, vehicleId, maintenanceId, conn = null) {
     const db = dbConnection(conn);
     const [result] = await db.query(
-        `INSERT INTO vehicle_availability_blocks
-         (vehicle_id, block_type, start_at, end_at, note, created_by_owner_id)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [vehicleId, payload.block_type, payload.start_at, payload.end_at, payload.note || null, ownerId]
-    );
-    return Number(result.insertId);
-}
-
-export async function findAvailabilityBlock(ownerId, vehicleId, blockId, conn = null) {
-    const db = dbConnection(conn);
-    const [rows] = await db.query(
-        `SELECT block_id, vehicle_id, block_type, start_at, end_at, note
-         FROM vehicle_availability_blocks
-         WHERE block_id = ? AND vehicle_id = ? AND created_by_owner_id = ?
-         LIMIT 1`,
-        [blockId, vehicleId, ownerId]
-    );
-    return rows[0] || null;
-}
-
-export async function updateAvailabilityBlock(ownerId, vehicleId, blockId, payload, conn = null) {
-    const db = dbConnection(conn);
-    await db.query(
-        `UPDATE vehicle_availability_blocks
-         SET block_type = ?, start_at = ?, end_at = ?, note = ?
-         WHERE block_id = ? AND vehicle_id = ? AND created_by_owner_id = ?`,
-        [payload.block_type, payload.start_at, payload.end_at, payload.note || null, blockId, vehicleId, ownerId]
-    );
-}
-
-export async function deleteAvailabilityBlock(ownerId, vehicleId, blockId, conn = null) {
-    const db = dbConnection(conn);
-    const [result] = await db.query(
-        `DELETE FROM vehicle_availability_blocks
-         WHERE block_id = ? AND vehicle_id = ? AND created_by_owner_id = ?`,
-        [blockId, vehicleId, ownerId]
+        `DELETE vm FROM vehicle_maintenance vm
+         INNER JOIN vehicles v ON v.vehicle_id = vm.vehicle_id
+         WHERE vm.maintenance_id = ? AND vm.vehicle_id = ? AND v.owner_id = ?`,
+        [maintenanceId, vehicleId, ownerId]
     );
     return result.affectedRows > 0;
+}
+
+export async function listVehicleRentalBookingBlocks(vehicleId, { from, to } = {}) {
+    const params = [vehicleId];
+    let sql = `SELECT rb.rental_id AS block_id, rb.start_datetime AS start_at, rb.end_datetime AS end_at,
+                      rb.rental_code AS note, rb.status
+               FROM rental_bookings rb
+               WHERE rb.vehicle_id = ?
+                 AND rb.status IN ('scheduled', 'pending', 'in_progress')`;
+    if (from) {
+        sql += ` AND rb.end_datetime >= ?`;
+        params.push(from);
+    }
+    if (to) {
+        sql += ` AND rb.start_datetime <= ?`;
+        params.push(to);
+    }
+    sql += ` ORDER BY rb.start_datetime ASC`;
+    const [rows] = await sqldb.query(sql, params);
+    return rows;
 }
 
 export async function listOwnerVehiclesSimple(ownerId) {
@@ -754,7 +770,8 @@ export async function listOwnerRentals(ownerId, { search, status, serviceType, v
     const [countRows] = await sqldb.query(`SELECT COUNT(*) AS total FROM rental_bookings rb WHERE ${whereSql}`, params);
 
     const [rows] = await sqldb.query(
-        `SELECT rb.rental_id, rb.rental_code, rb.service_type, rb.start_datetime, rb.end_datetime, rb.total_price,
+        `SELECT rb.rental_id, rb.rental_code, rb.service_type, rb.start_datetime, rb.end_datetime,
+                rb.total_price, rb.deposit_amount,
                 rb.payment_status, rb.status, rb.cancel_reason,
                 u.user_id, u.firstname, u.lastname,
                 v.vehicle_id, v.brand, v.model, v.year, v.license_plate,
@@ -923,6 +940,24 @@ export async function createWalletLedger(payload, conn) {
         ]
     );
     return Number(result.insertId);
+}
+
+export async function findPaymentByCodeForUpdate(paymentCode, conn) {
+    const [rows] = await conn.query(
+        `SELECT payment_id, payment_code, payer_wallet_id, actor_type, actor_id,
+                service_domain, rental_id, gateway_name, gateway_transaction_ref,
+                amount, currency_id, status, description
+         FROM payments WHERE payment_code = ? LIMIT 1 FOR UPDATE`,
+        [paymentCode]
+    );
+    return rows[0] || null;
+}
+
+export async function updatePaymentStatus(paymentId, status, conn) {
+    await conn.query(
+        `UPDATE payments SET status = ? WHERE payment_id = ? LIMIT 1`,
+        [status, paymentId]
+    );
 }
 
 export async function createWithdrawalRequest(walletId, amount, note, conn) {

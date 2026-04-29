@@ -31,6 +31,7 @@ import {
     upsertCouponUsage,
 } from "../../repositories/customer/rideRepository.js";
 import { emitBookingStatusUpdated } from "./realtimeService.js";
+import { startRideDispatch } from "../rideDispatchService.js";
 
 const BOOKING_STATUS = {
     PENDING: 0,
@@ -619,12 +620,43 @@ export async function createBooking(auth, payload) {
         return {
             booking: mapBookingRow(booking),
             fare: fare.breakdown,
-            dispatch: {
-                status: "pending",
-                message: "Booking is pending driver assignment.",
+            _dispatch: {
+                bookingId,
+                pickupLat: pickup.lat,
+                pickupLng: pickup.lng,
+                scheduled: scheduledAt ? true : false,
+                scheduledAt,
             },
         };
     });
+
+    // Fire-and-forget dispatch AFTER the transaction has committed
+    const { _dispatch, ...publicResult } = result;
+    if (!_dispatch.scheduled) {
+        startRideDispatch(_dispatch.bookingId, _dispatch.pickupLat, _dispatch.pickupLng);
+    } else {
+        // For scheduled rides, start dispatch 5 minutes before pickup time
+        const msUntilDispatch = _dispatch.scheduledAt.getTime() - Date.now() - 5 * 60 * 1000;
+        if (msUntilDispatch > 0) {
+            setTimeout(
+                () => startRideDispatch(_dispatch.bookingId, _dispatch.pickupLat, _dispatch.pickupLng),
+                msUntilDispatch
+            );
+        } else {
+            // Already close to or past the scheduled time — dispatch now
+            startRideDispatch(_dispatch.bookingId, _dispatch.pickupLat, _dispatch.pickupLng);
+        }
+    }
+
+    return {
+        ...publicResult,
+        dispatch: {
+            status:  "searching",
+            message: _dispatch.scheduled
+                ? "Đặt xe thành công. Tài xế sẽ được tìm trước chuyến 5 phút."
+                : "Đang tìm tài xế gần bạn...",
+        },
+    };
 }
 export async function getCurrentBooking(auth) {
     const userId = assertCustomer(auth);

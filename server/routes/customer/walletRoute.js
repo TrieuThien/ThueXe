@@ -9,7 +9,9 @@ import {
     getWalletHandler,
     getWalletTransactionsHandler,
     getWithdrawalsHandler,
+    momoIpnHandler,
     payRentalBookingHandler,
+    payRentalDepositHandler,
     payRideBookingHandler,
     retryPaymentHandler,
     webhookConfirmPaymentHandler,
@@ -18,7 +20,9 @@ import {
     confirmTopupValidator,
     createTopupPaymentValidator,
     createWithdrawalValidator,
+    momoIpnValidator,
     paymentIdParamValidator,
+    rentalDepositValidator,
     rentalPaymentValidator,
     retryPaymentValidator,
     ridePaymentValidator,
@@ -57,12 +61,27 @@ router.post(
     validateRequest,
     payRentalBookingHandler
 );
+router.post(
+    "/payments/rental/:rentalId/pay-deposit",
+    requireAuth,
+    rentalDepositValidator,
+    validateRequest,
+    payRentalDepositHandler
+);
 router.post("/payments/:paymentId/retry", requireAuth, retryPaymentValidator, validateRequest, retryPaymentHandler);
 router.post(
     "/payments/webhook/confirm",
     webhookConfirmValidator,
     validateRequest,
     webhookConfirmPaymentHandler
+);
+
+// MoMo IPN endpoint – server-to-server callback, không cần requireAuth
+router.post(
+    "/payments/webhook/momo",
+    momoIpnValidator,
+    validateRequest,
+    momoIpnHandler
 );
 
 export default router;

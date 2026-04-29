@@ -21,6 +21,7 @@ import {
 import {
     listVehicleDocuments,
     listOwnerDocuments,
+    listOwnerRequiredDocuments,
     updateOwnerVerificationState,
     updateVehicleVerificationStatus,
 } from "../repositories/ownerRepository.js";
@@ -268,18 +269,28 @@ export async function reviewDocumentSubmission({ actorType, submissionId, payloa
             throw new AppError("Submission not found.", 404, "SUBMISSION_NOT_FOUND");
         }
         const reviewNote = String(payload.review_note || "").trim() || null;
-        await setOwnerSubmissionVerification({ submissionId: numericSubmissionId, verified, reviewNote });
+        const docStatus = status === "approved" ? "verified" : status;
+        await setOwnerSubmissionVerification({ submissionId: numericSubmissionId, verified, docStatus, reviewNote });
 
         const ownerId = existing.actor_id;
-        if (status === "rejected") {
+        if (status === "rejected" || status === "expired") {
             await updateOwnerVerificationState(ownerId, {
                 verification_status: "rejected",
                 verification_submitted_at: null,
                 verification_admin_note: reviewNote,
             });
         } else if (status === "approved") {
-            const allDocs = await listOwnerDocuments(ownerId);
-            const allVerified = allDocs.length > 0 && allDocs.every((d) => d.status === "verified");
+            const [requiredDocs, submittedDocs] = await Promise.all([
+                listOwnerRequiredDocuments(),
+                listOwnerDocuments(ownerId),
+            ]);
+            const submittedMap = new Map(submittedDocs.map((d) => [Number(d.document_id), d]));
+            const allVerified =
+                requiredDocs.length > 0 &&
+                requiredDocs.every((req) => {
+                    const submitted = submittedMap.get(Number(req.id));
+                    return submitted && submitted.status === "verified";
+                });
             if (allVerified) {
                 await updateOwnerVerificationState(ownerId, {
                     verification_status: "verified",

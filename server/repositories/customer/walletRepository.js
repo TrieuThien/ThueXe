@@ -183,6 +183,20 @@ export async function findPaymentByIdForUpdate(paymentId, conn) {
     return rows[0] || null;
 }
 
+export async function findPaymentByCode(paymentCode, conn = null) {
+    const [rows] = await db(conn).query(
+        `SELECT payment_id, payment_code, payer_wallet_id, actor_type, actor_id, service_domain,
+                booking_id, rental_id, gateway_name, gateway_transaction_ref, amount, currency_id,
+                status, description, created_at, updated_at
+         FROM payments
+         WHERE payment_code = ?
+         LIMIT 1`,
+        [paymentCode]
+    );
+
+    return rows[0] || null;
+}
+
 export async function updatePaymentStatus(paymentId, status, conn) {
     await db(conn).query(
         `UPDATE payments
@@ -261,6 +275,69 @@ export async function findRentalForCustomerPayment(rentalId, userId, conn = null
     );
 
     return rows[0] || null;
+}
+
+export async function findRentalForDepositPayment(rentalId, userId, conn = null, forUpdate = false) {
+    const lockSql = forUpdate ? " FOR UPDATE" : "";
+    const [rows] = await db(conn).query(
+        `SELECT rental_id, user_id, owner_id, deposit_amount, total_price, payment_status
+         FROM rental_bookings
+         WHERE rental_id = ? AND user_id = ?
+         LIMIT 1${lockSql}`,
+        [rentalId, userId]
+    );
+
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        rental_id: Number(row.rental_id),
+        user_id: Number(row.user_id),
+        owner_id: row.owner_id !== null ? Number(row.owner_id) : null,
+        deposit_amount: Number(row.deposit_amount || 0),
+        total_price: Number(row.total_price || 0),
+        payment_status: row.payment_status,
+    };
+}
+
+export async function markRentalDepositPaid({ rentalId }, conn) {
+    await db(conn).query(
+        `UPDATE rental_bookings
+         SET payment_status = 'deposit_paid'
+         WHERE rental_id = ?
+         LIMIT 1`,
+        [rentalId]
+    );
+}
+
+export async function findWalletByActorForUpdate(actorType, actorId, conn) {
+    const [rows] = await db(conn).query(
+        `SELECT wallet_id, actor_type, actor_id, currency_id, balance, status
+         FROM wallet_accounts
+         WHERE actor_type = ? AND actor_id = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [actorType, actorId]
+    );
+
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        wallet_id: Number(row.wallet_id),
+        actor_type: Number(row.actor_type),
+        actor_id: Number(row.actor_id),
+        currency_id: Number(row.currency_id),
+        balance: Number(row.balance || 0),
+        status: Number(row.status || 0),
+    };
+}
+
+export async function createWalletForActor({ actorType, actorId, currencyId }, conn) {
+    const [result] = await db(conn).query(
+        `INSERT INTO wallet_accounts (actor_type, actor_id, currency_id, balance, status)
+         VALUES (?, ?, ?, 0, 1)`,
+        [actorType, actorId, currencyId]
+    );
+    return Number(result.insertId);
 }
 
 export async function markRentalPaid({ rentalId, paymentId, paymentType }, conn) {

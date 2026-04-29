@@ -263,7 +263,6 @@ export async function listRentalHistoryByUser(userId, { limit, offset }, conn = 
         `SELECT rental_id
          FROM rental_bookings
          WHERE user_id = ?
-           AND status IN ('completed', 'cancelled')
          ORDER BY rental_id DESC
          LIMIT ? OFFSET ?`,
         [userId, limit, offset]
@@ -276,8 +275,7 @@ export async function countRentalHistoryByUser(userId, conn = null) {
     const [rows] = await db(conn).query(
         `SELECT COUNT(*) AS total_items
          FROM rental_bookings
-         WHERE user_id = ?
-           AND status IN ('completed', 'cancelled')`,
+         WHERE user_id = ?`,
         [userId]
     );
 
@@ -362,8 +360,8 @@ export async function isVehicleAvailableInWindow(vehicleId, startDatetime, endDa
         `SELECT v.vehicle_id
          FROM vehicles v
          WHERE v.vehicle_id = ?
-           AND v.status = 'available'
            AND v.is_verified = 1
+           AND v.status = 'available'
            AND NOT EXISTS (
                SELECT 1
                FROM rental_bookings rb
@@ -374,14 +372,6 @@ export async function isVehicleAvailableInWindow(vehicleId, startDatetime, endDa
            )
            AND NOT EXISTS (
                SELECT 1
-               FROM vehicle_availability_blocks vab
-               WHERE vab.vehicle_id = v.vehicle_id
-                 AND vab.block_type IN ('booking', 'maintenance', 'manual_block')
-                 AND vab.start_at < ?
-                 AND vab.end_at > ?
-           )
-           AND NOT EXISTS (
-               SELECT 1
                FROM vehicle_maintenance vm
                WHERE vm.vehicle_id = v.vehicle_id
                  AND vm.status IN ('scheduled', 'in_progress')
@@ -389,7 +379,7 @@ export async function isVehicleAvailableInWindow(vehicleId, startDatetime, endDa
                  AND COALESCE(vm.end_date, '9999-12-31 23:59:59') > ?
            )
          LIMIT 1`,
-        [vehicleId, endDatetime, startDatetime, endDatetime, startDatetime, endDatetime, startDatetime]
+        [vehicleId, endDatetime, startDatetime, endDatetime, startDatetime]
     );
 
     return Boolean(rows[0]);
@@ -450,14 +440,6 @@ export async function listAvailableVehicles({ startDatetime, endDatetime }, conn
            )
            AND NOT EXISTS (
                SELECT 1
-               FROM vehicle_availability_blocks vab
-               WHERE vab.vehicle_id = v.vehicle_id
-                 AND vab.block_type IN ('booking', 'maintenance', 'manual_block')
-                 AND vab.start_at < ?
-                 AND vab.end_at > ?
-           )
-           AND NOT EXISTS (
-               SELECT 1
                FROM vehicle_maintenance vm
                WHERE vm.vehicle_id = v.vehicle_id
                  AND vm.status IN ('scheduled', 'in_progress')
@@ -465,7 +447,7 @@ export async function listAvailableVehicles({ startDatetime, endDatetime }, conn
                  AND COALESCE(vm.end_date, '9999-12-31 23:59:59') > ?
            )
          ORDER BY v.vehicle_id DESC`,
-        [endDatetime, startDatetime, endDatetime, startDatetime, endDatetime, startDatetime]
+        [endDatetime, startDatetime, endDatetime, startDatetime]
     );
 
     return rows.map((row) => ({

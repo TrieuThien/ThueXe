@@ -19,6 +19,8 @@ import driverIncomeRoute from "./driver/incomeRoute.js";
 import driverRentalRoute from "./driver/rentalRoute.js";
 import driverSupportRoute from "./driver/supportRoute.js";
 import driverNotificationRoute from "./driver/notificationRoute.js";
+import driverPackagesRoute from "./driver/packagesRoute.js";
+import driverRealtimeRoute from "./driver/realtimeRoute.js";
 
 const router = Router();
 
@@ -33,5 +35,7 @@ router.use("/api/driver/income", driverIncomeRoute);
 router.use("/api/driver/rental", driverRentalRoute);
 router.use("/api/driver/support", driverSupportRoute);
 router.use("/api/driver/notifications", driverNotificationRoute);
+router.use("/api/driver/packages", driverPackagesRoute);
+router.use("/api/driver/realtime", driverRealtimeRoute);
 
 export default router;

@@ -348,9 +348,9 @@ export async function listAllSubmissions({ actorType, verified, submissionId, do
     }));
 }
 
-export async function setOwnerSubmissionVerification({ submissionId, verified, reviewNote }, conn) {
+export async function setOwnerSubmissionVerification({ submissionId, verified, docStatus, reviewNote }, conn) {
     const db = dbConnection(conn);
-    const status = verified === 1 ? "verified" : "rejected";
+    const status = docStatus || (verified === 1 ? "verified" : "rejected");
     await db.query(
         `UPDATE vehicle_owner_documents
          SET verified = ?, status = ?, review_note = ?

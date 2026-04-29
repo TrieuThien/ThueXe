@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { createMomoPayment, mapMomoResultCode } from "./payment/momoService.js";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import { uploadBufferToCloudinary } from "../config/cloudinary.js";
@@ -9,7 +10,6 @@ import { hashPassword, verifyPassword } from "../utils/password.js";
 import { sendOwnerRegisterVerificationEmail } from "./emailService.js";
 import {
     cancelPendingOwnerRegisterRequestsByIdentifier,
-    createAvailabilityBlock,
     createMaintenance,
     createOwner,
     createOwnerRegisterRequest,
@@ -19,12 +19,10 @@ import {
     createPayment,
     createWalletLedger,
     createWithdrawalRequest,
-    deleteAvailabilityBlock,
     deleteMaintenance,
     deleteAllOwnerSessions,
     deleteOwnerSession,
     expirePendingOwnerRegisterRequests,
-    findAvailabilityBlock,
     findContractByOwner,
     findOwnerByEmail,
     findOwnerById,
@@ -36,6 +34,7 @@ import {
     findOwnerSession,
     findOwnerVehicleById,
     findOwnerWallet,
+    findPaymentByCodeForUpdate,
     findVehicleByPlate,
     findVehicleByVin,
     findVehicleTypeById,
@@ -53,14 +52,12 @@ import {
     listOwnerVehiclesSimple,
     listOwnerWalletLedger,
     listOwnerWithdrawals,
-    listVehicleAvailabilityBlocks,
     listVehicleDocumentTypes,
     listVehicleDocuments,
     listVehicleTypes,
     markOwnerRegisterRequestCancelled,
     markOwnerRegisterRequestExpired,
     markOwnerRegisterRequestVerified,
-    updateAvailabilityBlock,
     updateMaintenance,
     updateOwnerLastLogin,
     updateOwnerPassword,
@@ -68,10 +65,16 @@ import {
     updateOwnerRentalStatus,
     updateOwnerVerificationState,
     updateOwnerVehicle,
+    updatePaymentStatus,
+    updateVehiclePhotoUrl,
     updateVehicleVerificationStatus,
     updateWalletBalance,
     upsertOwnerDocument,
     upsertVehicleDocument,
+    updateVehicleOperationStatus,
+    listVehicleRentalBookingBlocks,
+    listOwnerVehicleMaintenanceForCalendar,
+    deleteOwnerVehicleMaintenance,
 } from "../repositories/ownerRepository.js";
 
 const OWNER_USER_TYPE = 2;
@@ -664,7 +667,7 @@ export async function getOwnerDashboard(auth) {
             code: item.rental_code,
             startDate: item.start_datetime,
             status: BOOKING_STATUS_MAP[item.status] || item.status,
-            totalAmount: Number(item.total_price || 0),
+            totalAmount: Number(item.total_price || 0) - Number(item.deposit_amount || 0),
         })),
         latestWithdrawals: withdrawals.items,
     };
@@ -711,6 +714,7 @@ function mapVehicleDetail(row, documents = []) {
         fuelType: row.fuel_type,
         odometerKm: Number(row.odometer_km || 0),
         notes: row.notes || "",
+        photoUrl: row.photo_url || null,
         usageStatus: row.status,
         verificationStatus: row.verification_status || (Number(row.is_verified) === 1 ? "verified" : "pending_review"),
         addedAt: row.date_added,
@@ -785,6 +789,15 @@ export async function createOwnerVehicleService(auth, payload, uploadedFiles = [
             notes: payload.notes || null,
             verification_status: "missing_documents",
         }, conn);
+
+        const vehiclePhotoFile = fileMap.get("vehicle_photo");
+        if (vehiclePhotoFile) {
+            const uploaded = await uploadBufferToCloudinary(vehiclePhotoFile.buffer, {
+                folder: `thuexe/vehicles/${createdId}/photo`,
+                resource_type: "image",
+            });
+            await updateVehiclePhotoUrl(createdId, uploaded.secure_url, conn);
+        }
 
         for (const doc of payload.documents || []) {
             if (!doc.documentTypeId) continue;
@@ -984,23 +997,29 @@ export async function getOwnerVehicleAvailability(auth, vehicleIdInput, query) {
     const vehicleId = Number(vehicleIdInput);
     const vehicle = await findOwnerVehicleById(ownerId, vehicleId);
     if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
-    const items = await listVehicleAvailabilityBlocks(ownerId, vehicleId, {
-        from: ensureValidDate(query.from, "from"),
-        to: ensureValidDate(query.to, "to"),
-    });
-    return {
-        vehicleId,
-        view: query.view || "week",
-        from: query.from || null,
-        to: query.to || null,
-        blocks: items.map((item) => ({
+    const from = ensureValidDate(query.from, "from");
+    const to = ensureValidDate(query.to, "to");
+    const maintenanceBlocks = await listOwnerVehicleMaintenanceForCalendar(ownerId, vehicleId, { from, to });
+    const rentalBlocks = await listVehicleRentalBookingBlocks(vehicleId, { from, to });
+    const blocks = [
+        ...maintenanceBlocks.map((item) => ({
             id: Number(item.block_id),
-            type: mapAvailabilityTypeToClient(item.block_type),
+            type: "maintenance",
             startAt: item.start_at,
             endAt: item.end_at,
             note: item.note || "",
+            deletable: true,
         })),
-    };
+        ...rentalBlocks.map((item) => ({
+            id: Number(item.block_id),
+            type: "booked",
+            startAt: item.start_at,
+            endAt: item.end_at,
+            note: item.note || "",
+            deletable: false,
+        })),
+    ].sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
+    return { vehicleId, view: query.view || "week", from: query.from || null, to: query.to || null, blocks };
 }
 
 export async function createOwnerAvailabilityBlock(auth, vehicleIdInput, payload) {
@@ -1011,39 +1030,35 @@ export async function createOwnerAvailabilityBlock(auth, vehicleIdInput, payload
     const startAt = ensureValidDate(payload.startAt, "startAt");
     const endAt = ensureValidDate(payload.endAt, "endAt");
     if (new Date(endAt) <= new Date(startAt)) throw new AppError("Invalid time range.", 422, "VALIDATION_ERROR");
-    const blockType = normalizeAvailabilityType(payload.type) || "manual_block";
-    const id = await createAvailabilityBlock(ownerId, vehicleId, {
-        block_type: blockType,
-        start_at: startAt,
-        end_at: endAt,
-        note: payload.note || null,
+    const id = await createMaintenance({
+        vehicle_id: vehicleId,
+        description: payload.note || "Bảo trì xe",
+        start_date: startAt,
+        end_date: endAt,
+        cost: 0,
+        status: "scheduled",
     });
-    return { id, type: mapAvailabilityTypeToClient(blockType), startAt, endAt, note: payload.note || "" };
+    return { id, type: "maintenance", startAt, endAt, note: payload.note || "Bảo trì xe", deletable: true };
 }
 
-export async function updateOwnerAvailabilityBlock(auth, vehicleIdInput, blockIdInput, payload) {
+export async function toggleVehicleOperationStatus(auth, vehicleIdInput) {
     const ownerId = ensureOwnerAuth(auth);
     const vehicleId = Number(vehicleIdInput);
-    const blockId = Number(blockIdInput);
-    const block = await findAvailabilityBlock(ownerId, vehicleId, blockId);
-    if (!block) throw new AppError("Availability block not found.", 404, "AVAILABILITY_BLOCK_NOT_FOUND");
-    const startAt = ensureValidDate(payload.startAt || block.start_at, "startAt");
-    const endAt = ensureValidDate(payload.endAt || block.end_at, "endAt");
-    if (new Date(endAt) <= new Date(startAt)) throw new AppError("Invalid time range.", 422, "VALIDATION_ERROR");
-    const type = normalizeAvailabilityType(payload.type) || block.block_type;
-    await updateAvailabilityBlock(ownerId, vehicleId, blockId, {
-        block_type: type,
-        start_at: startAt,
-        end_at: endAt,
-        note: payload.note ?? block.note,
-    });
-    return { id: blockId, type: mapAvailabilityTypeToClient(type), startAt, endAt, note: payload.note ?? block.note ?? "" };
+    const vehicle = await findOwnerVehicleById(ownerId, vehicleId);
+    if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
+    if (vehicle.is_verified !== 1) throw new AppError("Only verified vehicles can be toggled.", 409, "VEHICLE_NOT_VERIFIED");
+    const newStatus = vehicle.status === "available" ? "unavailable" : "available";
+    const updated = await updateVehicleOperationStatus(ownerId, vehicleId, newStatus);
+    if (!updated) throw new AppError("Could not update vehicle status.", 500, "UPDATE_FAILED");
+    return { vehicleId, status: newStatus };
 }
 
 export async function deleteOwnerAvailabilityBlock(auth, vehicleIdInput, blockIdInput) {
     const ownerId = ensureOwnerAuth(auth);
-    const ok = await deleteAvailabilityBlock(ownerId, Number(vehicleIdInput), Number(blockIdInput));
-    if (!ok) throw new AppError("Availability block not found.", 404, "AVAILABILITY_BLOCK_NOT_FOUND");
+    const vehicleId = Number(vehicleIdInput);
+    const blockId = Number(blockIdInput);
+    const ok = await deleteOwnerVehicleMaintenance(ownerId, vehicleId, blockId);
+    if (!ok) throw new AppError("Maintenance record not found.", 404, "AVAILABILITY_BLOCK_NOT_FOUND");
     return true;
 }
 
@@ -1055,19 +1070,31 @@ export async function getOwnerTimeline(auth, query) {
     const items = [];
     for (const vehicle of vehicles) {
         if (query.status && query.status !== "all" && vehicle.status !== query.status) continue;
-        const blocks = await listVehicleAvailabilityBlocks(ownerId, Number(vehicle.vehicle_id), { from, to });
-        items.push({
-            vehicleId: Number(vehicle.vehicle_id),
-            plateNumber: vehicle.license_plate,
-            displayName: `${vehicle.brand} ${vehicle.model} ${vehicle.year || ""}`.trim(),
-            status: vehicle.status,
-            blocks: blocks.map((b) => ({
+        const vehicleId = Number(vehicle.vehicle_id);
+        const maintenanceBlocks = await listOwnerVehicleMaintenanceForCalendar(ownerId, vehicleId, { from, to });
+        const rentalBlocks = await listVehicleRentalBookingBlocks(vehicleId, { from, to });
+        const blocks = [
+            ...maintenanceBlocks.map((b) => ({
                 id: Number(b.block_id),
-                type: mapAvailabilityTypeToClient(b.block_type),
+                type: "maintenance",
                 startAt: b.start_at,
                 endAt: b.end_at,
                 note: b.note || "",
             })),
+            ...rentalBlocks.map((b) => ({
+                id: Number(b.block_id),
+                type: "booked",
+                startAt: b.start_at,
+                endAt: b.end_at,
+                note: b.note || "",
+            })),
+        ].sort((a, b) => new Date(a.startAt) - new Date(b.startAt));
+        items.push({
+            vehicleId,
+            plateNumber: vehicle.license_plate,
+            displayName: `${vehicle.brand} ${vehicle.model} ${vehicle.year || ""}`.trim(),
+            status: vehicle.status,
+            blocks,
         });
     }
     return { from: query.from, to: query.to, items };
@@ -1184,7 +1211,7 @@ function mapRentalListItem(row) {
         serviceType: String(row.service_type || ""),
         startAt: row.start_datetime,
         endAt: row.end_datetime,
-        totalAmount: Number(row.total_price || 0),
+        totalAmount: Number(row.total_price || 0) - Number(row.deposit_amount || 0),
         paymentStatus: row.payment_status,
         orderStatus: BOOKING_STATUS_MAP[row.status] || row.status,
     };
@@ -1234,7 +1261,7 @@ export async function getOwnerBookingDetail(auth, rentalIdInput) {
         pickup: { at: rental.start_datetime, address: rental.pickup_address },
         dropoff: { at: rental.end_datetime, address: rental.dropoff_address },
         costBreakdown: {
-            totalAmount: Number(rental.total_price || 0),
+            totalAmount: Number(rental.total_price || 0) - Number(rental.deposit_amount || 0),
             basePrice: Number(rental.base_price || 0),
             depositAmount: Number(rental.deposit_amount || 0),
             extraTimeFee: Number(rental.extra_time_fee || 0),
@@ -1354,7 +1381,7 @@ export async function listOwnerRevenueLedger(auth, query) {
     return {
         items: listed.items.map((item) => ({
             id: String(item.ledger_id),
-            transactionCode: `TXN-${item.ledger_id}`,
+            transactionCode: `${item.ledger_id}`,
             transactionType: item.entry_type,
             amount: Number(item.amount || 0),
             direction: item.direction,
@@ -1410,6 +1437,8 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
     const ownerId = ensureOwnerAuth(auth);
     const amount = Number(payload.amount || 0);
     if (!(amount > 0)) throw new AppError("Invalid amount.", 422, "INVALID_AMOUNT");
+    const gatewayName = String(payload.method || "manual").toLowerCase();
+    const isMomo = gatewayName === "momo";
     const key = idempotencyKey || "";
     if (key) {
         const cached = consumeCachedResponse(ownerId, key);
@@ -1421,9 +1450,43 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
         const wallet = await ensureOwnerWallet(ownerId, conn);
         const locked = await findWalletByIdForUpdate(wallet.wallet_id, conn);
         if (!locked || Number(locked.status) !== 1) throw new AppError("Wallet disabled.", 409, "WALLET_DISABLED");
+        const thePaymentCode = buildPaymentCode("TOPUP");
+
+        if (isMomo) {
+            // Tạo payment pending — chưa cộng tiền ví, chờ IPN xác nhận
+            const paymentId = await createPayment({
+                payment_code: thePaymentCode,
+                payer_wallet_id: locked.wallet_id,
+                owner_id: ownerId,
+                service_domain: 2,
+                amount,
+                currency_id: Number(locked.currency_id),
+                status: "pending",
+                gateway_name: "momo",
+                gateway_transaction_ref: null,
+                description: "Owner wallet topup via MoMo",
+            }, conn);
+            const momoResult = await createMomoPayment({
+                paymentCode: thePaymentCode,
+                amount,
+                orderInfo: "Nạp tiền ví Chủ xe ThueXe",
+                ipnUrl: process.env.MOMO_OWNER_IPN_URL || process.env.MOMO_IPN_URL || "",
+                redirectUrl: process.env.MOMO_REDIRECT_URL || "",
+                extraData: "",
+            });
+            return {
+                paymentCode: thePaymentCode,
+                paymentId,
+                status: "pending",
+                paymentUrl: momoResult.payUrl,
+                walletBalanceAfter: Number(locked.balance),
+            };
+        }
+
+        // Thanh toán thủ công / chuyển khoản: cộng tiền ngay
         const nextBalance = Number((Number(locked.balance) + amount).toFixed(2));
         const paymentId = await createPayment({
-            payment_code: buildPaymentCode("TOPUP"),
+            payment_code: thePaymentCode,
             payer_wallet_id: locked.wallet_id,
             owner_id: ownerId,
             service_domain: 2,
@@ -1446,7 +1509,7 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
             source_id: paymentId,
             description: "Owner wallet topup",
         }, conn);
-        return { paymentCode: buildPaymentCode("TOPUP"), status: "success", paymentUrl: null, walletBalanceAfter: nextBalance };
+        return { paymentCode: thePaymentCode, paymentId, status: "success", paymentUrl: null, walletBalanceAfter: nextBalance };
     }));
     if (key) rememberInflightPromise(ownerId, key, promise);
     try {
@@ -1456,6 +1519,40 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
     } finally {
         if (key) clearInflightPromise(ownerId, key);
     }
+}
+
+export async function processOwnerMomoTopupIpn({ orderId, resultCode, transId, message }) {
+    return runInTx(async (conn) => {
+        const payment = await findPaymentByCodeForUpdate(orderId, conn);
+        if (!payment || Number(payment.actor_type) !== 2) return { ok: true, skipped: true };
+
+        const prevStatus = String(payment.status || "").toLowerCase();
+        const newStatus = mapMomoResultCode(resultCode);
+        if (prevStatus === newStatus) return { ok: true, unchanged: true };
+
+        await updatePaymentStatus(Number(payment.payment_id), newStatus, conn);
+
+        if (newStatus === "paid" && prevStatus !== "paid") {
+            const wallet = await findWalletByIdForUpdate(Number(payment.payer_wallet_id), conn);
+            if (wallet && Number(wallet.status) === 1) {
+                const nextBalance = Number((Number(wallet.balance) + Number(payment.amount)).toFixed(2));
+                await updateWalletBalance(Number(wallet.wallet_id), nextBalance, conn);
+                await createWalletLedger({
+                    wallet_id: Number(wallet.wallet_id),
+                    payment_id: Number(payment.payment_id),
+                    amount: Number(payment.amount),
+                    balance_after: nextBalance,
+                    direction: "credit",
+                    entry_type: "topup",
+                    source_type: "gateway_payment",
+                    source_id: Number(payment.payment_id),
+                    description: "Owner wallet topup via MoMo",
+                }, conn);
+            }
+        }
+
+        return { ok: true, payment_id: Number(payment.payment_id), status: newStatus };
+    });
 }
 
 export async function createOwnerRevenueWithdrawal(auth, payload, idempotencyKey = "") {
@@ -1485,6 +1582,21 @@ export async function createOwnerRevenueWithdrawal(auth, payload, idempotencyKey
     } finally {
         if (key) clearInflightPromise(ownerId, key);
     }
+}
+
+export async function updateVehiclePhotoService(auth, vehicleIdInput, photoFile) {
+    const ownerId = ensureOwnerAuth(auth);
+    const vehicleId = Number(vehicleIdInput);
+    const vehicle = await findOwnerVehicleById(ownerId, vehicleId);
+    if (!vehicle) throw new AppError("Vehicle not found.", 404, "VEHICLE_NOT_FOUND");
+    if (!photoFile || !photoFile.buffer) throw new AppError("No photo file provided.", 422, "PHOTO_REQUIRED");
+
+    const uploaded = await uploadBufferToCloudinary(photoFile.buffer, {
+        folder: `thuexe/vehicles/${vehicleId}/photo`,
+        resource_type: "image",
+    });
+    await updateVehiclePhotoUrl(vehicleId, uploaded.secure_url);
+    return { photoUrl: uploaded.secure_url };
 }
 
 export const __ownerTestUtils = {

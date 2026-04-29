@@ -10,13 +10,16 @@ import { readdirSync } from "fs";
 import connectCloudinary from "./config/cloudinary.js";
 import { globalLimiter } from "./middlewares/rateLimiters.js";
 import { globalErrorHandler, notFoundHandler } from "./middlewares/errorHandler.js";
-// import http from "http";
+import http from "http";
 
-
+// ─── Socket.io (driver matching realtime) ─────────────────────────────────────
+import { initSocket } from "./socket/index.js";
 
 const app = express();
-// const server = http.createServer(app);
-// initSocket(server);
+const server = http.createServer(app);
+
+// Initialize Socket.io with the HTTP server
+initSocket(server); 
 
 const port = Number(process.env.PORT) || 5000;
 
@@ -56,7 +59,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "token"],
+    allowedHeaders: ["Content-Type", "Authorization", "token", "Idempotency-Key", "idempotency-key", "X-Request-ID", "x-request-id"],
   })
 );
 app.use(helmet());
@@ -88,6 +91,6 @@ app.get("/", (req, res) => {
 app.use(notFoundHandler);
 app.use(globalErrorHandler);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

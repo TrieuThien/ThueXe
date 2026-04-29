@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import sqldb from "../../config/sqldatabase.js";
 import AppError from "../../utils/appError.js";
+import { findOwnerEmailById } from "../../repositories/ownerRepository.js";
+import { sendOwnerRentalRequestEmail } from "../emailService.js";
 import {
     countRentalHistoryByUser,
     createRentalBooking,
@@ -373,7 +375,7 @@ export async function createRentalBookingForCustomer(auth, payload) {
 
         let endDatetime = payload.end_datetime
             ? parseDateTime(payload.end_datetime, "end_datetime")
-            : new Date(startDatetime.getTime() + Number(rentalPackage.duration_hours || 1) * 60 * 60 * 1000);
+            : new Date(startDatetime.getTime() + Number(rentalPackage.duration_hours || payload.duration_hours || 1) * 60 * 60 * 1000);
 
         if (endDatetime.getTime() <= startDatetime.getTime()) {
             throw new AppError("end_datetime must be greater than start_datetime.", 422, "INVALID_TIME_RANGE");
@@ -492,6 +494,26 @@ export async function createRentalBookingForCustomer(auth, payload) {
         );
 
         const created = await findRentalBookingByIdForUser(rentalId, userId, conn);
+
+        // Gửi email thông báo cho chủ xe (bất đồng bộ, không ảnh hưởng response)
+        if (ownerId) {
+            const customerName = `${customer.firstname || ""} ${customer.lastname || ""}`.trim() || "Khách hàng";
+            findOwnerEmailById(ownerId).then((ownerInfo) => {
+                if (ownerInfo?.email) {
+                    sendOwnerRentalRequestEmail({
+                        toEmail: ownerInfo.email,
+                        ownerName: ownerInfo.fullname || "Chủ xe",
+                        customerName,
+                        packageName: rentalPackage.package_name,
+                        startDatetime: toMySqlDatetime(startDatetime),
+                        durationHours: requestedDurationHours,
+                        pickupAddress: String(payload.pickup_address || ""),
+                        rentalCode: created?.rental_code || String(rentalId),
+                    }).catch(() => {});
+                }
+            }).catch(() => {});
+        }
+
         return {
             booking: mapRentalBooking(created),
             pricing: {

@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import sqldb from "../../config/sqldatabase.js";
 import AppError from "../../utils/appError.js";
+import { createMomoPayment } from "../payment/momoService.js";
 import {
     countWalletTransactionsByWallet,
     countWithdrawalsByWallet,
     createCustomerWallet,
+    createWalletForActor,
     findBookingForCustomerPayment,
     findCustomerWallet,
     findCustomerWalletForUpdate,
@@ -12,7 +14,9 @@ import {
     findPaymentByIdForUpdate,
     findPaymentByIdForUser,
     findRentalForCustomerPayment,
+    findRentalForDepositPayment,
     findUserBankAccount,
+    findWalletByActorForUpdate,
     insertGatewayLog,
     insertPayment,
     insertWalletLedger,
@@ -20,6 +24,7 @@ import {
     listWalletTransactionsByWallet,
     listWithdrawalsByWallet,
     markBookingPaid,
+    markRentalDepositPaid,
     markRentalPaid,
     updatePaymentGatewayRef,
     updatePaymentStatus,
@@ -278,9 +283,10 @@ export async function createWalletTopupPayment(auth, payload) {
     return runInTransaction(async (conn) => {
         const wallet = await ensureWalletForCustomer(userId, conn, true);
 
+        const thePaymentCode = paymentCode("TOPUP");
         const paymentId = await insertPayment(
             {
-                payment_code: paymentCode("TOPUP"),
+                payment_code: thePaymentCode,
                 payer_wallet_id: Number(wallet.wallet_id),
                 actor_type: 0,
                 actor_id: userId,
@@ -294,6 +300,24 @@ export async function createWalletTopupPayment(auth, payload) {
             },
             conn
         );
+
+        if (gatewayName === "momo") {
+            const momoResult = await createMomoPayment({
+                paymentCode: thePaymentCode,
+                amount,
+                orderInfo: "Nạp tiền ví ThueXe",
+                ipnUrl: process.env.MOMO_IPN_URL,
+                redirectUrl: process.env.MOMO_REDIRECT_URL,
+            });
+            return {
+                payment_id: paymentId,
+                payment_status: "pending",
+                amount,
+                gateway_name: "momo",
+                redirect_url: momoResult.payUrl,
+                payer_wallet_id: Number(wallet.wallet_id),
+            };
+        }
 
         return {
             payment_id: paymentId,
@@ -573,9 +597,10 @@ export async function payRideBooking(auth, bookingIdInput, payload) {
         }
 
         const gatewayName = String(payload.gateway_name || "mock").trim();
+        const thePaymentCode = paymentCode("RIDE");
         const paymentId = await insertPayment(
             {
-                payment_code: paymentCode("RIDE"),
+                payment_code: thePaymentCode,
                 payer_wallet_id: Number(wallet.wallet_id),
                 actor_type: 0,
                 actor_id: userId,
@@ -590,6 +615,23 @@ export async function payRideBooking(auth, bookingIdInput, payload) {
             },
             conn
         );
+
+        if (gatewayName === "momo") {
+            const momoResult = await createMomoPayment({
+                paymentCode: thePaymentCode,
+                amount,
+                orderInfo: `Thanh toán chuyến đi #${bookingId}`,
+                ipnUrl: process.env.MOMO_IPN_URL,
+                redirectUrl: process.env.MOMO_REDIRECT_URL,
+            });
+            return {
+                payment_id: paymentId,
+                booking_id: bookingId,
+                status: "pending",
+                amount,
+                redirect_url: momoResult.payUrl,
+            };
+        }
 
         return {
             payment_id: paymentId,
@@ -691,9 +733,10 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
         }
 
         const gatewayName = String(payload.gateway_name || "mock").trim();
+        const thePaymentCode = paymentCode("RNT");
         const paymentId = await insertPayment(
             {
-                payment_code: paymentCode("RNT"),
+                payment_code: thePaymentCode,
                 payer_wallet_id: Number(wallet.wallet_id),
                 actor_type: 0,
                 actor_id: userId,
@@ -709,6 +752,23 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
             conn
         );
 
+        if (gatewayName === "momo") {
+            const momoResult = await createMomoPayment({
+                paymentCode: thePaymentCode,
+                amount,
+                orderInfo: `Thanh toán thuê xe #${rentalId}`,
+                ipnUrl: process.env.MOMO_IPN_URL,
+                redirectUrl: process.env.MOMO_REDIRECT_URL,
+            });
+            return {
+                payment_id: paymentId,
+                rental_id: rentalId,
+                status: "pending",
+                amount,
+                redirect_url: momoResult.payUrl,
+            };
+        }
+
         return {
             payment_id: paymentId,
             rental_id: rentalId,
@@ -717,6 +777,144 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
             redirect_url: getRedirectUrl(paymentId, gatewayName),
         };
     });
+}
+
+export async function payRentalDeposit(auth, rentalIdInput) {
+    const userId = assertCustomer(auth);
+    const rentalId = Number(rentalIdInput);
+
+    if (!Number.isInteger(rentalId) || rentalId < 1) {
+        throw new AppError("rentalId is invalid.", 422, "INVALID_RENTAL_ID");
+    }
+
+    const result = await runInTransaction(async (conn) => {
+        const rental = await findRentalForDepositPayment(rentalId, userId, conn, true);
+        if (!rental) throw new AppError("Rental not found.", 404, "RENTAL_NOT_FOUND");
+
+        const depositAmount = round2(Number(rental.deposit_amount || 0));
+        const paymentStatus = String(rental.payment_status || "").toLowerCase();
+
+        if (paymentStatus === "deposit_paid" || paymentStatus === "paid") {
+            throw new AppError("Deposit already paid.", 409, "DEPOSIT_ALREADY_PAID");
+        }
+
+        if (depositAmount <= 0) {
+            await markRentalDepositPaid({ rentalId }, conn);
+            return { rental_id: rentalId, status: "deposit_paid", amount: 0, skipped: true };
+        }
+
+        const customerWallet = await ensureWalletForCustomer(userId, conn, true);
+
+        if (Number(customerWallet.balance || 0) < depositAmount) {
+            throw new AppError(
+                "Số dư ví không đủ để thanh toán tiền cọc.",
+                402,
+                "INSUFFICIENT_WALLET_BALANCE"
+            );
+        }
+
+        // Find or create owner wallet (actor_type = 2 for vehicle_owners)
+        let ownerWallet = null;
+        if (rental.owner_id) {
+            ownerWallet = await findWalletByActorForUpdate(2, rental.owner_id, conn);
+            if (!ownerWallet) {
+                const currency = await findDefaultCurrency(conn);
+                await createWalletForActor({ actorType: 2, actorId: rental.owner_id, currencyId: Number(currency.id) }, conn);
+                ownerWallet = await findWalletByActorForUpdate(2, rental.owner_id, conn);
+            }
+        }
+
+        const paymentId = await insertPayment(
+            {
+                payment_code: paymentCode("DEP"),
+                payer_wallet_id: Number(customerWallet.wallet_id),
+                actor_type: 0,
+                actor_id: userId,
+                service_domain: 1,
+                rental_id: rentalId,
+                amount: depositAmount,
+                currency_id: Number(customerWallet.currency_id),
+                status: "paid",
+                gateway_name: null,
+                gateway_transaction_ref: null,
+                description: `Deposit payment for rental #${rentalId}`,
+            },
+            conn
+        );
+
+        const customerNextBalance = round2(Number(customerWallet.balance || 0) - depositAmount);
+        await updateWalletBalance(Number(customerWallet.wallet_id), customerNextBalance, conn);
+
+        await insertWalletLedger(
+            {
+                wallet_id: Number(customerWallet.wallet_id),
+                payment_id: paymentId,
+                amount: depositAmount,
+                balance_after: customerNextBalance,
+                direction: "debit",
+                entry_type: "rental_payment",
+                source_type: "rental_booking",
+                source_id: rentalId,
+                description: `Tiền cọc thuê xe #${rentalId}`,
+            },
+            conn
+        );
+
+        if (ownerWallet) {
+            const ownerNextBalance = round2(Number(ownerWallet.balance || 0) + depositAmount);
+            await updateWalletBalance(Number(ownerWallet.wallet_id), ownerNextBalance, conn);
+            await insertWalletLedger(
+                {
+                    wallet_id: Number(ownerWallet.wallet_id),
+                    payment_id: paymentId,
+                    amount: depositAmount,
+                    balance_after: ownerNextBalance,
+                    direction: "credit",
+                    entry_type: "rental_payment",
+                    source_type: "rental_booking",
+                    source_id: rentalId,
+                    description: `Nhận tiền cọc thuê xe #${rentalId}`,
+                },
+                conn
+            );
+        }
+
+        await markRentalDepositPaid({ rentalId }, conn);
+
+        return {
+            payment_id: paymentId,
+            rental_id: rentalId,
+            status: "deposit_paid",
+            amount: depositAmount,
+            wallet_balance_after: customerNextBalance,
+            wallet_id: Number(customerWallet.wallet_id),
+        };
+    });
+
+    if (!result.skipped) {
+        await emitWalletUpdated({
+            walletId: result.wallet_id,
+            balance: result.wallet_balance_after,
+            userId,
+        });
+        await emitPaymentUpdated({
+            paymentId: result.payment_id,
+            status: "paid",
+            userId,
+        });
+    }
+
+    return {
+        payment_id: result.payment_id ?? null,
+        rental_id: result.rental_id,
+        status: result.status,
+        amount: result.amount,
+        wallet_balance_after: result.wallet_balance_after ?? null,
+        realtime: {
+            channel: "payment.updated",
+            payload: { rental_id: result.rental_id, status: result.status },
+        },
+    };
 }
 
 export async function retryPayment(auth, paymentIdInput) {

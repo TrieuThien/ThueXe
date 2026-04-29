@@ -100,6 +100,62 @@ export async function sendCustomerActivationEmail({ toEmail, firstname, code }) 
     });
 }
 
+export async function sendOwnerRentalRequestEmail({
+    toEmail,
+    ownerName,
+    customerName,
+    packageName,
+    startDatetime,
+    durationHours,
+    pickupAddress,
+    rentalCode,
+}) {
+    const mailer = getTransporter();
+    if (!mailer) {
+        console.warn(`[rental] Email not configured. Skipping owner notification for rental ${rentalCode}`);
+        return;
+    }
+
+    const safeOwner = String(ownerName || "Chủ xe");
+    const safeCustomer = String(customerName || "Khách hàng");
+    const safePackage = String(packageName || "Gói thuê");
+    const safeCode = String(rentalCode || "");
+    const safePickup = String(pickupAddress || "");
+    const safeDuration = Number(durationHours) > 0 ? Number(durationHours) : 1;
+
+    await mailer.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_APP_ADMIN,
+        to: toEmail,
+        subject: `ThueXe - Yêu cầu thuê xe mới #${safeCode}`,
+        text:
+            `Xin chào ${safeOwner},\n\n` +
+            `Bạn vừa nhận được một yêu cầu thuê xe mới từ khách hàng.\n\n` +
+            `Thông tin đơn thuê:\n` +
+            `  Mã đơn     : #${safeCode}\n` +
+            `  Khách hàng : ${safeCustomer}\n` +
+            `  Gói thuê   : ${safePackage}\n` +
+            `  Bắt đầu    : ${startDatetime}\n` +
+            `  Thời lượng : ${safeDuration} giờ\n` +
+            `  Điểm đón   : ${safePickup}\n\n` +
+            `Vui lòng đăng nhập vào trang quản lý chủ xe để xem và xác nhận đơn thuê.`,
+        html:
+            `<div style="font-family:sans-serif;max-width:520px;margin:0 auto">` +
+            `<h2 style="color:#0369a1">ThueXe – Yêu cầu thuê xe mới</h2>` +
+            `<p>Xin chào <strong>${safeOwner}</strong>,</p>` +
+            `<p>Bạn vừa nhận được một yêu cầu thuê xe mới từ khách hàng. Vui lòng xem thông tin bên dưới và xác nhận đơn.</p>` +
+            `<table style="width:100%;border-collapse:collapse;margin:16px 0">` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280;width:40%">Mã đơn</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:700">#${safeCode}</td></tr>` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Khách hàng</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${safeCustomer}</td></tr>` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Gói thuê</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${safePackage}</td></tr>` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Thời gian bắt đầu</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${startDatetime}</td></tr>` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Thời lượng</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${safeDuration} giờ</td></tr>` +
+            `<tr><td style="padding:8px;color:#6b7280">Điểm đón</td><td style="padding:8px">${safePickup}</td></tr>` +
+            `</table>` +
+            `<p style="margin-top:24px">Đăng nhập vào trang quản lý để xác nhận hoặc từ chối yêu cầu này.</p>` +
+            `</div>`,
+    });
+}
+
 export async function sendOwnerRegisterVerificationEmail({ toEmail, ownerName, verifyLink, expiresMinutes = 3 }) {
     const mailer = getTransporter();
     if (!mailer) {

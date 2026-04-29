@@ -250,23 +250,39 @@ export async function listActivePackagesWithGeo() {
 /**
  * Lấy danh sách xe đã đăng ký gói thuê (qua vehicle_rental_packages),
  * trả về thông tin xe kèm chủ xe và điểm đánh giá trung bình.
+ * Chỉ trả về xe đã được admin duyệt (is_verified=1) và chủ xe đã đặt
+ * ít nhất 1 block "manual_available" trong tương lai.
  */
 export async function listPackageCars(packageId) {
     const [rows] = await sqldb.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color,
-                v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status,
+                v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status, v.photo_url,
                 vt.type_name,
                 vo.fullname AS owner_name, vo.phone AS owner_phone,
                 ROUND(AVG(rv.rating), 1) AS avg_rating,
                 COUNT(rv.id)            AS rating_count
          FROM vehicle_rental_packages vrp
-         INNER JOIN vehicles v       ON v.vehicle_id = vrp.vehicle_id
-         LEFT JOIN vehicle_types vt  ON vt.type_id   = v.type_id
-         LEFT JOIN vehicle_owners vo ON vo.owner_id  = v.owner_id
+         INNER JOIN vehicles v ON v.vehicle_id = vrp.vehicle_id
+         LEFT JOIN vehicle_types vt  ON vt.type_id  = v.type_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = v.owner_id
          LEFT JOIN ratings_vehicles rv ON rv.vehicle_id = v.vehicle_id
          WHERE vrp.package_id = ?
-           AND v.status = 'available'
            AND v.is_verified = 1
+           AND v.status = 'available'
+           AND NOT EXISTS (
+               SELECT 1 FROM vehicle_maintenance vm
+               WHERE vm.vehicle_id = v.vehicle_id
+                 AND vm.status IN ('scheduled', 'in_progress')
+                 AND vm.start_date <= NOW()
+                 AND COALESCE(vm.end_date, '9999-12-31 23:59:59') >= NOW()
+           )
+           AND NOT EXISTS (
+               SELECT 1 FROM rental_bookings rb
+               WHERE rb.vehicle_id = v.vehicle_id
+                 AND rb.status IN ('scheduled', 'pending', 'in_progress')
+                 AND rb.start_datetime <= NOW()
+                 AND rb.end_datetime >= NOW()
+           )
          GROUP BY v.vehicle_id, vt.type_name, vo.fullname, vo.phone
          ORDER BY avg_rating DESC, v.vehicle_id ASC`,
         [packageId]
@@ -287,6 +303,7 @@ export async function listPackageCars(packageId) {
         status: row.status,
         owner_name: row.owner_name,
         owner_phone: row.owner_phone,
+        photo_url: row.photo_url || null,
         avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
         rating_count: Number(row.rating_count || 0),
     }));

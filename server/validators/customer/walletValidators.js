@@ -55,6 +55,10 @@ export const rentalPaymentValidator = [
     body("gateway_name").optional({ values: "falsy" }).isString().trim().isLength({ max: 30 }).withMessage("gateway_name must not exceed 30 characters"),
 ];
 
+export const rentalDepositValidator = [
+    param("rentalId").isInt({ min: 1 }).withMessage("rentalId must be a positive integer").toInt(),
+];
+
 export const retryPaymentValidator = [
     ...paymentIdParamValidator,
 ];
@@ -65,4 +69,14 @@ export const webhookConfirmValidator = [
     body("gateway_status").optional({ values: "falsy" }).isString().withMessage("gateway_status must be a string"),
     body("gateway_name").optional({ values: "falsy" }).isString().withMessage("gateway_name must be a string"),
     body("gateway_transaction_ref").optional({ values: "falsy" }).isString().isLength({ max: 100 }).withMessage("gateway_transaction_ref must not exceed 100 characters"),
+];
+
+// Validator cho IPN callback từ MoMo (server-to-server, không cần auth)
+export const momoIpnValidator = [
+    body("partnerCode").isString().notEmpty().withMessage("partnerCode is required"),
+    body("orderId").isString().notEmpty().withMessage("orderId is required"),
+    body("requestId").isString().notEmpty().withMessage("requestId is required"),
+    body("amount").notEmpty().withMessage("amount is required"),
+    body("resultCode").notEmpty().withMessage("resultCode is required"),
+    body("signature").isString().notEmpty().withMessage("signature is required"),
 ];

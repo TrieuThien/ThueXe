@@ -470,10 +470,60 @@ export async function listLedgerEntries(filters = {}) {
 export async function listPendingWithdrawals() {
     const [rows] = await sqldb.query(
         `SELECT wr.withdrawal_id, wr.wallet_id, wr.amount, wr.status, wr.note, wr.requested_at,
-                wa.actor_type, wa.actor_id
+                wa.actor_type, wa.actor_id,
+                COALESCE(
+                    CASE
+                        WHEN wa.actor_type IN (0, 3) THEN CONCAT(COALESCE(u.firstname, ''), ' ', COALESCE(u.lastname, ''))
+                        WHEN wa.actor_type = 1 THEN CONCAT(COALESCE(d.firstname, ''), ' ', COALESCE(d.lastname, ''))
+                        WHEN wa.actor_type = 2 THEN vo.fullname
+                        ELSE NULL
+                    END,
+                    ''
+                ) AS actor_name,
+                CASE
+                    WHEN wa.actor_type IN (0, 3) THEN uba.bank_name
+                    WHEN wa.actor_type = 1 THEN d.bank_name
+                    WHEN wa.actor_type = 2 THEN vo.bank_name
+                    ELSE NULL
+                END AS payout_bank_name,
+                CASE
+                    WHEN wa.actor_type IN (0, 3) THEN uba.bank_account_number
+                    WHEN wa.actor_type = 1 THEN d.bank_acc_num
+                    WHEN wa.actor_type = 2 THEN vo.bank_account
+                    ELSE NULL
+                END AS payout_bank_account,
+                CASE
+                    WHEN wa.actor_type IN (0, 3) THEN uba.bank_account_holder
+                    WHEN wa.actor_type = 1 THEN d.bank_acc_holder_name
+                    WHEN wa.actor_type = 2 THEN vo.fullname
+                    ELSE NULL
+                END AS payout_bank_holder,
+                CASE
+                    WHEN wa.actor_type IN (0, 3) THEN uba.bank_code
+                    WHEN wa.actor_type = 1 THEN d.bank_code
+                    WHEN wa.actor_type = 2 THEN vo.bank_code
+                    ELSE NULL
+                END AS payout_bank_code,
+                CASE
+                    WHEN wa.actor_type = 1 THEN d.bank_swift_code
+                    WHEN wa.actor_type = 2 THEN vo.swift_code
+                    ELSE NULL
+                END AS payout_bank_swift_code
          FROM withdrawal_requests wr
          INNER JOIN wallet_accounts wa ON wa.wallet_id = wr.wallet_id
-         WHERE wr.status = 'pending'
+         LEFT JOIN users u ON wa.actor_type IN (0, 3) AND u.user_id = wa.actor_id
+         LEFT JOIN drivers d ON wa.actor_type = 1 AND d.driver_id = wa.actor_id
+         LEFT JOIN vehicle_owners vo ON wa.actor_type = 2 AND vo.owner_id = wa.actor_id
+         LEFT JOIN user_bank_accounts uba
+                ON wa.actor_type IN (0, 3)
+               AND uba.user_id = wa.actor_id
+               AND uba.bank_account_id = (
+                    SELECT ub2.bank_account_id
+                    FROM user_bank_accounts ub2
+                    WHERE ub2.user_id = wa.actor_id
+                    ORDER BY ub2.is_default DESC, ub2.bank_account_id DESC
+                    LIMIT 1
+               )
          ORDER BY wr.withdrawal_id DESC`
     );
     return rows.map((row) => ({
@@ -485,6 +535,12 @@ export async function listPendingWithdrawals() {
         requested_at: row.requested_at,
         actor_type: Number(row.actor_type),
         actor_id: Number(row.actor_id),
+        actor_name: row.actor_name ? String(row.actor_name).trim() : null,
+        payout_bank_name: row.payout_bank_name || null,
+        payout_bank_account: row.payout_bank_account || null,
+        payout_bank_holder: row.payout_bank_holder || null,
+        payout_bank_code: row.payout_bank_code || null,
+        payout_bank_swift_code: row.payout_bank_swift_code || null,
     }));
 }
 

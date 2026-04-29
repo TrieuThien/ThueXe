@@ -15,6 +15,7 @@ import AppError from "../utils/appError.js";
 const BANNER_VISIBILITY_VALUES = [0, 1, 2];
 const BANNER_STATUS_VALUES = [0, 1];
 const BANNER_IMAGE_FOLDER = "thuexe/banners";
+const BANNER_FEATURE_IMG_MAX_LENGTH = 2048;
 
 function assertAdmin(auth) {
     if (!auth || Number(auth.accountType) !== 3) {
@@ -80,7 +81,7 @@ function normalizeCreatePayload(payload = {}) {
     const excerpt = normalizeText(payload.excerpt, { maxLength: 255, fallback: null });
     const content = normalizeText(payload.content, { fallback: null });
     const city = normalizeInt(payload.city, { fallback: 0 });
-    const feature_img = normalizeText(payload.feature_img, { maxLength: 2048, fallback: "" }) || "";
+    const feature_img = normalizeText(payload.feature_img, { maxLength: BANNER_FEATURE_IMG_MAX_LENGTH, fallback: "" }) || "";
     const visibility = normalizeInt(payload.visibility, { fallback: 1 });
     const status = normalizeInt(payload.status, { fallback: 1 });
 
@@ -129,8 +130,18 @@ async function uploadBannerImage(file) {
             folder: BANNER_IMAGE_FOLDER,
             resource_type: "image",
         });
-        return uploaded.secure_url || null;
-    } catch {
+        const secureUrl = normalizeText(uploaded?.secure_url, { fallback: null });
+        if (!secureUrl) {
+            return null;
+        }
+        if (secureUrl.length > BANNER_FEATURE_IMG_MAX_LENGTH) {
+            throw new AppError("Uploaded banner image URL is too long.", 502, "BANNER_IMAGE_URL_TOO_LONG");
+        }
+        return secureUrl;
+    } catch (error) {
+        if (error instanceof AppError) {
+            throw error;
+        }
         throw new AppError("Failed to upload banner image.", 502, "BANNER_IMAGE_UPLOAD_FAILED");
     }
 }

@@ -1,10 +1,13 @@
 import { ownerPaginated, ownerSuccess } from "../utils/ownerApiResponse.js";
+import { verifyMomoIpnSignature } from "../services/payment/momoService.js";
 import {
     changeOwnerPassword,
+    toggleVehicleOperationStatus,
     createOwnerAvailabilityBlock,
     createOwnerMaintenance,
     createOwnerRevenueTopup,
     createOwnerRevenueWithdrawal,
+    processOwnerMomoTopupIpn,
     createOwnerVehicleService,
     deleteOwnerAvailabilityBlock,
     deleteOwnerMaintenanceService,
@@ -43,11 +46,11 @@ import {
     ownerRegister,
     submitOwnerVerification,
     updateOwnerAccountProfile,
-    updateOwnerAvailabilityBlock,
     updateOwnerBookingStatus,
     updateOwnerMaintenanceService,
     updateOwnerVehicleService,
     updateOwnerVerificationDocument,
+    updateVehiclePhotoService,
     uploadOwnerVerificationDocument,
     upsertOwnerVehicleDocumentsService,
     verifyOwnerRegisterEmailToken,
@@ -292,6 +295,15 @@ export async function ownerVehicleUpdateHandler(req, res, next) {
     }
 }
 
+export async function ownerVehiclePhotoUpdateHandler(req, res, next) {
+    try {
+        const photoFile = (req.files || []).find((f) => f.fieldname === "vehicle_photo") || req.file || null;
+        return ownerSuccess(res, await updateVehiclePhotoService(req.auth, req.params.vehicleId, photoFile), requestMeta(req));
+    } catch (error) {
+        return next(error);
+    }
+}
+
 export async function ownerVehicleDocumentsUpsertHandler(req, res, next) {
     try {
         return ownerSuccess(res, await upsertOwnerVehicleDocumentsService(req.auth, req.params.vehicleId, req.body, req.files || []), requestMeta(req));
@@ -341,14 +353,6 @@ export async function ownerActivityAvailabilityCreateHandler(req, res, next) {
     }
 }
 
-export async function ownerActivityAvailabilityUpdateHandler(req, res, next) {
-    try {
-        return ownerSuccess(res, await updateOwnerAvailabilityBlock(req.auth, req.params.vehicleId, req.params.blockId, req.body), requestMeta(req));
-    } catch (error) {
-        return next(error);
-    }
-}
-
 export async function ownerActivityAvailabilityDeleteHandler(req, res, next) {
     try {
         await deleteOwnerAvailabilityBlock(req.auth, req.params.vehicleId, req.params.blockId);
@@ -361,6 +365,14 @@ export async function ownerActivityAvailabilityDeleteHandler(req, res, next) {
 export async function ownerActivityTimelineHandler(req, res, next) {
     try {
         return ownerSuccess(res, await getOwnerTimeline(req.auth, req.query), requestMeta(req));
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function ownerVehicleToggleOperationStatusHandler(req, res, next) {
+    try {
+        return ownerSuccess(res, await toggleVehicleOperationStatus(req.auth, req.params.vehicleId), requestMeta(req));
     } catch (error) {
         return next(error);
     }
@@ -532,6 +544,25 @@ export async function ownerRevenueTopupHandler(req, res, next) {
         return ownerSuccess(res, data, requestMeta(req), 201);
     } catch (error) {
         return next(error);
+    }
+}
+
+// MoMo IPN cho owner topup (server-to-server, không cần auth)
+export async function ownerMomoIpnHandler(req, res, next) {
+    try {
+        const isValid = verifyMomoIpnSignature(req.body);
+        if (!isValid) {
+            return res.status(400).json({ resultCode: 1, message: "Invalid signature" });
+        }
+        await processOwnerMomoTopupIpn({
+            orderId: req.body.orderId,
+            resultCode: req.body.resultCode,
+            transId: req.body.transId,
+            message: req.body.message,
+        });
+        return res.status(200).json({ resultCode: 0, message: "ok" });
+    } catch (error) {
+        next(error);
     }
 }
 

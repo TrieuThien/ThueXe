@@ -14,6 +14,7 @@ import {
     updateBookingStatus,
 } from "../../repositories/driver/bookingRepository.js";
 import { findDriverById } from "../../repositories/driver/authRepository.js";
+import { notifyRideAccepted, notifyRideRejected } from "../rideDispatchService.js";
 
 // ─── Booking status constants (must stay in sync with bookings.status) ─────
 const BOOKING_STATUS = {
@@ -172,6 +173,18 @@ export async function acceptBooking(auth, bookingId) {
 
         const booking = await findBookingByIdForDriver(bId, driverId);
 
+        // Notify dispatch engine to stop timer and inform customer
+        if (booking) {
+            notifyRideAccepted(bId, driverId, booking.user_id, {
+                firstname:     driver.firstname,
+                lastname:      driver.lastname,
+                phone:         driver.phone,
+                driver_rating: driver.driver_rating ?? null,
+                current_lat:   null,
+                current_lng:   null,
+            });
+        }
+
         return { booking };
     } catch (error) {
         await conn.rollback();
@@ -209,7 +222,19 @@ export async function rejectBooking(auth, bookingId) {
 
         await updateAllocationStatus(allocation.id, ALLOCATION_STATUS.REJECTED, conn);
 
+        // Fetch booking pickup coords so dispatch can resume from the same location
+        const [bookingRows] = await conn.query(
+            "SELECT user_id, pickup_lat, pickup_long FROM bookings WHERE id = ? LIMIT 1",
+            [bId]
+        );
+
         await conn.commit();
+
+        // Resume dispatch for the next driver (fire-and-forget)
+        if (bookingRows[0]) {
+            const { user_id, pickup_lat, pickup_long } = bookingRows[0];
+            notifyRideRejected(bId, Number(user_id), Number(pickup_lat), Number(pickup_long));
+        }
 
         return { message: "Booking rejected." };
     } catch (error) {

@@ -29,6 +29,7 @@ import customerRentalChatRoute from "./customer/rentalChatRoute.js";
 import customerRealtimeRoute from "./customer/realtimeRoute.js";
 import customerRideRoute from "./customer/rideRoute.js";
 import customerRentalRoute from "./customer/rentalRoute.js";
+import customerDriverHireRoute from "./customer/driverHireRoute.js";
 import customerWalletRoute from "./customer/walletRoute.js";
 
 const router = Router();
@@ -38,6 +39,7 @@ router.use("/api/customer", customerHomeRoute);
 router.use("/api/customer/chats", customerChatRoute);
 router.use("/api/customer/ride", customerRideRoute);
 router.use("/api/customer/rentals", customerRentalRoute);
+router.use("/api/customer/driver-hire", customerDriverHireRoute);
 router.use("/api/customer/rental-chats", customerRentalChatRoute);
 router.use("/api/customer/coupons", customerCouponRoute);
 router.use("/api/customer", customerWalletRoute);

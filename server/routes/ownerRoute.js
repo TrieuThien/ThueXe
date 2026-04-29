@@ -18,10 +18,10 @@ import {
     ownerActivityAvailabilityCreateHandler,
     ownerActivityAvailabilityDeleteHandler,
     ownerActivityAvailabilityHandler,
-    ownerActivityAvailabilityUpdateHandler,
     ownerActivityTimelineHandler,
     ownerActivityVehicleLocationsHandler,
     ownerActivityVehiclesHandler,
+    ownerVehicleToggleOperationStatusHandler,
     ownerBookingContractDetailHandler,
     ownerBookingContractsListHandler,
     ownerBookingDetailHandler,
@@ -45,6 +45,7 @@ import {
     ownerRevenueLedgerHandler,
     ownerRevenuePaymentsHandler,
     ownerRevenueSummaryHandler,
+    ownerMomoIpnHandler,
     ownerRevenueTopupHandler,
     ownerRevenueWalletHandler,
     ownerRevenueWithdrawalsHandler,
@@ -53,6 +54,7 @@ import {
     ownerVehicleDocumentTypesHandler,
     ownerVehicleDocumentsUpsertHandler,
     ownerVehicleListHandler,
+    ownerVehiclePhotoUpdateHandler,
     ownerVehicleRentalPackagesGetHandler,
     ownerVehicleRentalPackagesSetHandler,
     ownerVehicleTypesHandler,
@@ -88,6 +90,7 @@ import {
     ownerLoginValidator,
     ownerChangePasswordValidator,
 } from "../validators/ownerValidators.js";
+import { momoIpnValidator } from "../validators/customer/walletValidators.js";
 
 const router = Router();
 const ownerAuth = [requireAuth, requireRole("owner")];
@@ -132,6 +135,7 @@ router.post("/api/owner/vehicle-management/vehicles", ...ownerAuth, ownerDocUplo
 router.get("/api/owner/vehicle-management/vehicles", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerVehicleListHandler);
 router.get("/api/owner/vehicle-management/vehicles/:vehicleId", ...ownerAuth, ownerVehicleIdParamValidator, validateRequest, ownerVehicleDetailHandler);
 router.put("/api/owner/vehicle-management/vehicles/:vehicleId", ...ownerAuth, ownerVehicleIdParamValidator, ownerVehicleUpsertValidator, validateRequest, ownerVehicleUpdateHandler);
+router.put("/api/owner/vehicle-management/vehicles/:vehicleId/photo", ...ownerAuth, ownerDocUploadSingle("vehicle_photo", 5 * 1024 * 1024), ownerVehicleIdParamValidator, validateRequest, ownerVehiclePhotoUpdateHandler);
 router.post(
     "/api/owner/vehicle-management/vehicles/:vehicleId/documents",
     ...ownerAuth,
@@ -152,10 +156,10 @@ router.get(
 
 router.get("/api/owner/vehicle-activity/vehicles", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerActivityVehiclesHandler);
 router.get("/api/owner/vehicle-activity/vehicle-locations", ...ownerAuth, ownerActivityVehicleLocationsHandler);
+router.patch("/api/owner/vehicle-activity/vehicles/:vehicleId/operation-status", ...ownerAuth, ownerVehicleIdParamValidator, validateRequest, ownerVehicleToggleOperationStatusHandler);
 router.get("/api/owner/vehicle-activity/vehicles/:vehicleId", ...ownerAuth, ownerVehicleIdParamValidator, validateRequest, ownerVehicleDetailHandler);
 router.get("/api/owner/vehicle-activity/vehicles/:vehicleId/availability", ...ownerAuth, ownerVehicleIdParamValidator, validateRequest, ownerActivityAvailabilityHandler);
 router.post("/api/owner/vehicle-activity/vehicles/:vehicleId/availability", ...ownerAuth, ownerVehicleIdParamValidator, ownerAvailabilityUpsertValidator, validateRequest, ownerActivityAvailabilityCreateHandler);
-router.put("/api/owner/vehicle-activity/vehicles/:vehicleId/availability/:blockId", ...ownerAuth, ownerVehicleIdParamValidator, ownerBlockIdParamValidator, ownerAvailabilityUpsertValidator, validateRequest, ownerActivityAvailabilityUpdateHandler);
 router.delete("/api/owner/vehicle-activity/vehicles/:vehicleId/availability/:blockId", ...ownerAuth, ownerVehicleIdParamValidator, ownerBlockIdParamValidator, validateRequest, ownerActivityAvailabilityDeleteHandler);
 router.get("/api/owner/vehicle-activity/timeline", ...ownerAuth, ownerActivityTimelineHandler);
 
@@ -181,6 +185,8 @@ router.get("/api/owner/owner-revenue/payments", ...ownerAuth, ownerPaginationVal
 router.get("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerRevenueWithdrawalsHandler);
 router.post("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerRevenueWithdrawalValidator, validateRequest, ownerRevenueCreateWithdrawalHandler);
 router.post("/api/owner/owner-revenue/topup", ...ownerAuth, ownerRevenueTopupValidator, validateRequest, ownerRevenueTopupHandler);
+// MoMo IPN callback — server-to-server, không cần auth
+router.post("/api/owner/payments/webhook/momo", momoIpnValidator, validateRequest, ownerMomoIpnHandler);
 
 // Rental packages (owner-facing) — gói thuê chuẩn cho xe
 router.get("/api/owner/rental-packages", ...ownerAuth, ownerRentalPackagesListHandler);

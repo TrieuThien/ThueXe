@@ -868,3 +868,194 @@ export async function listAssignableDrivers({ routeId, rideId, search, limit = 3
         ride_type: row.ride_type,
     }));
 }
+
+/**
+ * Find available drivers near a GPS coordinate using Haversine formula.
+ * Conditions:
+ *  - account_active=1, is_activated=1, available=1, operation_status=0
+ *  - GPS updated within last 5 minutes
+ *  - Not currently on an active booking (status 0, 1, or 6)
+ *  - Not already tried for this booking (excludeIds)
+ * Ordered by distance ASC.
+ */
+export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeIds = []) {
+    // Bounding box pre-filter (1 degree lat ≈ 111 km)
+    const latDelta = radiusKm / 111.0;
+    const lngDelta = radiusKm / (111.0 * Math.cos((lat * Math.PI) / 180));
+
+    const latMin = lat - latDelta;
+    const latMax = lat + latDelta;
+    const lngMin = lng - lngDelta;
+    const lngMax = lng + lngDelta;
+
+    let excludeSql = "";
+    const excludeParams = [];
+
+    if (excludeIds.length > 0) {
+        excludeSql = `AND d.driver_id NOT IN (${excludeIds.map(() => "?").join(",")})`;
+        excludeParams.push(...excludeIds);
+    }
+
+    // Parameter order matches placeholder order in the query below:
+    // 1. lat, lng, lat  → Haversine ACOS args (SELECT clause)
+    // 2. latMin, latMax → bounding box lat BETWEEN
+    // 3. lngMin, lngMax → bounding box lng BETWEEN
+    // 4. excludeParams  → NOT IN list
+    // 5. radiusKm       → HAVING distance_km <=
+    const queryParams = [lat, lng, lat, latMin, latMax, lngMin, lngMax, ...excludeParams, radiusKm];
+
+    const [rows] = await sqldb.query(
+        `SELECT
+            d.driver_id,
+            d.firstname,
+            d.lastname,
+            d.phone,
+            d.driver_rating,
+            dcl.current_lat,
+            dcl.current_lng,
+            (
+                6371 * ACOS(
+                    GREATEST(-1, LEAST(1,
+                        COS(RADIANS(?)) * COS(RADIANS(dcl.current_lat))
+                        * COS(RADIANS(dcl.current_lng) - RADIANS(?))
+                        + SIN(RADIANS(?)) * SIN(RADIANS(dcl.current_lat))
+                    ))
+                )
+            ) AS distance_km
+         FROM drivers d
+         INNER JOIN driver_current_locations dcl ON dcl.driver_id = d.driver_id
+         WHERE d.account_active = 1
+           AND d.is_activated = 1
+           AND d.account_deleted = 0
+           AND d.available = 1
+           AND d.operation_status = 0
+           AND dcl.current_lat BETWEEN ? AND ?
+           AND dcl.current_lng BETWEEN ? AND ?
+           AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+           AND NOT EXISTS (
+               SELECT 1 FROM bookings ab
+               WHERE ab.driver_id = d.driver_id
+                 AND ab.status IN (0, 1, 6)
+               LIMIT 1
+           )
+           ${excludeSql}
+         HAVING distance_km <= ?
+         ORDER BY distance_km ASC
+         LIMIT 10`,
+        queryParams
+    );
+
+    return rows.map((row) => ({
+        driver_id: Number(row.driver_id),
+        firstname: row.firstname,
+        lastname: row.lastname,
+        phone: row.phone,
+        driver_rating: Number(row.driver_rating || 0),
+        current_lat: Number(row.current_lat),
+        current_lng: Number(row.current_lng),
+        distance_km: Number(Number(row.distance_km).toFixed(2)),
+    }));
+}
+
+/**
+ * Atomically assign a driver to a booking.
+ * Uses WHERE driver_id IS NULL to prevent double-assignment race conditions.
+ * Returns true if the update succeeded (this driver won the race), false otherwise.
+ */
+export async function atomicAssignDriverToBooking(bookingId, driverId, driverFirstname, driverLastname, driverPhone, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `UPDATE bookings
+         SET driver_id        = ?,
+             driver_firstname = ?,
+             driver_lastname  = ?,
+             driver_phone     = ?,
+             dispatch_mode    = 1
+         WHERE id = ?
+           AND driver_id IS NULL
+           AND status = 0
+         LIMIT 1`,
+        [driverId, driverFirstname, driverLastname, driverPhone, bookingId]
+    );
+    return result.affectedRows === 1;
+}
+
+/** Increment dispatch_attempts counter for a booking. */
+export async function incrementBookingDispatchAttempts(bookingId, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE bookings SET dispatch_attempts = dispatch_attempts + 1 WHERE id = ? LIMIT 1`,
+        [bookingId]
+    );
+}
+
+/**
+ * Cancel a booking with a no-driver-found reason (dispatch gave up).
+ * Only updates if booking is still pending (status=0) and has no driver assigned.
+ */
+export async function markBookingNoDriverFound(bookingId, reason, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `UPDATE bookings
+         SET status = 2, no_driver_reason = ?, cancel_comment = ?
+         WHERE id = ? AND status = 0 AND driver_id IS NULL
+         LIMIT 1`,
+        [reason, reason, bookingId]
+    );
+    return result.affectedRows === 1;
+}
+
+/** Create a dispatch allocation record for a driver. */
+export async function createDispatchAllocation({ bookingId, driverId, expiresAt }, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `INSERT INTO driver_allocate (booking_id, driver_id, status, expires_at)
+         VALUES (?, ?, 0, ?)`,
+        [bookingId, driverId, expiresAt]
+    );
+    return Number(result.insertId);
+}
+
+/** Mark a specific allocation as timed-out. */
+export async function timeoutDispatchAllocation(allocationId, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `UPDATE driver_allocate SET status = 3 WHERE id = ? AND status = 0 LIMIT 1`,
+        [allocationId]
+    );
+    return result.affectedRows === 1;
+}
+
+/** Mark a specific allocation as rejected (driver explicitly rejected). */
+export async function rejectDispatchAllocation(allocationId, conn) {
+    const db = dbConnection(conn);
+    const [result] = await db.query(
+        `UPDATE driver_allocate SET status = 2 WHERE id = ? AND status = 0 LIMIT 1`,
+        [allocationId]
+    );
+    return result.affectedRows === 1;
+}
+
+/** Get current dispatch state of a booking (for the dispatch engine to check if already assigned). */
+export async function getBookingDispatchState(bookingId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT id, status, driver_id FROM bookings WHERE id = ? LIMIT 1`,
+        [bookingId]
+    );
+    if (!rows[0]) return null;
+    return {
+        id: Number(rows[0].id),
+        status: Number(rows[0].status),
+        driver_id: rows[0].driver_id === null ? null : Number(rows[0].driver_id),
+    };
+}
+
+/** Get the IDs of all drivers already tried for a booking (all allocations regardless of outcome). */
+export async function getTriedDriverIdsForBooking(bookingId) {
+    const [rows] = await sqldb.query(
+        `SELECT DISTINCT driver_id FROM driver_allocate WHERE booking_id = ?`,
+        [bookingId]
+    );
+    return rows.map((r) => Number(r.driver_id));
+}
