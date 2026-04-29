@@ -273,12 +273,12 @@ export default function VehicleDocumentReviewPage() {
             {preview ? (() => {
                 const pairedRow = preview.doc_two_sides
                     ? rows.find(
-                          (r) =>
-                              Number(r.vehicle_id) === Number(preview.vehicle_id) &&
-                              Number(r.document_id) === Number(preview.document_id) &&
-                              Number(r.id) !== Number(preview.id) &&
-                              (r.side === "front" || r.side === "back")
-                      ) ?? null
+                        (r) =>
+                            Number(r.vehicle_id) === Number(preview.vehicle_id) &&
+                            Number(r.document_id) === Number(preview.document_id) &&
+                            Number(r.id) !== Number(preview.id) &&
+                            (r.side === "front" || r.side === "back")
+                    ) ?? null
                     : null;
 
                 const frontRow = preview.side === "front" ? preview : pairedRow?.side === "front" ? pairedRow : null;
@@ -377,6 +377,51 @@ export default function VehicleDocumentReviewPage() {
                                     <p className="mt-1 text-sm text-amber-800">{preview.review_note}</p>
                                 </div>
                             ) : null}
+
+                            <div className="mt-4">
+                                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                                    Ảnh phương tiện
+                                </p>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-xs font-semibold text-slate-500">Ảnh ngoại thất</p>
+                                        {preview.photo_url ? (
+                                            <a href={preview.photo_url} target="_blank" rel="noreferrer">
+                                                <img
+                                                    src={preview.photo_url}
+                                                    alt="Ảnh ngoại thất"
+                                                    className="max-h-48 w-full rounded-2xl border border-slate-200 object-contain"
+                                                />
+                                            </a>
+                                        ) : (
+                                            <div className="flex h-40 w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+                                                Chưa có ảnh
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-xs font-semibold text-slate-500">Ảnh nội thất</p>
+                                        {preview.interior_photo_urls && preview.interior_photo_urls.length > 0 ? (
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {preview.interior_photo_urls.map((url, index) => (
+                                                    <a key={index} href={url} target="_blank" rel="noreferrer">
+                                                        <img
+                                                            src={url}
+                                                            alt={`Ảnh nội thất ${index + 1}`}
+                                                            className="h-24 w-full rounded-xl border border-slate-200 object-cover"
+                                                        />
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex h-40 w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-400">
+                                                Chưa có ảnh
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
 
                             <div className="mt-4">
                                 <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
