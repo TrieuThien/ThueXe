@@ -15,9 +15,15 @@ function AdjustModal({ wallet, onClose, onSuccess }) {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
 
+    function parseAmountInput(value) {
+        const normalized = String(value || "").replace(/[.,\s]/g, "");
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? parsed : NaN;
+    }
+
     async function handleSubmit(e) {
         e.preventDefault();
-        const numAmount = Number(amount);
+        const numAmount = parseAmountInput(amount);
         if (!numAmount || numAmount <= 0) {
             setError("Số tiền phải lớn hơn 0.");
             return;
@@ -84,12 +90,11 @@ function AdjustModal({ wallet, onClose, onSuccess }) {
                     <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">Số tiền (VND)</label>
                         <input
-                            type="number"
-                            min="1"
-                            step="1000"
+                            type="text"
+                            inputMode="numeric"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
-                            placeholder="VD: 50000"
+                            placeholder="VD: 100000 hoac 100.000"
                             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                             required
                         />
@@ -416,3 +421,4 @@ export default function WalletsPage() {
         </div>
     );
 }
+

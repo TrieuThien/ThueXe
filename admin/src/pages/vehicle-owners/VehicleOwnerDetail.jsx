@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useOutletContext, useParams } from "react-router-dom";
-import { AlertCircle, ArrowLeft, CheckCircle2, FileText, Loader2, PencilLine } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Eye, FileText, Loader2, PencilLine } from "lucide-react";
 import { reviewPayout } from "../../services/adminService";
 import { getVehicleOwnerDetail } from "../../services/vehicleOwnerService";
 import { buildRolePath } from "../../config/roleRoutes";
@@ -40,6 +40,7 @@ export default function VehicleOwnerDetail() {
     const [errorMessage, setErrorMessage] = useState("");
     const [tab, setTab] = useState("vehicles");
     const [actionMessage, setActionMessage] = useState({ type: "", text: "" });
+    const [documentPreview, setDocumentPreview] = useState(null);
 
     async function loadDetail() {
         setLoading(true);
@@ -167,8 +168,8 @@ export default function VehicleOwnerDetail() {
                             ) : null}
                             {tab === "documents" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Hồ sơ</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Hạn sử dụng</th><th className="px-6 py-4">Trạng thái xác minh</th><th className="px-6 py-4">Cập nhật</th></tr></thead>
-                                    <tbody className="divide-y divide-slate-100">{(detail?.documents || []).map((item) => <tr key={item.id} className="text-sm text-slate-700"><td className="px-6 py-4">{item.document_title || "--"}</td><td className="px-6 py-4">{item.doc_number || "--"}</td><td className="px-6 py-4">{formatDateTime(item.doc_expiry_date)}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{formatDateTime(item.updated_at)}</td></tr>)}</tbody>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">Hồ sơ</th><th className="px-6 py-4">Số giấy tờ</th><th className="px-6 py-4">Hạn sử dụng</th><th className="px-6 py-4">Trạng thái xác minh</th><th className="px-6 py-4">Cập nhật</th><th className="px-6 py-4">Hành động</th></tr></thead>
+                                    <tbody className="divide-y divide-slate-100">{(detail?.documents || []).map((item) => <tr key={item.id} className="text-sm text-slate-700"><td className="px-6 py-4">{item.document_title || "--"}</td><td className="px-6 py-4">{item.doc_number || "--"}</td><td className="px-6 py-4">{formatDateTime(item.doc_expiry_date)}</td><td className="px-6 py-4">{item.status || "--"}</td><td className="px-6 py-4">{formatDateTime(item.updated_at)}</td><td className="px-6 py-4">{item.file_url ? <button type="button" onClick={() => setDocumentPreview(item)} className="inline-flex items-center gap-1 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"><Eye className="h-4 w-4" />Xem ảnh</button> : "--"}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
                         </div>
@@ -177,10 +178,39 @@ export default function VehicleOwnerDetail() {
             ) : (
                 <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><FileText className="h-6 w-6" /></div>
-                    <p className="mt-4 text-sm text-slate-500">Không tìm thấy chủ xe này.</p>
+                    <p className="mt-4 text-sm text-slate-500">Khong tim thay chu xe nay.</p>
                 </div>
             )}
+
+            {documentPreview ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" onClick={() => setDocumentPreview(null)}>
+                    <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[28px] bg-white p-6" onClick={(event) => event.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-slate-900">{documentPreview.document_title || "Ho so"}</h3>
+                        <p className="mt-1 text-sm text-slate-500">Số giấy tờ: {documentPreview.doc_number || "--"}</p>
+                        <div className="mt-4">
+                            {documentPreview.mime_type && documentPreview.mime_type.startsWith("image/") ? (
+                                <img src={documentPreview.file_url} alt={documentPreview.document_title || "Ho so"} className="max-h-[70vh] w-full rounded-2xl border border-slate-200 object-contain" />
+                            ) : documentPreview.mime_type === "application/pdf" ? (
+                                <div className="overflow-hidden rounded-2xl border border-slate-200">
+                                    <iframe src={documentPreview.file_url} title={documentPreview.document_title || "PDF"} className="h-[70vh] w-full" />
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                                    Dinh dang tep nay khong ho tro preview truc tiep.
+                                </div>
+                            )}
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                            <button type="button" onClick={() => setDocumentPreview(null)} className="rounded-2xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }
+
+
+
+
 
