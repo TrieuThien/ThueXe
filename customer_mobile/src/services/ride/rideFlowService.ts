@@ -54,9 +54,9 @@ interface BackendCreateBookingResponse {
 }
 
 const FALLBACK_PAYMENT_METHODS: RidePaymentMethodOption[] = [
-  { id: "1", type: "CASH", displayName: "Tien mat" },
-  { id: "2", type: "WALLET", displayName: "Vi ThueXe" },
-  { id: "3", type: "BANK_CARD", displayName: "The/Online Banking" },
+  { id: "1", type: "CASH", displayName: "Tiền mặt" },
+  { id: "2", type: "WALLET", displayName: "Ví ThueXe" },
+  { id: "3", type: "BANK_CARD", displayName: "Thẻ/Online Banking" },
 ];
 
 function normalizeRidePaymentMethodType(value: unknown): RidePaymentMethodOption["type"] {
@@ -103,7 +103,7 @@ function toRidePaymentMethods(payload: unknown): RidePaymentMethodOption[] {
       return {
         id: String(id),
         type: normalizeRidePaymentMethodType(row.type ?? row.payment_type ?? row.method_type),
-        displayName: String(row.displayName ?? row.title ?? row.name ?? row.label ?? "Phuong thuc thanh toan"),
+        displayName: String(row.displayName ?? row.title ?? row.name ?? row.label ?? "Phương thức thanh toán"),
         subtitle: row.subtitle ? String(row.subtitle) : undefined,
       };
     })

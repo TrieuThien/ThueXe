@@ -43,6 +43,8 @@ export function RentalBookingFormScreen({ navigation }: Props) {
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(true);
   const [showDropoffSuggestions, setShowDropoffSuggestions] = useState(true);
   const pickupAutoFilledRef = useRef(false);
+  // Tọa độ của địa chỉ đón được chọn từ autocomplete (không phải GPS hiện tại)
+  const [selectedPickupCoord, setSelectedPickupCoord] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const {
     control,
@@ -137,12 +139,10 @@ export function RentalBookingFormScreen({ navigation }: Props) {
         durationHours: Number(values.durationHours),
         pickupAddress: values.pickupAddress,
         dropoffAddress: values.dropoffAddress || undefined,
-        pickupCoordinate: location.data
-          ? {
-              latitude: location.data.latitude,
-              longitude: location.data.longitude,
-            }
-          : undefined,
+        // Ưu tiên tọa độ của địa chỉ đón được chọn; fallback GPS nếu địa chỉ auto-fill từ GPS
+        pickupCoordinate: selectedPickupCoord ?? (location.data
+          ? { latitude: location.data.latitude, longitude: location.data.longitude }
+          : undefined),
       });
       setExtraInfo(values.couponCode || undefined, values.note || undefined);
       navigation.navigate("RentalPackageList");
@@ -231,6 +231,7 @@ export function RentalBookingFormScreen({ navigation }: Props) {
                 onChangeText={(text) => {
                   pickupAutoFilledRef.current = false;
                   setShowPickupSuggestions(true);
+                  setSelectedPickupCoord(null); // xóa tọa độ cũ khi người dùng tự gõ
                   field.onChange(text);
                 }}
                 errorMessage={fieldState.error?.message}
@@ -245,7 +246,7 @@ export function RentalBookingFormScreen({ navigation }: Props) {
               ) : null}
 
               {showPickupSuggestions && pickupAutocomplete.suggestions.length > 0 ? (
-                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+                <View style={[styles.suggestionList, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                   {pickupAutocomplete.suggestions.map((item, index) => (
                     <Pressable
                       key={item.id}
@@ -253,6 +254,10 @@ export function RentalBookingFormScreen({ navigation }: Props) {
                         pickupAutoFilledRef.current = false;
                         const nextLabel = await resolveSuggestionLabel(item);
                         setValue("pickupAddress", nextLabel, { shouldValidate: true });
+                        // Lưu tọa độ của địa chỉ được chọn để dùng cho GIS filter
+                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                          setSelectedPickupCoord({ latitude: item.latitude, longitude: item.longitude });
+                        }
                         setShowPickupSuggestions(false);
                       }}
                       style={[

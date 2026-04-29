@@ -49,6 +49,21 @@ export function useRealtime({
           queryClient.invalidateQueries({ queryKey: ["wallet", "transactions"] }),
         ]);
       },
+      // Ride dispatch events — invalidate driver allocation status so UI updates instantly
+      "RIDE_DRIVER_ACCEPTED": () => {
+        if (!bookingId) return;
+        void queryClient.invalidateQueries({ queryKey: ["rideFlow", "driverAllocation", bookingId] });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEY_FACTORY.bookings.detail(bookingId) });
+      },
+      "RIDE_NO_DRIVER_FOUND": () => {
+        if (!bookingId) return;
+        void queryClient.invalidateQueries({ queryKey: ["rideFlow", "driverAllocation", bookingId] });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEY_FACTORY.bookings.detail(bookingId) });
+      },
+      "RIDE_DRIVER_SEARCHING": () => {
+        if (!bookingId) return;
+        void queryClient.invalidateQueries({ queryKey: ["rideFlow", "driverAllocation", bookingId] });
+      },
       ...handlers,
     }),
     [bookingId, handlers, queryClient],

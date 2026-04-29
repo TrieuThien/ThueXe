@@ -29,8 +29,57 @@ export type BookingStackParamList = {
   RentalBookingForm: undefined;
   RentalPackageList: undefined;
   /** Danh sách xe khả dụng của gói thuê, sau khi chọn gói trên màn hình nearby */
-  RentalPackageCars: { packageId: number; packageName: string };
+  RentalPackageCars: { packageId: number; packageName: string; packageBasePrice?: number; packageDurationHours?: number };
+  /** Chi tiết xe thuê – truyền toàn bộ object xe để tránh fetch thêm */
+  RentalCarDetail: {
+    car: {
+      vehicle_id: number;
+      brand: string;
+      model: string;
+      year: string | null;
+      color: string | null;
+      license_plate: string;
+      seat_count: number;
+      transmission: "auto" | "manual";
+      fuel_type: "petrol" | "diesel" | "electric" | "hybrid";
+      status: string;
+      type_name: string;
+      owner_name: string | null;
+      owner_phone: string | null;
+      avg_rating: number | null;
+      rating_count: number;
+    };
+    packageId: number;
+    packageName: string;
+    packageBasePrice?: number;
+    packageDurationHours?: number;
+  };
+  /** Xác nhận đặt xe thuê – chọn phương thức thanh toán và gửi yêu cầu */
+  RentalVehicleConfirm: {
+    car: {
+      vehicle_id: number;
+      brand: string;
+      model: string;
+      year: string | null;
+      color: string | null;
+      license_plate: string;
+      seat_count: number;
+      transmission: "auto" | "manual";
+      fuel_type: "petrol" | "diesel" | "electric" | "hybrid";
+      status: string;
+      type_name: string;
+      owner_name: string | null;
+      owner_phone: string | null;
+      avg_rating: number | null;
+      rating_count: number;
+    };
+    packageId: number;
+    packageName: string;
+    packageBasePrice?: number;
+    packageDurationHours?: number;
+  };
   RentalBookingConfirm: undefined;
+  RentalBookingDetail: { bookingId: string };
   RentalBookingSuccess: { bookingId: string; status: "PENDING" | "SCHEDULED"; message: string };
   RideLocationPicker: undefined;
   RideVehicleSelection: undefined;

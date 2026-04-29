@@ -45,7 +45,7 @@ export function MainTabNavigator() {
       <Tab.Screen
         name="Booking"
         component={BookingStackNavigator}
-        options={{ title: "Đặt xe" }}
+        options={{ title: "Dịch vụ" }}
         listeners={({ navigation }) => ({
           tabPress: (event) => {
             event.preventDefault();
@@ -63,11 +63,12 @@ export function MainTabNavigator() {
         options={{ title: "Ví" }}
         listeners={({ navigation }) => ({
           tabPress: (event) => {
-            if (isAuthenticated) {
+            event.preventDefault();
+            if (!isAuthenticated) {
+              openAuthLogin(navigation);
               return;
             }
-            event.preventDefault();
-            openAuthLogin(navigation);
+            navigation.navigate("Wallet", { screen: "WalletMain" });
           },
         })}
       />

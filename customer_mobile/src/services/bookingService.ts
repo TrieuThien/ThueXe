@@ -77,14 +77,22 @@ function normalizeRideBooking(item: any): RideBooking {
 function normalizeRentalBooking(item: any): RentalBooking {
   const serviceType = Number(item?.service_type ?? item?.serviceType ?? 1);
 
+  // Server trả rental_id (không phải rental_booking_id/booking_id)
+  const id = pickId(item?.rental_id, item?.rental_booking_id, item?.booking_id, item?.id);
+
+  // Server trả total_price, không có estimated_fare
+  const estimatedTotalPrice = toNumber(
+    item?.total_price ?? item?.base_price ?? item?.estimated_fare ?? item?.estimatedTotalPrice,
+  );
+
   return {
-    id: pickId(item?.rental_booking_id, item?.booking_id, item?.id),
+    id,
     customerId: pickId(item?.user_id, item?.customer_id, item?.customerId),
     rideType: serviceType === 2 ? "RENTAL_DRIVER" : "RENTAL_CAR",
     pickupAddress: String(item?.pickup_address ?? item?.pickupAddress ?? ""),
     startAt: String(item?.start_datetime ?? item?.startAt ?? new Date().toISOString()),
-    endAt: String(item?.end_datetime ?? item?.endAt ?? new Date().toISOString()),
-    estimatedTotalPrice: toNumber(item?.estimated_fare, item?.estimatedTotalPrice),
+    endAt: String(item?.actual_end_datetime ?? item?.end_datetime ?? item?.endAt ?? new Date().toISOString()),
+    estimatedTotalPrice,
     finalTotalPrice:
       item?.final_fare != null ? toNumber(item?.final_fare) : item?.finalTotalPrice != null ? toNumber(item?.finalTotalPrice) : undefined,
     notes: item?.note ?? item?.notes,
@@ -92,7 +100,7 @@ function normalizeRentalBooking(item: any): RentalBooking {
     driver: item?.driver
       ? {
           id: pickId(item.driver?.id, item.driver?.driver_id),
-          fullName: String(item.driver?.fullName ?? item.driver?.full_name ?? ""),
+          fullName: String(item.driver?.fullName ?? item.driver?.full_name ?? item.driver?.name ?? ""),
           phoneNumber: String(item.driver?.phoneNumber ?? item.driver?.phone ?? ""),
           avatarUrl: item.driver?.avatarUrl ?? item.driver?.avatar_url,
           rating: toNumber(item.driver?.rating, 0),

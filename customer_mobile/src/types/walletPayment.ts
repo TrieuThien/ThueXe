@@ -109,6 +109,7 @@ export interface BookingPaymentRequest {
 export interface BookingPaymentResponse {
   paymentId: ID;
   status: PaymentStatus;
+  redirectUrl?: string;
 }
 
 export interface SetDefaultPaymentMethodRequest {

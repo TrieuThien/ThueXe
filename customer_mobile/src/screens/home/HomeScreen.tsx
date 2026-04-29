@@ -17,11 +17,11 @@ import {
   RecentRouteCard,
 } from "../../components";
 import { SERVICE_TYPE_OPTIONS } from "../../constants";
-import { useCurrentLocation, useHomeOverviewQuery } from "../../hooks";
+import { useCurrentLocation, useHomeOverviewQuery, useNearbyPackagesQuery, useRentalBookingsQuery } from "../../hooks";
 import { MainTabParamList } from "../../navigation";
 import { useAuthStore, useBookingDraftStore, useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
-import { FeaturedCoupon, HomeBanner, QuickDestination, RecentRoute, RideType } from "../../types";
+import { FeaturedCoupon, HomeBanner, QuickDestination, RecentRoute, RentalBooking, RideType } from "../../types";
 import { formatCurrencyVND } from "../../utils/format";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Home">;
@@ -34,7 +34,18 @@ export function HomeScreen({ navigation }: Props) {
   const setRentalServiceType = useRentalFlowStore((state) => state.setServiceType);
 
   const homeQuery = useHomeOverviewQuery(isAuthenticated);
+  const rentalBookingsQuery = useRentalBookingsQuery(isAuthenticated);
   const location = useCurrentLocation(true);
+  const nearbyRentalCarQuery = useNearbyPackagesQuery(
+    location.data
+      ? { lat: location.data.latitude, lng: location.data.longitude, service_type: 1 }
+      : null
+  );
+  const nearbyRentalDriverQuery = useNearbyPackagesQuery(
+    location.data
+      ? { lat: location.data.latitude, lng: location.data.longitude, service_type: 2 }
+      : null
+  );
   const homeOverview = homeQuery.data ?? {
     currentAddress: "",
     banners: [],
@@ -45,6 +56,59 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   const serviceCards = useMemo(() => SERVICE_TYPE_OPTIONS, []);
+
+  const recentCompletedRentals = useMemo<RecentRoute[]>(() => {
+    const bookings = rentalBookingsQuery.data ?? [];
+    return bookings
+      .filter((booking: RentalBooking) => booking.status === "COMPLETED")
+      .slice(0, 4)
+      .map((booking: RentalBooking) => ({
+        id: `rental_${booking.id}`,
+        pickupAddress: booking.pickupAddress || "Đơn thuê gần đây",
+        destinationAddress: booking.rideType === "RENTAL_DRIVER" ? "Đơn thuê tài xế đã hoàn tất" : "Đơn thuê xe đã hoàn tất",
+        usedAt: booking.updatedAt || booking.endAt || booking.startAt,
+        rideType: booking.rideType,
+      }));
+  }, [rentalBookingsQuery.data]);
+
+  const mergedRecentRoutes = useMemo<RecentRoute[]>(() => {
+    return [...homeOverview.recentRoutes, ...recentCompletedRentals]
+      .sort((a, b) => new Date(b.usedAt).getTime() - new Date(a.usedAt).getTime())
+      .slice(0, 8);
+  }, [homeOverview.recentRoutes, recentCompletedRentals]);
+
+  const areaPopularServices = useMemo(() => {
+    const fareBasedRideServices = homeOverview.popularServices.filter(
+      (service) => service.rideType === "CALL_RIDE"
+    );
+
+    const rentalPackages = [
+      ...(((nearbyRentalCarQuery.data as any)?.items ?? []).map((item: any) => ({
+        id: `pkg_car_${item.package_id}`,
+        rideType: "RENTAL_CAR" as const,
+        title: item.package_name || "Gói thuê xe",
+        description: item.description || "Gói thuê xe phổ biến tại khu vực của bạn",
+        estimatedFromPrice: Number(item.price || 0),
+      }))),
+      ...(((nearbyRentalDriverQuery.data as any)?.items ?? []).map((item: any) => ({
+        id: `pkg_driver_${item.package_id}`,
+        rideType: "RENTAL_DRIVER" as const,
+        title: item.package_name || "Gói thuê tài xế",
+        description: item.description || "Gói thuê tài xế phổ biến tại khu vực của bạn",
+        estimatedFromPrice: Number(item.price || 0),
+      }))),
+    ];
+
+    const merged = [...fareBasedRideServices, ...rentalPackages]
+      .filter((item) => Number(item.estimatedFromPrice || 0) > 0);
+
+    const seen = new Set<string>();
+    return merged.filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [homeOverview.popularServices, nearbyRentalCarQuery.data, nearbyRentalDriverQuery.data]);
 
   const goToLogin = () => {
     const parent = navigation.getParent() as { navigate: (name: string, params?: unknown) => void } | null;
@@ -155,11 +219,11 @@ export function HomeScreen({ navigation }: Props) {
 
           <View style={styles.section}>
             <HomeSectionHeader title="Dịch vụ phổ biến" />
-            {homeOverview.popularServices.length === 0 ? (
+            {areaPopularServices.length === 0 ? (
               <EmptyState title="Chưa có gợi ý" description="Các gợi ý dịch vụ sẽ hiển tại đây." />
             ) : (
               <View style={styles.popularList}>
-                {homeOverview.popularServices.map((service) => (
+                {areaPopularServices.map((service) => (
                   <HomeServiceCard
                     key={service.id}
                     title={service.title}
@@ -174,11 +238,11 @@ export function HomeScreen({ navigation }: Props) {
 
           <View style={styles.section}>
             <HomeSectionHeader title="Lịch sử gần đây" />
-            {homeOverview.recentRoutes.length === 0 ? (
+            {mergedRecentRoutes.length === 0 ? (
               <EmptyState title="Chưa có lịch sử" description="Các lộ trình đã đi sẽ hiển ở đây." />
             ) : (
               <View style={styles.recentList}>
-                {homeOverview.recentRoutes.map((route) => (
+                {mergedRecentRoutes.map((route) => (
                   <RecentRouteCard key={route.id} item={route} onPress={handleRecentRoutePress} />
                 ))}
               </View>

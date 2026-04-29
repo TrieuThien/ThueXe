@@ -6,6 +6,7 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import {
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -13,10 +14,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader, EmptyState, ErrorState, LoadingState } from "../../components";
+import { AppHeader, EmptyState, ErrorState, HeaderTextButton, LoadingState } from "../../components";
 import { usePackageCarsQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
-import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
 import type { PackageCar } from "../../services/api/modules/rentalApi";
 
@@ -54,15 +54,28 @@ function StarRating({ rating }: { rating: number | null }) {
 
 interface CarCardProps {
   car: PackageCar;
+  onDetail: () => void;
   onSelect: () => void;
 }
 
-function CarCard({ car, onSelect }: CarCardProps) {
+function CarCard({ car, onDetail, onSelect }: CarCardProps) {
   const { theme } = useTheme();
   const vehicleName = [car.brand, car.model, car.year].filter(Boolean).join(" ");
 
   return (
-    <View style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+      onPress={onDetail}
+      activeOpacity={0.75}
+    >
+      {car.photo_url ? (
+        <Image
+          source={{ uri: car.photo_url }}
+          style={styles.carThumbnail}
+          resizeMode="cover"
+        />
+      ) : null}
+      <View style={styles.cardContent}>
       {/* Tên xe + biển số */}
       <View style={styles.cardHeader}>
         <View style={styles.cardTitleRow}>
@@ -90,15 +103,25 @@ function CarCard({ car, onSelect }: CarCardProps) {
         </Text>
       ) : null}
 
-      {/* Nút Thuê ngay */}
-      <TouchableOpacity
-        style={[styles.hireBtn, { backgroundColor: theme.colors.primary ?? "#2563eb" }]}
-        onPress={onSelect}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.hireBtnText}>Thuê ngay</Text>
-      </TouchableOpacity>
-    </View>
+      {/* Hàng nút */}
+      <View style={styles.cardActions}>
+        <TouchableOpacity
+          style={[styles.detailBtn, { borderColor: theme.colors.border }]}
+          onPress={onDetail}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.detailBtnText, { color: theme.colors.text }]}>Xem chi tiết</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.hireBtn, { backgroundColor: theme.colors.primary ?? "#2563eb" }]}
+          onPress={onSelect}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.hireBtnText}>Thuê ngay</Text>
+        </TouchableOpacity>
+      </View>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -114,33 +137,24 @@ function InfoChip({ label, color }: { label: string; color: string }) {
 
 export function RentalPackageCarsScreen({ navigation, route }: Props) {
   const { theme } = useTheme();
-  const { packageId, packageName } = route.params;
+  const { packageId, packageName, packageBasePrice, packageDurationHours } = route.params;
 
-  const setSelectedPackage = useRentalFlowStore((state) => state.setSelectedPackage);
   const query = usePackageCarsQuery(packageId);
 
-  const cars: PackageCar[] = Array.isArray(query.data?.cars) ? query.data.cars : [];
+  const queryData = query.data as { cars?: PackageCar[] } | undefined;
+  const cars: PackageCar[] = Array.isArray(queryData?.cars) ? (queryData!.cars as PackageCar[]) : [];
 
-  /**
-   * Khi người dùng chọn xe:
-   * 1. Set gói thuê vào flow store (giống flow hiện tại khi chọn từ RentalPackageList)
-   * 2. Điều hướng đến màn hình xác nhận đặt xe
-   */
   function handleSelectCar(car: PackageCar) {
-    // Lưu package đã chọn vào store (RentalBookingForm cần package_id)
-    setSelectedPackage({
-      packageId,
-      packageName,
-      // Các field khác của package sẽ được load lại ở RentalBookingForm
-    } as any);
+    navigation.navigate("RentalVehicleConfirm", { car, packageId, packageName, packageBasePrice, packageDurationHours });
+  }
 
-    // Điều hướng về form đặt xe với vehicle_id đã chọn sẵn
-    navigation.navigate("RentalBookingForm");
+  function handleViewDetail(car: PackageCar) {
+    navigation.navigate("RentalCarDetail", { car, packageId, packageName, packageBasePrice, packageDurationHours });
   }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
-      <AppHeader title={packageName || "Danh sách xe"} onBack={() => navigation.goBack()} />
+      <AppHeader title={packageName || "Danh sách xe"} leftAction={<HeaderTextButton label="Quay lại" onPress={() => navigation.goBack()} />} />
 
       {query.isLoading ? (
         <LoadingState message="Đang tải danh sách xe..." />
@@ -158,7 +172,11 @@ export function RentalPackageCarsScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <CarCard car={item} onSelect={() => handleSelectCar(item)} />
+            <CarCard
+              car={item}
+              onDetail={() => handleViewDetail(item)}
+              onSelect={() => handleSelectCar(item)}
+            />
           )}
           ListHeaderComponent={
             <View style={styles.listHeader}>
@@ -188,6 +206,14 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     borderWidth: 1,
+    overflow: "hidden",
+    gap: 10,
+  },
+  carThumbnail: {
+    width: "100%",
+    height: 160,
+  },
+  cardContent: {
     padding: 16,
     gap: 10,
   },
@@ -215,11 +241,24 @@ const styles = StyleSheet.create({
 
   ownerText: { fontSize: 12 },
 
+  cardActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  detailBtn: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 11,
+    alignItems: "center",
+  },
+  detailBtnText: { fontWeight: "600", fontSize: 14 },
   hireBtn: {
+    flex: 1,
     borderRadius: 12,
     paddingVertical: 11,
     alignItems: "center",
-    marginTop: 4,
   },
   hireBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
 });

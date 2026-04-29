@@ -10,5 +10,8 @@ export const APP_CONFIG = {
     "chat.message.created",
     "payment.updated",
     "wallet.updated",
+    "RIDE_DRIVER_ACCEPTED",
+    "RIDE_NO_DRIVER_FOUND",
+    "RIDE_DRIVER_SEARCHING",
   ] as const,
 };

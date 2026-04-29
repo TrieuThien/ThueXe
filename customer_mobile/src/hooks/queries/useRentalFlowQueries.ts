@@ -62,6 +62,13 @@ export function useNearbyPackagesQuery(params: { lat: number; lng: number; servi
   });
 }
 
+export function useCreateVehicleBookingMutation() {
+  return useMutation({
+    mutationFn: (params: Parameters<typeof rentalFlowService.createVehicleRentalBooking>[0]) =>
+      rentalFlowService.createVehicleRentalBooking(params),
+  });
+}
+
 /** Lấy danh sách xe khả dụng của 1 gói thuê */
 export function usePackageCarsQuery(packageId: number | string | null) {
   return useQuery({

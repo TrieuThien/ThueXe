@@ -166,11 +166,20 @@ export const walletPaymentService = {
   },
 
   createTopUp: async (payload: CreateTopUpRequest): Promise<CreateTopUpResponse> => {
-    const response = await apiClient.post<CreateTopUpResponse>(`${APP_CONFIG.customerApiPrefix}/wallet/topup/create-payment`, {
+    // Map paymentMethodId sang gateway_name server nhận ("momo", "mock", ...)
+    const gatewayName = String(payload.paymentMethodId).toLowerCase().includes("momo") ? "momo" : String(payload.paymentMethodId);
+
+    const response = await apiClient.post<Record<string, unknown>>(`${APP_CONFIG.customerApiPrefix}/wallet/topup/create-payment`, {
       amount: payload.amount,
-      gateway_name: payload.paymentMethodId,
+      gateway_name: gatewayName,
     });
-    return response.data;
+
+    const data = (response.data ?? {}) as Record<string, unknown>;
+    return {
+      paymentId: String(data.payment_id ?? data.paymentId ?? ""),
+      status: toPaymentStatus(data.payment_status ?? data.status),
+      redirectUrl: data.redirect_url ? String(data.redirect_url) : undefined,
+    };
   },
 
   getBookingPaymentSummary: async (params: { bookingId?: string; rentalBookingId?: string }): Promise<BookingPaymentSummary> => {
@@ -180,13 +189,39 @@ export const walletPaymentService = {
   },
 
   payBooking: async (payload: BookingPaymentRequest): Promise<BookingPaymentResponse> => {
-    const response = await apiClient.post<BookingPaymentResponse>(
+    const isMomo = String(payload.paymentMethodId ?? "").toLowerCase().includes("momo");
+    const requestBody: Record<string, unknown> = {
+      payment_type: isMomo ? 3 : 2,
+    };
+    if (isMomo) requestBody.gateway_name = "momo";
+
+    const response = await apiClient.post<Record<string, unknown>>(
       payload.bookingId
         ? `${APP_CONFIG.customerApiPrefix}/payments/ride/${payload.bookingId}/pay`
         : `${APP_CONFIG.customerApiPrefix}/payments/rental/${payload.rentalBookingId}/pay`,
-      { payment_type: 3 },
+      requestBody,
     );
-    return response.data;
+
+    const data = (response.data ?? {}) as Record<string, unknown>;
+    return {
+      paymentId: String(data.payment_id ?? ""),
+      status: toPaymentStatus(data.status),
+      redirectUrl: data.redirect_url ? String(data.redirect_url) : undefined,
+    };
+  },
+
+  payDeposit: async (rentalBookingId: string): Promise<{ payment_id: number | null; rental_id: number; status: string; amount: number; wallet_balance_after: number | null }> => {
+    const response = await apiClient.post<Record<string, unknown>>(
+      `${APP_CONFIG.customerApiPrefix}/payments/rental/${rentalBookingId}/pay-deposit`,
+    );
+    const data = (response.data ?? {}) as Record<string, unknown>;
+    return {
+      payment_id: data.payment_id != null ? Number(data.payment_id) : null,
+      rental_id: Number(data.rental_id ?? 0),
+      status: String(data.status ?? "deposit_paid"),
+      amount: toNumber(data.amount, 0),
+      wallet_balance_after: data.wallet_balance_after != null ? toNumber(data.wallet_balance_after, 0) : null,
+    };
   },
 
   retryPayment: async (payload: RetryPaymentRequest): Promise<RetryPaymentResponse> => {

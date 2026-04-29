@@ -1,6 +1,6 @@
 ﻿import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useMemo, useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text } from "react-native";
+import { Alert, Linking, ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppHeader, EmptyState, ErrorState, LoadingState, PaymentMethodListItem, PrimaryButton, TextField } from "../../components";
@@ -32,14 +32,28 @@ export function TopUpWalletScreen({ navigation }: Props) {
 
   const onTopUp = async () => {
     const amount = Number(amountText.replace(/[^0-9]/g, ""));
-    if (!resolvedMethodId || Number.isNaN(amount)) {
+    if (!resolvedMethodId || Number.isNaN(amount) || amount <= 0) {
       return;
     }
 
     try {
-      await topupMutation.mutateAsync({ amount, paymentMethodId: resolvedMethodId });
-      Alert.alert("Nạp", "Nạp tiền thành công");
-      navigation.goBack();
+      const result = await topupMutation.mutateAsync({ amount, paymentMethodId: resolvedMethodId });
+
+      if (result.redirectUrl) {
+        // Gateway payment (MoMo, ...): mở URL thanh toán
+        const canOpen = await Linking.canOpenURL(result.redirectUrl);
+        if (canOpen) {
+          await Linking.openURL(result.redirectUrl);
+        } else {
+          Alert.alert("Lỗi", "Không thể mở ứng dụng thanh toán. Vui lòng thử lại.");
+          return;
+        }
+        // Quay về – ví sẽ tự cập nhật khi IPN xác nhận qua realtime
+        navigation.goBack();
+      } else {
+        Alert.alert("Nạp", "Nạp tiền thành công");
+        navigation.goBack();
+      }
     } catch {
       Alert.alert("Nạp", "Nạp tiền thất bại");
     }

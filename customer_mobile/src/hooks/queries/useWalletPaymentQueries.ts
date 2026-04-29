@@ -91,6 +91,20 @@ export function useRetryPaymentMutation() {
   });
 }
 
+export function usePayRentalDepositMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (rentalBookingId: string) => walletPaymentService.payDeposit(rentalBookingId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.wallet }),
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.walletTransactions }),
+      ]);
+    },
+  });
+}
+
 export function useWithdrawalRequestMutation() {
   const queryClient = useQueryClient();
 

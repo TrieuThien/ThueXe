@@ -1,6 +1,6 @@
 ﻿import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -13,7 +13,7 @@ import {
 } from "../../components";
 import { useHomeOverviewQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
-import { useBookingDraftStore } from "../../store";
+import { useBookingDraftStore, useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
 import { RecentRoute } from "../../types";
 
@@ -24,6 +24,7 @@ export function BookingHomeScreen({ navigation }: Props) {
   const homeQuery = useHomeOverviewQuery();
   const setRideType = useBookingDraftStore((state) => state.setRideType);
   const setLocations = useBookingDraftStore((state) => state.setLocations);
+  const setServiceType = useRentalFlowStore((state) => state.setServiceType);
 
   const handleRecentRoutePress = (route: RecentRoute) => {
     setRideType(route.rideType);
@@ -51,10 +52,29 @@ export function BookingHomeScreen({ navigation }: Props) {
       onPress: () => navigation.navigate("RideLocationPicker"),
     },
     {
-      id: "rental",
-      title: "Thuê xe / Thuê tài xế",
-      icon: "key-outline",
-      onPress: () => navigation.navigate("RentalServiceChooser"),
+      id: "rental-car",
+      title: "Thuê xe",
+      icon: "car-outline",
+      onPress: () => {
+        setServiceType("RENTAL_CAR");
+        navigation.navigate("RentalBookingForm");
+      },
+    },
+    {
+      id: "rental-driver",
+      title: "Thuê tài xế",
+      icon: "person-outline",
+      onPress: () => {
+        setServiceType("RENTAL_DRIVER");
+        navigation.navigate("RentalBookingForm");
+      },
+    },
+    {
+      id: "rental-car-with-driver",
+      title: "Thuê xe kèm tài xế",
+      icon: "people-outline",
+      onPress: () =>
+        Alert.alert("Sắp ra mắt", "Chức năng thuê xe kèm tài xế đang được phát triển và sẽ sớm ra mắt."),
     },
     {
       id: "active-trip",
