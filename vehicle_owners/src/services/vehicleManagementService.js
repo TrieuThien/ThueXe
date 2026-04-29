@@ -9,13 +9,18 @@ export const vehicleManagementService = {
   },
 
   async createVehicle(payload) {
-    const { documents = [], vehiclePhoto, ...vehicleMeta } = payload;
+    const { documents = [], vehiclePhoto, vehicleInteriorPhotos = [], ...vehicleMeta } = payload;
     const formData = new FormData();
     Object.entries(vehicleMeta).forEach(([k, v]) => {
       if (v !== undefined && v !== null) formData.append(k, v);
     });
     if (vehiclePhoto instanceof File) {
       formData.append('vehicle_photo', vehiclePhoto);
+    }
+    for (const interiorPhoto of vehicleInteriorPhotos) {
+      if (interiorPhoto instanceof File) {
+        formData.append('vehicle_interior_photo', interiorPhoto);
+      }
     }
     const docsMeta = documents.map(({ file, fileUrl, ...rest }) => ({
       ...rest,

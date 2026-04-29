@@ -63,6 +63,8 @@ export default function VehicleRegistrationForm({
   const [documentFiles, setDocumentFiles] = useState({});
   const [vehiclePhoto, setVehiclePhoto] = useState(null);
   const [vehiclePhotoPreview, setVehiclePhotoPreview] = useState('');
+  const [vehicleInteriorPhotos, setVehicleInteriorPhotos] = useState([]);
+  const [vehicleInteriorPhotoPreviews, setVehicleInteriorPhotoPreviews] = useState([]);
 
   const requiredMissing = useMemo(
     () =>
@@ -127,6 +129,7 @@ export default function VehicleRegistrationForm({
       vin: values.vin.toUpperCase(),
       documents: docs,
       vehiclePhoto,
+      vehicleInteriorPhotos,
     });
   };
 
@@ -178,12 +181,12 @@ export default function VehicleRegistrationForm({
             </label>
             <label className="flex flex-col gap-1">
               <span className="form-label">Màu xe</span>
-              <input className="input-field" {...register('color')} placeholder='Ví dụ: MPV 7 chỗ hạng B đa dụng'/>
+              <input className="input-field" {...register('color')} placeholder='Ví dụ: MPV 7 chỗ hạng B đa dụng' />
               {errors.color ? <span className="error-text">{errors.color.message}</span> : null}
             </label>
             <label className="flex flex-col gap-1">
               <span className="form-label">Biển số</span>
-              <input className="input-field" {...register('plateNumber')} placeholder='51H-123.45'/>
+              <input className="input-field" {...register('plateNumber')} placeholder='51H-123.45' />
               {errors.plateNumber ? <span className="error-text">{errors.plateNumber.message}</span> : null}
             </label>
           </div>
@@ -235,31 +238,98 @@ export default function VehicleRegistrationForm({
 
         <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
           <h4 className="text-sm font-bold text-slate-800">Ảnh xe</h4>
-          <p className="mt-1 text-xs text-slate-500">Tải lên ảnh đại diện của xe (JPG, PNG, WebP, tối đa 5MB).</p>
-          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
-            <div className="flex-1">
-              <input
-                className="input-field p-2"
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => {
-                  const file = e.target.files?.[0] || null;
-                  setVehiclePhoto(file);
-                  setVehiclePhotoPreview(file ? URL.createObjectURL(file) : '');
-                }}
-              />
-              {vehiclePhoto && (
-                <p className="mt-1 text-xs text-slate-500">{vehiclePhoto.name}</p>
-              )}
+          <p className="mt-1 text-xs text-slate-500">Tải lên ảnh ngoại thất (tối đa 1 ảnh) và nội thất xe (tối đa 3 ảnh) (JPG, PNG, WebP, tối đa 5MB).</p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {/* Ảnh ngoại thất */}
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-700">
+                Ảnh ngoại thất <span className="text-rose-600">*</span>
+              </p>
+              <div className="mt-2 flex flex-col gap-2">
+                <input
+                  className="input-field p-2"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setVehiclePhoto(file);
+                    setVehiclePhotoPreview(file ? URL.createObjectURL(file) : '');
+                  }}
+                />
+                <p className="text-xs text-slate-500">{vehiclePhoto ? vehiclePhoto.name : 'Chưa chọn ảnh'}</p>
+                {vehiclePhotoPreview && (
+                  <img
+                    src={vehiclePhotoPreview}
+                    alt="Ảnh ngoại thất xem trước"
+                    className="h-32 w-full rounded-lg border border-slate-200 object-cover"
+                  />
+                )}
+              </div>
             </div>
-            {vehiclePhotoPreview && (
-              <img
-                src={vehiclePhotoPreview}
-                alt="Ảnh xe xem trước"
-                className="h-32 w-48 rounded-lg border border-slate-200 object-cover"
-              />
-            )}
+
+            {/* Ảnh nội thất */}
+            <div className="rounded-lg border border-slate-200 bg-white p-3">
+              <p className="text-sm font-semibold text-slate-700">
+                Ảnh nội thất <span className="text-rose-600">*</span>
+              </p>
+              <div className="mt-2 flex flex-col gap-2">
+                <input
+                  className="input-field p-2"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={(e) => {
+                    const newFiles = Array.from(e.target.files || []);
+                    const remainingSlots = 3 - vehicleInteriorPhotos.length;
+                    const filesToAdd = newFiles.slice(0, remainingSlots);
+
+                    const combinedPhotos = [...vehicleInteriorPhotos, ...filesToAdd];
+                    const combinedPreviews = [...vehicleInteriorPhotoPreviews, ...filesToAdd.map((file) => URL.createObjectURL(file))];
+
+                    setVehicleInteriorPhotos(combinedPhotos);
+                    setVehicleInteriorPhotoPreviews(combinedPreviews);
+
+                    // Reset input to allow re-selection
+                    e.target.value = '';
+                  }}
+                />
+                <p className="text-xs text-slate-500">
+                  {vehicleInteriorPhotos.length > 0 ? `${vehicleInteriorPhotos.length}/3 ảnh đã chọn` : 'Chưa chọn ảnh'}
+                </p>
+                {vehicleInteriorPhotoPreviews.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {vehicleInteriorPhotoPreviews.map((preview, index) => (
+                      <div key={preview} className="relative">
+                        <img
+                          src={preview}
+                          alt={`Ảnh nội thất ${index + 1}`}
+                          className="h-20 w-full rounded-lg border border-slate-200 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newPhotos = vehicleInteriorPhotos.filter((_, i) => i !== index);
+                            const newPreviews = vehicleInteriorPhotoPreviews.filter((_, i) => i !== index);
+                            setVehicleInteriorPhotos(newPhotos);
+                            setVehicleInteriorPhotoPreviews(newPreviews);
+                          }}
+                          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white hover:bg-rose-700"
+                          title="Xóa ảnh"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
           </div>
+          {(!vehiclePhoto || vehicleInteriorPhotos.length === 0) && (
+            <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Vui lòng tải lên ít nhất 1 ảnh ngoại thất và 1 ảnh nội thất xe.
+            </p>
+          )}
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -356,11 +426,17 @@ export default function VehicleRegistrationForm({
               setDocumentFiles({});
               setVehiclePhoto(null);
               setVehiclePhotoPreview('');
+              setVehicleInteriorPhotos([]);
+              setVehicleInteriorPhotoPreviews([]);
             }}
           >
             Làm mới form
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting || requiredMissing || !isVerified}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={submitting || requiredMissing || !isVerified || !vehiclePhoto || vehicleInteriorPhotos.length === 0}
+          >
             {submitting ? 'Đang gửi yêu cầu đăng ký...' : 'Đăng ký xe'}
           </button>
         </div>
@@ -368,6 +444,5 @@ export default function VehicleRegistrationForm({
     </section>
   );
 }
-
 
 
