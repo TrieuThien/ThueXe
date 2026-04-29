@@ -151,7 +151,7 @@ export async function sendOwnerRentalRequestEmail({
             `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Thời lượng</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${safeDuration} giờ</td></tr>` +
             `<tr><td style="padding:8px;color:#6b7280">Điểm đón</td><td style="padding:8px">${safePickup}</td></tr>` +
             `</table>` +
-            `<p style="margin-top:24px">Đăng nhập vào trang quản lý để xác nhận hoặc từ chối yêu cầu này.</p>` +
+            `<p style="margin-top:24px">Vui lòng đăng nhập vào <a href="${process.env.VEHICLE_OWNERS_URL}" style="color:#0369a1;text-decoration:underline;">trang quản lý</a> để tiếp tục xử lý hoặc từ chối yêu cầu này.</p>` +
             `</div>`,
     });
 }

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import {
+    calcOwnerRequiredBalance,
     countWalletLedgerByWallet,
     findBookingForWalletPayment,
     findDefaultCurrencyId,
@@ -464,6 +465,17 @@ export async function adminProcessWithdrawal({ withdrawalId, payload }) {
             if (wallet.balance < withdrawal.amount) {
                 throw new AppError("Insufficient wallet balance to settle withdrawal.", 409, "INSUFFICIENT_WALLET_BALANCE");
             }
+            if (wallet.actor_type === 2) {
+                const required = await calcOwnerRequiredBalance(wallet.actor_id, conn);
+                const nextAfter = Number((wallet.balance - withdrawal.amount).toFixed(2));
+                if (nextAfter < required) {
+                    throw new AppError(
+                        `Không thể thanh toán: số dư chủ xe sau khi rút (${nextAfter} VND) thấp hơn tiền cọc bắt buộc (${required} VND).`,
+                        409,
+                        "OWNER_INSUFFICIENT_FREE_BALANCE"
+                    );
+                }
+            }
             const nextBalance = Number((wallet.balance - withdrawal.amount).toFixed(2));
             await updateWalletBalance(wallet.wallet_id, nextBalance, conn);
             await insertWalletLedger(
@@ -494,6 +506,97 @@ export async function adminProcessWithdrawal({ withdrawalId, payload }) {
         return {
             withdrawal_id: numericWithdrawalId,
             status,
+        };
+    });
+}
+
+export async function adminDisputeRefund({ payload, auth }) {
+    const ownerId = Number(payload.owner_id);
+    const customerId = Number(payload.customer_id);
+    const amount = ensurePositiveAmount(payload.amount);
+    const rentalId = payload.rental_id ? Number(payload.rental_id) : null;
+    const note = payload.note || null;
+
+    if (!Number.isInteger(ownerId) || ownerId < 1) throw new AppError("Invalid owner_id.", 422, "INVALID_OWNER_ID");
+    if (!Number.isInteger(customerId) || customerId < 1) throw new AppError("Invalid customer_id.", 422, "INVALID_CUSTOMER_ID");
+
+    return runInTransaction(async (conn) => {
+        const currencyId = await findDefaultCurrencyId();
+
+        const ownerWallet = await findWalletByActor({ actorType: 2, actorId: ownerId }, conn);
+        if (!ownerWallet) throw new AppError("Owner wallet not found.", 404, "OWNER_WALLET_NOT_FOUND");
+        const lockedOwner = await findWalletByIdForUpdate(ownerWallet.wallet_id, conn);
+        if (!lockedOwner || lockedOwner.status !== 1) throw new AppError("Owner wallet is disabled.", 409, "WALLET_DISABLED");
+        if (lockedOwner.balance < amount) throw new AppError(`Số dư ví chủ xe không đủ (${lockedOwner.balance} VND) để bồi thường ${amount} VND.`, 409, "INSUFFICIENT_WALLET_BALANCE");
+
+        const ownerNextBalance = Number((lockedOwner.balance - amount).toFixed(2));
+
+        const customerWallet = await findOrCreateWallet({ actorType: 0, actorId: customerId, currencyId }, conn);
+        const lockedCustomer = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+        if (!lockedCustomer || lockedCustomer.status !== 1) throw new AppError("Customer wallet is disabled.", 409, "CUSTOMER_WALLET_DISABLED");
+
+        const customerNextBalance = Number((lockedCustomer.balance + amount).toFixed(2));
+
+        const description = note || `Bồi thường tranh chấp: chủ xe #${ownerId} → khách hàng #${customerId} (admin #${auth.userId})`;
+
+        const paymentId = await insertPayment(
+            {
+                payment_code: generatePaymentCode("DSP"),
+                payer_wallet_id: lockedOwner.wallet_id,
+                actor_type: 0,
+                actor_id: customerId,
+                service_domain: 4,
+                rental_id: rentalId,
+                amount,
+                currency_id: lockedOwner.currency_id,
+                status: "paid",
+                description,
+            },
+            conn
+        );
+
+        await updateWalletBalance(lockedOwner.wallet_id, ownerNextBalance, conn);
+        await insertWalletLedger(
+            {
+                wallet_id: lockedOwner.wallet_id,
+                payment_id: paymentId,
+                amount,
+                balance_after: ownerNextBalance,
+                direction: "debit",
+                entry_type: "dispute_refund",
+                source_type: "dispute_refund",
+                source_id: rentalId,
+                description,
+            },
+            conn
+        );
+
+        await updateWalletBalance(lockedCustomer.wallet_id, customerNextBalance, conn);
+        await insertWalletLedger(
+            {
+                wallet_id: lockedCustomer.wallet_id,
+                payment_id: paymentId,
+                amount,
+                balance_after: customerNextBalance,
+                direction: "credit",
+                entry_type: "dispute_refund",
+                source_type: "dispute_refund",
+                source_id: rentalId,
+                description,
+            },
+            conn
+        );
+
+        return {
+            payment_id: paymentId,
+            owner_id: ownerId,
+            customer_id: customerId,
+            rental_id: rentalId,
+            amount,
+            owner_balance_before: lockedOwner.balance,
+            owner_balance_after: ownerNextBalance,
+            customer_balance_before: lockedCustomer.balance,
+            customer_balance_after: customerNextBalance,
         };
     });
 }

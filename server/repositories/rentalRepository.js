@@ -256,7 +256,7 @@ export async function listActivePackagesWithGeo() {
 export async function listPackageCars(packageId) {
     const [rows] = await sqldb.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color,
-                v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status, v.photo_url,
+                v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status, v.photo_url, v.interior_photo_urls,
                 vt.type_name,
                 vo.fullname AS owner_name, vo.phone AS owner_phone,
                 ROUND(AVG(rv.rating), 1) AS avg_rating,
@@ -304,6 +304,7 @@ export async function listPackageCars(packageId) {
         owner_name: row.owner_name,
         owner_phone: row.owner_phone,
         photo_url: row.photo_url || null,
+        interior_photo_urls: (() => { try { return JSON.parse(row.interior_photo_urls || "[]"); } catch { return []; } })(),
         avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,
         rating_count: Number(row.rating_count || 0),
     }));
@@ -424,7 +425,12 @@ export async function createRentalBooking(payload, conn) {
             payload.status || "scheduled",
         ]
     );
-    return Number(result.insertId);
+    const rentalId = Number(result.insertId);
+    await db.query(
+        `INSERT INTO rental_booking_status_history (rental_id, status, note) VALUES (?, ?, NULL)`,
+        [rentalId, payload.status || "scheduled"]
+    );
+    return rentalId;
 }
 
 export async function findRentalBookingById(rentalId, conn) {
@@ -613,6 +619,10 @@ export async function updateRentalStatus(payload, conn) {
             payload.total_price,
             payload.rental_id,
         ]
+    );
+    await db.query(
+        `INSERT INTO rental_booking_status_history (rental_id, status, note) VALUES (?, ?, ?)`,
+        [payload.rental_id, payload.status, payload.cancel_reason || null]
     );
 }
 

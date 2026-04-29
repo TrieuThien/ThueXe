@@ -158,6 +158,19 @@ export async function insertWithdrawalRequest({ walletId, amount, note }, conn) 
     return Number(result.insertId);
 }
 
+export async function calcOwnerRequiredBalance(ownerId, conn) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT COALESCE(SUM(rp.deposit_amount), 0) AS required
+         FROM vehicle_rental_packages vrp
+         JOIN vehicles v ON v.vehicle_id = vrp.vehicle_id
+         JOIN rental_packages rp ON rp.package_id = vrp.package_id
+         WHERE v.owner_id = ?`,
+        [ownerId]
+    );
+    return Number(rows[0]?.required || 0);
+}
+
 export async function findWithdrawalByIdForUpdate(withdrawalId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(

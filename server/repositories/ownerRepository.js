@@ -381,8 +381,8 @@ export async function createOwnerVehicle(ownerId, payload, conn = null) {
     const [result] = await db.query(
         `INSERT INTO vehicles
          (owner_id, type_id, brand, model, year, color, license_plate, vin, seat_count, transmission,
-          fuel_type, odometer_km, status, is_verified, verification_status, notes, photo_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+          fuel_type, odometer_km, status, is_verified, verification_status, notes, photo_url, interior_photo_urls)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
         [
             ownerId,
             payload.type_id,
@@ -400,6 +400,7 @@ export async function createOwnerVehicle(ownerId, payload, conn = null) {
             payload.verification_status || "missing_documents",
             payload.notes || null,
             payload.photo_url || null,
+            payload.interior_photo_urls ? JSON.stringify(payload.interior_photo_urls) : null,
         ]
     );
     return Number(result.insertId);
@@ -410,6 +411,14 @@ export async function updateVehiclePhotoUrl(vehicleId, photoUrl, conn = null) {
     await db.query(
         `UPDATE vehicles SET photo_url = ? WHERE vehicle_id = ?`,
         [photoUrl || null, vehicleId]
+    );
+}
+
+export async function updateVehicleInteriorPhotoUrls(vehicleId, urlsArray, conn = null) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE vehicles SET interior_photo_urls = ? WHERE vehicle_id = ?`,
+        [urlsArray && urlsArray.length > 0 ? JSON.stringify(urlsArray) : null, vehicleId]
     );
 }
 
@@ -435,7 +444,7 @@ export async function listOwnerVehicles(ownerId, { search, status, page = 1, pag
     const [rows] = await sqldb.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.vin,
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
-                v.date_added, v.notes, v.photo_url, vt.type_name
+                v.date_added, v.notes, v.photo_url, v.interior_photo_urls, vt.type_name
          FROM vehicles v
          LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
          WHERE ${whereSql}
@@ -455,7 +464,7 @@ export async function findOwnerVehicleById(ownerId, vehicleId, conn = null) {
     const [rows] = await db.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.vin,
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
-                v.current_long, v.current_lat, v.date_added, v.notes, v.photo_url,
+                v.current_long, v.current_lat, v.date_added, v.notes, v.photo_url, v.interior_photo_urls,
                 vt.type_name
          FROM vehicles v
          INNER JOIN vehicle_types vt ON vt.type_id = v.type_id
@@ -820,6 +829,22 @@ export async function updateOwnerRentalStatus(rentalId, status, cancelReason = n
          WHERE rental_id = ?`,
         [status, cancelReason, rentalId]
     );
+    await db.query(
+        `INSERT INTO rental_booking_status_history (rental_id, status, note) VALUES (?, ?, ?)`,
+        [rentalId, status, cancelReason || null]
+    );
+}
+
+export async function listRentalStatusHistory(rentalId, conn = null) {
+    const db = dbConnection(conn);
+    const [rows] = await db.query(
+        `SELECT id, rental_id, status, note, created_at
+         FROM rental_booking_status_history
+         WHERE rental_id = ?
+         ORDER BY id ASC`,
+        [rentalId]
+    );
+    return rows;
 }
 
 export async function listContractsByOwner(ownerId, bookingId = null) {

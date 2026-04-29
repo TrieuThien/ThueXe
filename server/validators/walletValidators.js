@@ -62,3 +62,11 @@ export const adminProcessWithdrawalValidator = [
     body("note").optional({ values: "falsy" }).trim().isLength({ max: 255 }).withMessage("note must not exceed 255 characters"),
 ];
 
+export const adminDisputeRefundValidator = [
+    body("owner_id").isInt({ min: 1 }).withMessage("owner_id must be a positive integer").toInt(),
+    body("customer_id").isInt({ min: 1 }).withMessage("customer_id must be a positive integer").toInt(),
+    body("amount").isFloat({ gt: 0 }).withMessage("amount must be greater than 0").toFloat(),
+    body("rental_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("rental_id must be a positive integer").toInt(),
+    body("note").optional({ values: "falsy" }).trim().isLength({ max: 500 }).withMessage("note must not exceed 500 characters"),
+];
+

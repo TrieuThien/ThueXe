@@ -25,6 +25,7 @@ import {
     updateRentalPackage,
     updateRentalStatus,
 } from "../repositories/rentalRepository.js";
+import { calcOwnerRequiredBalance, findWalletByActor } from "../repositories/walletRepository.js";
 
 // n_type = 10 cho thông báo "yêu cầu thuê tài xế" trong driver_notifications
 const DRIVER_RENTAL_NOTIFY_TYPE = 10;
@@ -545,6 +546,20 @@ export async function setVehiclePackagesService({ ownerId, vehicleId, packageIds
         }
 
         await replaceVehiclePackages(numericVehicleId, uniqueIds, conn);
+
+        if (uniqueIds.length > 0) {
+            const required = await calcOwnerRequiredBalance(ownerId, conn);
+            const wallet = await findWalletByActor({ actorType: 2, actorId: Number(ownerId) }, conn);
+            const balance = wallet ? Number(wallet.balance) : 0;
+            if (balance < required) {
+                throw new AppError(
+                    `Số dư ví không đủ để đảm bảo tiền cọc. Cần tối thiểu ${required} VND, hiện có ${balance} VND.`,
+                    409,
+                    "OWNER_INSUFFICIENT_COLLATERAL"
+                );
+            }
+        }
+
         const packages = await listVehiclePackages(numericVehicleId, conn);
         return { vehicle_id: numericVehicleId, packages };
     });

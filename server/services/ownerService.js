@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { calcOwnerRequiredBalance } from "../repositories/walletRepository.js";
 import { createMomoPayment, mapMomoResultCode } from "./payment/momoService.js";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
@@ -67,6 +68,7 @@ import {
     updateOwnerVehicle,
     updatePaymentStatus,
     updateVehiclePhotoUrl,
+    updateVehicleInteriorPhotoUrls,
     updateVehicleVerificationStatus,
     updateWalletBalance,
     upsertOwnerDocument,
@@ -75,6 +77,7 @@ import {
     listVehicleRentalBookingBlocks,
     listOwnerVehicleMaintenanceForCalendar,
     deleteOwnerVehicleMaintenance,
+    listRentalStatusHistory,
 } from "../repositories/ownerRepository.js";
 
 const OWNER_USER_TYPE = 2;
@@ -699,6 +702,14 @@ function mapVehicleListItem(row, documentRows) {
 }
 
 function mapVehicleDetail(row, documents = []) {
+    const interiorPhotoUrls = (() => {
+        try {
+            const parsed = JSON.parse(row.interior_photo_urls || "[]");
+            return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+        } catch {
+            return [];
+        }
+    })();
     return {
         id: Number(row.vehicle_id),
         typeId: Number(row.type_id),
@@ -715,6 +726,7 @@ function mapVehicleDetail(row, documents = []) {
         odometerKm: Number(row.odometer_km || 0),
         notes: row.notes || "",
         photoUrl: row.photo_url || null,
+        interiorPhotoUrls,
         usageStatus: row.status,
         verificationStatus: row.verification_status || (Number(row.is_verified) === 1 ? "verified" : "pending_review"),
         addedAt: row.date_added,
@@ -769,8 +781,22 @@ export async function createOwnerVehicleService(auth, payload, uploadedFiles = [
     const type = await findVehicleTypeById(Number(payload.vehicleType));
     if (!type) throw new AppError("Vehicle type not found.", 404, "VEHICLE_TYPE_NOT_FOUND");
 
+    const vehiclePhotoFiles = uploadedFiles.filter((f) => f.fieldname === "vehicle_photo");
+    const interiorPhotoFiles = uploadedFiles.filter((f) => f.fieldname === "vehicle_interior_photo");
+
+    if (vehiclePhotoFiles.length > 1) {
+        throw new AppError("Maximum 1 exterior photo is allowed.", 422, "MAX_EXTERIOR_PHOTOS_EXCEEDED");
+    }
+    if (interiorPhotoFiles.length > 3) {
+        throw new AppError("Maximum 3 interior photos are allowed.", 422, "MAX_INTERIOR_PHOTOS_EXCEEDED");
+    }
+
     const fileMap = new Map();
-    for (const f of uploadedFiles) fileMap.set(f.fieldname, f);
+    for (const f of uploadedFiles) {
+        if (String(f.fieldname || "").startsWith("file_")) {
+            fileMap.set(f.fieldname, f);
+        }
+    }
 
     const vehicleId = await runInTx(async (conn) => {
         const createdId = await createOwnerVehicle(ownerId, {
@@ -790,13 +816,25 @@ export async function createOwnerVehicleService(auth, payload, uploadedFiles = [
             verification_status: "missing_documents",
         }, conn);
 
-        const vehiclePhotoFile = fileMap.get("vehicle_photo");
+        const vehiclePhotoFile = vehiclePhotoFiles[0];
         if (vehiclePhotoFile) {
             const uploaded = await uploadBufferToCloudinary(vehiclePhotoFile.buffer, {
                 folder: `thuexe/vehicles/${createdId}/photo`,
                 resource_type: "image",
             });
             await updateVehiclePhotoUrl(createdId, uploaded.secure_url, conn);
+        }
+
+        if (interiorPhotoFiles.length > 0) {
+            const uploadedInteriorUrls = [];
+            for (const interiorPhotoFile of interiorPhotoFiles) {
+                const uploaded = await uploadBufferToCloudinary(interiorPhotoFile.buffer, {
+                    folder: `thuexe/vehicles/${createdId}/interior`,
+                    resource_type: "image",
+                });
+                uploadedInteriorUrls.push(uploaded.secure_url);
+            }
+            await updateVehicleInteriorPhotoUrls(createdId, uploadedInteriorUrls, conn);
         }
 
         for (const doc of payload.documents || []) {
@@ -1243,9 +1281,13 @@ export async function listOwnerBookings(auth, query) {
 
 export async function getOwnerBookingDetail(auth, rentalIdInput) {
     const ownerId = ensureOwnerAuth(auth);
-    const rental = await findOwnerRentalById(ownerId, Number(rentalIdInput));
+    const rentalId = Number(rentalIdInput);
+    const rental = await findOwnerRentalById(ownerId, rentalId);
     if (!rental) throw new AppError("Booking not found.", 404, "BOOKING_NOT_FOUND");
-    const contracts = await listContractsByOwner(ownerId, Number(rentalIdInput));
+    const [contracts, historyRows] = await Promise.all([
+        listContractsByOwner(ownerId, rentalId),
+        listRentalStatusHistory(rentalId),
+    ]);
     return {
         id: String(rental.rental_id),
         orderCode: rental.rental_code,
@@ -1257,17 +1299,28 @@ export async function getOwnerBookingDetail(auth, rentalIdInput) {
             plateNumber: rental.license_plate || "",
             displayName: `${rental.brand || ""} ${rental.model || ""} ${rental.year || ""}`.trim(),
         },
-        servicePackage: { name: rental.package_name || "", serviceType: String(rental.service_type || "") },
+        servicePackage: {
+            name: rental.package_name || "",
+            serviceType: String(rental.service_type || ""),
+            includedDistanceKm: Number(rental.distance_limit_km || 0),
+        },
         pickup: { at: rental.start_datetime, address: rental.pickup_address },
-        dropoff: { at: rental.end_datetime, address: rental.dropoff_address },
+        dropoff: { at: rental.actual_end_datetime || rental.end_datetime, address: rental.dropoff_address },
+        cancelNote: rental.cancel_reason || null,
         costBreakdown: {
             totalAmount: Number(rental.total_price || 0) - Number(rental.deposit_amount || 0),
             basePrice: Number(rental.base_price || 0),
             depositAmount: Number(rental.deposit_amount || 0),
             extraTimeFee: Number(rental.extra_time_fee || 0),
             extraDistanceFee: Number(rental.extra_distance_fee || 0),
+            deliveryFee: 0,
+            discount: 0,
         },
-        statusHistory: [],
+        statusHistory: historyRows.map((row) => ({
+            status: BOOKING_STATUS_MAP[row.status] || row.status,
+            at: row.created_at,
+            note: row.note || null,
+        })),
         contracts: contracts.map((item) => ({
             id: String(item.contract_id),
             bookingId: String(item.rental_id),
@@ -1570,7 +1623,9 @@ export async function createOwnerRevenueWithdrawal(auth, payload, idempotencyKey
         const wallet = await ensureOwnerWallet(ownerId, conn);
         const locked = await findWalletByIdForUpdate(wallet.wallet_id, conn);
         if (!locked || Number(locked.status) !== 1) throw new AppError("Wallet disabled.", 409, "WALLET_DISABLED");
-        if (Number(locked.balance) < amount) throw new AppError("Insufficient balance.", 409, "INSUFFICIENT_WALLET_BALANCE");
+        const required = await calcOwnerRequiredBalance(ownerId, conn);
+        const freeBalance = Number(locked.balance) - required;
+        if (freeBalance < amount) throw new AppError(`Số dư khả dụng không đủ. Số dư: ${Number(locked.balance)} VND, đang giữ cọc: ${required} VND, có thể rút: ${Math.max(0, freeBalance)} VND.`, 409, "OWNER_INSUFFICIENT_FREE_BALANCE");
         const withdrawalId = await createWithdrawalRequest(Number(locked.wallet_id), amount, payload.note || null, conn);
         return { id: String(withdrawalId), requestCode: `WD-${withdrawalId}`, amount, status: "pending" };
     }));

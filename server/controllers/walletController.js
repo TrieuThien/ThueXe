@@ -1,6 +1,7 @@
 import { successResponse } from "../utils/apiResponse.js";
 import {
     adminAdjustWallet,
+    adminDisputeRefund,
     adminListWalletAccounts,
     adminListWalletLedger,
     adminProcessWithdrawal,
@@ -139,6 +140,15 @@ export async function adminProcessWithdrawalHandler(req, res, next) {
             payload: req.body,
         });
         return successResponse(res, result, "Withdrawal processed successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function adminDisputeRefundHandler(req, res, next) {
+    try {
+        const result = await adminDisputeRefund({ payload: req.body, auth: req.auth });
+        return successResponse(res, result, "Dispute refund processed successfully", 201);
     } catch (error) {
         return next(error);
     }

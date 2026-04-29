@@ -4,6 +4,7 @@ import requireRole from "../middlewares/roleMiddleware.js";
 import validateRequest from "../middlewares/validateRequest.js";
 import {
     adminAdjustWalletHandler,
+    adminDisputeRefundHandler,
     adminListWalletAccountsHandler,
     adminListWalletLedgerHandler,
     adminProcessWithdrawalHandler,
@@ -19,6 +20,7 @@ import {
 } from "../controllers/walletController.js";
 import {
     adminAdjustWalletValidator,
+    adminDisputeRefundValidator,
     adminProcessWithdrawalValidator,
     adminUpdateWalletStatusValidator,
     adminWalletAccountsValidator,
@@ -125,6 +127,14 @@ router.patch(
     adminProcessWithdrawalValidator,
     validateRequest,
     adminProcessWithdrawalHandler
+);
+router.post(
+    "/api/wallets/admin/dispute-refund",
+    requireAuth,
+    requireRole("admin"),
+    adminDisputeRefundValidator,
+    validateRequest,
+    adminDisputeRefundHandler
 );
 
 export default router;
