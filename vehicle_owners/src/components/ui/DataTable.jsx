@@ -8,6 +8,7 @@ export default function DataTable({
   emptyMessage,
   pagination,
   onPageChange,
+  tableClassName = '',
 }) {
   if (loading) {
     return <div className="surface-card">Đang tải dữ liệu...</div>;
@@ -24,11 +25,15 @@ export default function DataTable({
   return (
     <div className="overflow-hidden rounded-2xl border border-sky-100 bg-white">
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse text-sm">
+        <table className={`min-w-full border-collapse text-sm ${tableClassName}`}>
           <thead>
             <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
               {columns.map((column) => (
-                <th key={column.key} className="whitespace-nowrap px-3 py-3">
+                <th
+                  key={column.key}
+                  style={column.width ? { width: column.width } : undefined}
+                  className={`px-3 py-3 ${column.headerClassName || 'whitespace-nowrap'}`}
+                >
                   {column.header}
                 </th>
               ))}
@@ -38,7 +43,11 @@ export default function DataTable({
             {rows.map((row) => (
               <tr key={row.id} className="border-t border-slate-100">
                 {columns.map((column) => (
-                  <td key={`${row.id}-${column.key}`} className="whitespace-nowrap px-3 py-3 text-slate-700">
+                  <td
+                    key={`${row.id}-${column.key}`}
+                    style={column.width ? { width: column.width } : undefined}
+                    className={`px-3 py-3 text-slate-700 ${column.cellClassName || 'whitespace-nowrap'}`}
+                  >
                     {column.render ? column.render(row) : row[column.key]}
                   </td>
                 ))}
@@ -74,5 +83,3 @@ export default function DataTable({
     </div>
   );
 }
-
-

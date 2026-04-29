@@ -41,7 +41,7 @@ export const WITHDRAWAL_STATUS = {
 };
 
 export const STATUS_LABELS = {
-  [VEHICLE_STATUS.ACTIVE]: 'Đang hoat động',
+  [VEHICLE_STATUS.ACTIVE]: 'Đang hoạt động',
   [VEHICLE_STATUS.INACTIVE]: 'Tạm ngừng',
   [VEHICLE_STATUS.PENDING]: 'Chờ duyệt',
   [VEHICLE_STATUS.MAINTENANCE]: 'Bảo trì',
@@ -49,22 +49,22 @@ export const STATUS_LABELS = {
   [DOCUMENT_STATUS.PENDING]: 'Chờ duyệt',
   [DOCUMENT_STATUS.REJECTED]: 'Bị từ chối',
   [DOCUMENT_STATUS.EXPIRED]: 'Hết hạn',
-  [BOOKING_STATUS.CONFIRMED]: 'Ðã xác nhận',
+  [BOOKING_STATUS.CONFIRMED]: 'Đã xác nhận',
   [BOOKING_STATUS.PENDING]: 'Chờ xác nhận',
-  [BOOKING_STATUS.IN_PROGRESS]: 'Ðang thuê',
+  [BOOKING_STATUS.IN_PROGRESS]: 'Đang thuê',
   [BOOKING_STATUS.COMPLETED]: 'Hoàn tất',
-  [BOOKING_STATUS.CANCELED]: 'Ðã hủy',
-  [MAINTENANCE_STATUS.PLANNED]: 'Ðã lên lịch',
-  [MAINTENANCE_STATUS.IN_PROGRESS]: 'Ðang xử lý',
+  [BOOKING_STATUS.CANCELED]: 'Đã hủy',
+  [MAINTENANCE_STATUS.PLANNED]: 'Đã lên lịch',
+  [MAINTENANCE_STATUS.IN_PROGRESS]: 'Đang xử lý',
   [MAINTENANCE_STATUS.DONE]: 'Hoàn tất',
   [PAYMENT_STATUS.PENDING]: 'Chờ thanh toán',
   [PAYMENT_STATUS.SUCCESS]: 'Thành công',
   [PAYMENT_STATUS.FAILED]: 'Thất bại',
-  [PAYMENT_STATUS.REFUNDED]: 'Ðã hoàn tiền',
+  [PAYMENT_STATUS.REFUNDED]: 'Đã hoàn tiền',
   [WITHDRAWAL_STATUS.PENDING]: 'Chờ duyệt',
-  [WITHDRAWAL_STATUS.APPROVED]: 'Ðã duyệt',
+  [WITHDRAWAL_STATUS.APPROVED]: 'Đã duyệt',
   [WITHDRAWAL_STATUS.REJECTED]: 'Bị từ chối',
-  [WITHDRAWAL_STATUS.PAID]: 'Ðã cHủyển khoản',
+  [WITHDRAWAL_STATUS.PAID]: 'Đã thanh toán',
 };
 
 export const STATUS_VARIANTS = {
@@ -79,10 +79,10 @@ export const STATUS_VARIANTS = {
   pending: 'warning',
   planned: 'warning',
   inactive: 'neutral',
-  canceled: 'Đanger',
-  rejected: 'Đanger',
-  expired: 'Đanger',
-  failed: 'Đanger',
+  canceled: 'danger',
+  rejected: 'danger',
+  expired: 'danger',
+  failed: 'danger',
   refunded: 'neutral',
 };
 

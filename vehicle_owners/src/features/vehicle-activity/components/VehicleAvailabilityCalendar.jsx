@@ -1,10 +1,13 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const blockColor = {
-  available: 'bg-emerald-500',
-  unavailable: 'bg-slate-500',
   booked: 'bg-sky-500',
   maintenance: 'bg-amber-500',
+};
+
+const blockLabel = {
+  booked: 'Đã được đặt',
+  maintenance: 'Bảo trì',
 };
 
 const viewRanges = {
@@ -34,7 +37,6 @@ export default function VehicleAvailabilityCalendar({
   submitting,
 }) {
   const [draftBlock, setDraftBlock] = useState({
-    type: 'available',
     startAt: toDateTimeLocal(new Date()),
     endAt: toDateTimeLocal(new Date(Date.now() + 2 * 60 * 60 * 1000)),
     note: '',
@@ -54,11 +56,8 @@ export default function VehicleAvailabilityCalendar({
   const blocks = availabilityData?.blocks || [];
 
   const createBlock = () => {
-    if (!selectedVehicleId) {
-      return;
-    }
+    if (!selectedVehicleId) return;
     onCreateBlock(selectedVehicleId, {
-      type: draftBlock.type,
       startAt: new Date(draftBlock.startAt).toISOString(),
       endAt: new Date(draftBlock.endAt).toISOString(),
       note: draftBlock.note.trim(),
@@ -115,15 +114,23 @@ export default function VehicleAvailabilityCalendar({
               {!loading && blocks.length > 0 ? (
                 <div className="space-y-2">
                   {blocks.map((block) => (
-                    <div key={block.id} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2 py-1.5">
+                    <div key={`${block.type}-${block.id}`} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-2 py-1.5">
                       <p className="text-sm text-slate-700">
-                        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${blockColor[block.type] || blockColor.unavailable}`} />
-                        {block.type} - {new Date(block.startAt).toLocaleString('vi-VN')} {'->'}{' '}
+                        <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${blockColor[block.type] || 'bg-slate-400'}`} />
+                        <span className="font-medium">{blockLabel[block.type] || block.type}</span>
+                        {block.note ? <span className="ml-1 text-slate-500">({block.note})</span> : null}
+                        {' — '}
+                        {new Date(block.startAt).toLocaleString('vi-VN')}
+                        {' → '}
                         {new Date(block.endAt).toLocaleString('vi-VN')}
                       </p>
-                      <button type="button" className="btn" onClick={() => onDeleteBlock(selectedVehicleId, block.id)}>
-                        Xóa
-                      </button>
+                      {block.deletable ? (
+                        <button type="button" className="btn" onClick={() => onDeleteBlock(selectedVehicleId, block.id)}>
+                          Xóa
+                        </button>
+                      ) : (
+                        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-600">Đặt bởi khách</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -133,46 +140,60 @@ export default function VehicleAvailabilityCalendar({
         </div>
 
         <aside className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="text-base font-bold text-slate-900">Tạo lịch</h3>
+          <h3 className="text-base font-bold text-slate-900">Tạo lịch bảo trì</h3>
+          <p className="mt-1 text-xs text-slate-500">Trong thời gian bảo trì, xe sẽ không xuất hiện để khách đặt.</p>
           <div className="mt-3 space-y-2">
-            <select
-              className="input-field"
-              value={draftBlock.type}
-              onChange={(event) => setDraftBlock((prev) => ({ ...prev, type: event.target.value }))}
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Bắt đầu</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={draftBlock.startAt}
+                onChange={(event) => setDraftBlock((prev) => ({ ...prev, startAt: event.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Kết thúc</label>
+              <input
+                type="datetime-local"
+                className="input-field"
+                value={draftBlock.endAt}
+                onChange={(event) => setDraftBlock((prev) => ({ ...prev, endAt: event.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-600">Ghi chú</label>
+              <textarea
+                rows={3}
+                className="input-field resize-y"
+                value={draftBlock.note}
+                onChange={(event) => setDraftBlock((prev) => ({ ...prev, note: event.target.value }))}
+                placeholder="Ví dụ: Thay dầu, kiểm tra định kỳ..."
+              />
+            </div>
+            <button
+              type="button"
+              className="btn btn-primary w-full"
+              onClick={createBlock}
+              disabled={!selectedVehicleId || submitting}
             >
-              <option value="available">Khả dụng</option>
-              <option value="unavailable">Không khả dụng</option>
-              <option value="booked">Đã đặt</option>
-              <option value="maintenance">Bảo trì</option>
-            </select>
-            <input
-              type="datetime-local"
-              className="input-field"
-              value={draftBlock.startAt}
-              onChange={(event) => setDraftBlock((prev) => ({ ...prev, startAt: event.target.value }))}
-            />
-            <input
-              type="datetime-local"
-              className="input-field"
-              value={draftBlock.endAt}
-              onChange={(event) => setDraftBlock((prev) => ({ ...prev, endAt: event.target.value }))}
-            />
-            <textarea
-              rows={3}
-              className="input-field resize-y"
-              value={draftBlock.note}
-              onChange={(event) => setDraftBlock((prev) => ({ ...prev, note: event.target.value }))}
-              placeholder="Ghi chú (nếu có)"
-            />
-            <button type="button" className="btn btn-primary w-full" onClick={createBlock} disabled={!selectedVehicleId || submitting}>
-              {submitting ? 'Đang Cập nhật...' : 'Tạo lịch'}
+              {submitting ? 'Đang lưu...' : 'Tạo lịch bảo trì'}
             </button>
+          </div>
+
+          <div className="mt-4 space-y-1 rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <p className="text-xs font-semibold text-slate-600">Chú thích</p>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-500" />
+              Lịch bảo trì (chủ xe tạo)
+            </div>
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-sky-500" />
+              Đã được khách đặt
+            </div>
           </div>
         </aside>
       </div>
     </section>
   );
 }
-
-
-

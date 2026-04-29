@@ -12,7 +12,7 @@ import { vehicleActivityService } from '../services/vehicleActivityService';
 const tabs = [
   { key: 'list', label: 'Danh sách xe' },
   { key: 'map', label: 'Bản đồ vị trí xe' },
-  { key: 'calendar', label: 'Lịch khả dụng' },
+  { key: 'calendar', label: 'Lịch bảo trì' },
   { key: 'gantt', label: 'Lược đồ Gantt' },
 ];
 
@@ -79,21 +79,32 @@ export default function VehicleActivityPage() {
   const createBlockMutation = useMutation({
     mutationFn: ({ vehicleId, payload }) => vehicleActivityService.createAvailabilityBlock(vehicleId, payload),
     onSuccess: () => {
-      toast.success('Tạo lịch thành công.');
+      toast.success('Tạo lịch bảo trì thành công.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-activity-availability'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-activity-gantt'] });
     },
-    onError: (error) => toast.error(error.message || 'Không thể tạo lịch.'),
+    onError: (error) => toast.error(error.message || 'Không thể tạo lịch bảo trì.'),
   });
 
   const deleteBlockMutation = useMutation({
     mutationFn: ({ vehicleId, blockId }) => vehicleActivityService.deleteAvailabilityBlock(vehicleId, blockId),
     onSuccess: () => {
-      toast.success('Đã xóa lịch.');
+      toast.success('Đã xóa lịch bảo trì.');
       queryClient.invalidateQueries({ queryKey: ['vehicle-activity-availability'] });
       queryClient.invalidateQueries({ queryKey: ['vehicle-activity-gantt'] });
     },
-    onError: (error) => toast.error(error.message || 'Không thể xóa lịch.'),
+    onError: (error) => toast.error(error.message || 'Không thể xóa lịch bảo trì.'),
+  });
+
+  const toggleStatusMutation = useMutation({
+    mutationFn: (vehicleId) => vehicleActivityService.toggleVehicleOperationStatus(vehicleId),
+    onSuccess: (data) => {
+      const label = data.status === 'available' ? 'Xe đã được bật hoạt động.' : 'Xe đã dừng hoạt động.';
+      toast.success(label);
+      queryClient.invalidateQueries({ queryKey: ['vehicle-activity-list'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicle-activity-gantt'] });
+    },
+    onError: (error) => toast.error(error.message || 'Không thể thay đổi trạng thái xe.'),
   });
 
   const allVehicles = listVehiclesQuery.data?.items || [];
@@ -141,6 +152,8 @@ export default function VehicleActivityPage() {
           onSearchChange={(search) => setListQuery((prev) => ({ ...prev, search, page: 1 }))}
           onStatusChange={(status) => setListQuery((prev) => ({ ...prev, status, page: 1 }))}
           onPageChange={(page) => setListQuery((prev) => ({ ...prev, page }))}
+          onToggleStatus={(vehicleId) => toggleStatusMutation.mutate(vehicleId)}
+          togglingVehicleId={toggleStatusMutation.isPending ? toggleStatusMutation.variables : null}
         />
       ) : null}
 

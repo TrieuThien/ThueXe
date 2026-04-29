@@ -29,7 +29,7 @@ export default function BookingsPage() {
     mutationFn: ({ id, status }) => ownerService.updateBookingStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['owner-bookings'] });
-      toast.success('Cập nhật Trạng thái don thành công');
+      toast.success('Cập nhật trạng thái đơn thành công');
       setActionTarget(null);
     },
     onError: (error) => toast.error(error.message),
@@ -37,19 +37,37 @@ export default function BookingsPage() {
 
   const columns = useMemo(
     () => [
-      { key: 'code', header: 'Mã don' },
+      {
+        key: 'code',
+        header: 'Mã đơn',
+        width: '96px',
+        headerClassName: 'whitespace-nowrap',
+        cellClassName: 'overflow-hidden',
+        render: (row) => (
+          <span className="block w-[96px] truncate font-mono text-xs" title={row.code}>
+            {row.code}
+          </span>
+        ),
+      },
       { key: 'vehicleName', header: 'Xe' },
-      { key: 'customerName', header: 'khách hàng' },
+      {
+        key: 'customerName',
+        header: 'Khách hàng',
+        headerClassName: 'whitespace-nowrap min-w-[180px]',
+        cellClassName: 'min-w-[180px]',
+      },
       {
         key: 'time',
-        header: 'Thời gian thue',
+        header: 'Bắt đầu / Kết thúc',
+        headerClassName: 'whitespace-nowrap min-w-[220px]',
+        cellClassName: 'whitespace-nowrap min-w-[220px]',
         render: (row) => `${formatDate(row.startDate)} - ${formatDate(row.endDate)}`,
       },
-      { key: 'totalAmount', header: 'Tong tien', render: (row) => formatCurrency(row.totalAmount) },
+      { key: 'totalAmount', header: 'Tổng tiền', render: (row) => formatCurrency(row.totalAmount) },
       { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
       {
         key: 'action',
-        header: 'Thao tac',
+        header: 'Thao tác',
         render: (row) => (
           <div className="flex gap-2">
             <button
@@ -59,12 +77,12 @@ export default function BookingsPage() {
                 setActionTarget({
                   id: row.id,
                   status: BOOKING_STATUS.CONFIRMED,
-                  label: 'xac nhan',
+                  label: 'Xác nhận',
                 })
               }
               disabled={row.status === BOOKING_STATUS.CONFIRMED || row.status === BOOKING_STATUS.COMPLETED}
             >
-              Xac nhan
+              Xác nhận
             </button>
             <button
               type="button"
@@ -93,7 +111,6 @@ export default function BookingsPage() {
         title="Quản lý đơn thuê"
         description="Lọc theo trạng thái đơn, xác nhận lịch thuê, xử lý đơn hủy nhanh chóng."
       />
-
       <SearchFilterBar
         searchValue={query.search}
         onSearchChange={(search) => setQuery((prev) => ({ ...prev, page: 1, search }))}
@@ -101,23 +118,24 @@ export default function BookingsPage() {
         onStatusChange={(status) => setQuery((prev) => ({ ...prev, page: 1, status }))}
         statusOptions={statusOptions}
         onReset={() => setQuery((prev) => ({ ...prev, page: 1, search: '', status: 'all' }))}
-        searchPlaceholder="Tìm theo mã don, ten xe, khách hàng"
+        searchPlaceholder="Tìm theo mã đơn, tên xe, khách hàng"
       />
-
+      
       <DataTable
+        tableClassName="table-fixed"
         columns={columns}
         rows={data?.items || []}
         loading={isLoading}
         error={isError}
         pagination={data}
         onPageChange={(page) => setQuery((prev) => ({ ...prev, page }))}
-        emptyMessage="Không co don thue phu hop bo loc."
+        emptyMessage="Không có đơn thuê phù hợp với bộ lọc."
       />
 
       <ConfirmDialog
         open={Boolean(actionTarget)}
-        title="Xac nhan thao tac"
-        message={`Ban chac chan muon ${actionTarget?.label || ''} don nay?`}
+        title="Xác nhận thao tác"
+        message={`Bạn chắc chắn muốn ${actionTarget?.label || ''} đơn này?`}
         onCancel={() => setActionTarget(null)}
         onConfirm={() => mutation.mutate({ id: actionTarget.id, status: actionTarget.status })}
         loading={mutation.isPending}
@@ -125,5 +143,3 @@ export default function BookingsPage() {
     </section>
   );
 }
-
-

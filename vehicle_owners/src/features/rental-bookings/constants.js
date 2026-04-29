@@ -8,6 +8,7 @@
 
 export const RENTAL_PAYMENT_STATUS_LABELS = {
   pending: 'Chờ thanh toán',
+  deposit_paid: 'Đã đặt cọc',
   paid: 'Đã thanh toán',
   partial_paid: 'Thanh toán một phần',
   failed: 'Thất bại',
@@ -30,6 +31,7 @@ export const RENTAL_ORDER_STATUS_BADGES = {
 
 export const RENTAL_PAYMENT_STATUS_BADGES = {
   pending: 'border-amber-200 bg-amber-50 text-amber-700',
+  deposit_paid: 'border-violet-200 bg-violet-50 text-violet-700',
   paid: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   partial_paid: 'border-sky-200 bg-sky-50 text-sky-700',
   failed: 'border-rose-200 bg-rose-50 text-rose-700',

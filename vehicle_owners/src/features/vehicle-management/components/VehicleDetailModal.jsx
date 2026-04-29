@@ -27,7 +27,7 @@ const fuelLangMap = new Map([
   ['hybrid', 'Hybrid']
 ])
 
-export default function VehicleDetailModal({ open, vehicle, loading, onClose }) {
+export default function VehicleDetailModal({ open, vehicle, loading, uploadingPhoto, onClose, onUpdatePhoto }) {
   if (!open) {
     return null;
   }
@@ -47,6 +47,34 @@ export default function VehicleDetailModal({ open, vehicle, loading, onClose }) 
         {!loading && !vehicle ? <p className="text-sm text-slate-500">Không co dữ liệu xe.</p> : null}
         {!loading && vehicle ? (
           <div className="space-y-4">
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              {vehicle.photoUrl ? (
+                <img
+                  src={vehicle.photoUrl}
+                  alt={`Ảnh xe ${vehicle.plateNumber}`}
+                  className="h-56 w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-56 w-full flex-col items-center justify-center gap-2 bg-slate-50">
+                  <span className="text-5xl">🚗</span>
+                  <p className="text-sm text-slate-400">Chưa có ảnh xe</p>
+                </div>
+              )}
+              <label className={`flex cursor-pointer items-center justify-center gap-1.5 border-t border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-50 ${uploadingPhoto ? 'pointer-events-none opacity-60' : ''}`}>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/webp"
+                  disabled={uploadingPhoto}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) onUpdatePhoto(file);
+                    e.target.value = '';
+                  }}
+                />
+                {uploadingPhoto ? 'Đang tải lên...' : vehicle.photoUrl ? '🔄 Đổi ảnh xe' : '📷 Thêm ảnh xe'}
+              </label>
+            </div>
             <div className="grid gap-2 md:grid-cols-3">
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
                 <span className="font-semibold">Biển số:</span> {vehicle.plateNumber}

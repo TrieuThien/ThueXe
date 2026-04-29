@@ -232,7 +232,7 @@ export const payments = [
     bookingCode: 'TX-20260320-005',
     customerName: 'Vo Thi Linh',
     amount: 1700000,
-    method: 'VNPay',
+    method: 'Momo',
     paidAt: '2026-03-17T10:12:00',
     status: PAYMENT_STATUS.SUCCESS,
   },

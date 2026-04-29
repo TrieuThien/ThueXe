@@ -70,7 +70,7 @@ export const paymentHistorySeed = [
   {
     id: 'payh-001',
     paymentCode: 'PAY-20260403-333',
-    method: 'VNPay',
+    method: 'Momo',
     amount: 1950000,
     status: 'success',
     createdAt: '2026-04-03T09:00:00.000Z',

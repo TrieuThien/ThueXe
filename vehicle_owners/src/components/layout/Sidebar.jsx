@@ -37,11 +37,12 @@ export default function Sidebar() {
             key={item.path}
             to={item.path}
             onClick={closeMobileSidebar}
+            title={sidebarCollapsed ? item.label : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${isActive ? 'border border-sky-300/40 bg-sky-400/20 text-white' : 'text-slate-200 hover:bg-slate-700/70'}`
+              `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${sidebarCollapsed ? 'justify-center' : ''} ${isActive ? 'border border-sky-300/40 bg-sky-400/20 text-white' : 'text-slate-200 hover:bg-slate-700/70'}`
             }
           >
-            <span className="h-2 w-2 rounded-full bg-sky-400" />
+            <item.icon size={18} className="shrink-0" />
             {!sidebarCollapsed && <span>{item.label}</span>}
           </NavLink>
         ))}

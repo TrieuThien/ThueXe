@@ -25,7 +25,7 @@ export default function PaymentHistoryTable({ data, loading, onPageChange }) {
               <th className="px-3 py-2 font-semibold">Mã giao dịch</th>
               <th className="px-3 py-2 font-semibold">Loại giao dịch</th>
               <th className="px-3 py-2 font-semibold">Số tiền</th>
-              <th className="px-3 py-2 font-semibold">Chiều giao dịch</th>
+              <th className="px-3 py-2 font-semibold">Phương thức</th>
               <th className="px-3 py-2 font-semibold">Trạng thái</th>
               <th className="px-3 py-2 font-semibold">Thời gian</th>
               <th className="px-3 py-2 font-semibold">Mô tả</th>

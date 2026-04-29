@@ -44,8 +44,8 @@ export default function RentalBookingDetailPage() {
   return (
     <section className="space-y-4">
       <PageHeader
-        title="chi tiết don thue"
-        description="Xem thông tin đầy đủ don thue, timeline, hop dong va Cập nhật Trạng thái theo quy tac."
+        title="Chi tiết đơn thuê"
+        description="Xem thông tin đầy đủ đơn thuê, timeline, hợp đồng và Cập nhật Trạng thái theo quy tắc."
         actions={
           <Link className="btn" to={OWNER_ROUTES.BOOKINGS}>
             Quay lại danh sách

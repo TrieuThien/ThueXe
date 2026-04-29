@@ -18,20 +18,36 @@ export const OWNER_ROUTES = {
   RENTAL_PACKAGES: '/owner/rental-packages',
 };
 
+import {
+  LayoutDashboard,
+  Activity,
+  Package,
+  ClipboardList,
+  Wrench,
+  Car,
+  FileText,
+  TrendingUp,
+  CreditCard,
+  Wallet,
+  ArrowDownToLine,
+  User,
+  ShieldCheck,
+} from 'lucide-react';
+
 export const NAV_ITEMS = [
-  { label: 'Tổng quan', path: OWNER_ROUTES.DASHBOARD },
-  { label: 'Tài khoản', path: OWNER_ROUTES.ACCOUNT_PROFILE },
-  { label: 'Xác thực tài khoản', path: OWNER_ROUTES.ACCOUNT_VERIFICATION },
-  { label: 'Hoạt động xe', path: OWNER_ROUTES.VEHICLE_ACTIVITY },
-  { label: 'Xe của tôi', path: OWNER_ROUTES.VEHICLES },
-  { label: 'Gói thuê xe', path: OWNER_ROUTES.RENTAL_PACKAGES },
-  { label: 'Giấy tờ', path: OWNER_ROUTES.DOCUMENTS },
-  { label: 'Đơn thuê', path: OWNER_ROUTES.BOOKINGS },
-  { label: 'Bảo trì', path: OWNER_ROUTES.MAINTENANCE },
-  { label: 'Doanh thu', path: OWNER_ROUTES.REVENUE },
-  { label: 'Thanh toán', path: OWNER_ROUTES.PAYMENTS },
-  { label: 'Ví chủ xe', path: OWNER_ROUTES.WALLET },
-  { label: 'Rút tiền', path: OWNER_ROUTES.WITHDRAWALS },
+  { label: 'Tổng quan', path: OWNER_ROUTES.DASHBOARD, icon: LayoutDashboard },
+  { label: 'Hoạt động xe', path: OWNER_ROUTES.VEHICLE_ACTIVITY, icon: Activity },
+  { label: 'Gói thuê xe', path: OWNER_ROUTES.RENTAL_PACKAGES, icon: Package },
+  { label: 'Đơn thuê', path: OWNER_ROUTES.BOOKINGS, icon: ClipboardList },
+  { label: 'Bảo trì', path: OWNER_ROUTES.MAINTENANCE, icon: Wrench },
+  { label: 'Đăng ký xe', path: OWNER_ROUTES.VEHICLES, icon: Car },
+  { label: 'Giấy tờ', path: OWNER_ROUTES.DOCUMENTS, icon: FileText },
+  { label: 'Doanh thu', path: OWNER_ROUTES.REVENUE, icon: TrendingUp },
+  { label: 'Thanh toán', path: OWNER_ROUTES.PAYMENTS, icon: CreditCard },
+  { label: 'Ví chủ xe', path: OWNER_ROUTES.WALLET, icon: Wallet },
+  { label: 'Rút tiền', path: OWNER_ROUTES.WITHDRAWALS, icon: ArrowDownToLine },
+  { label: 'Tài khoản', path: OWNER_ROUTES.ACCOUNT_PROFILE, icon: User },
+  { label: 'Xác thực tài khoản', path: OWNER_ROUTES.ACCOUNT_VERIFICATION, icon: ShieldCheck },
 ];
 
 export const BREADCRUMB_LABELS = {

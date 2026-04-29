@@ -2,7 +2,7 @@
 
 export default function TopupWalletForm({ submitting, onSubmit }) {
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('VNPay');
+  const [method, setMethod] = useState('Momo');
   const [error, setError] = useState('');
 
   const submit = () => {
@@ -32,7 +32,6 @@ export default function TopupWalletForm({ submitting, onSubmit }) {
           placeholder="Nhập số tiền nạp vào ví"
         />
         <select className="input-field" value={method} onChange={(event) => setMethod(event.target.value)}>
-          <option value="VNPay">VNPay</option>
           <option value="Momo">Momo</option>
           <option value="BankTransfer">Chuyển khoản</option>
         </select>

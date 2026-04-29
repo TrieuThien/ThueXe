@@ -54,4 +54,9 @@ export const vehicleActivityService = {
     const response = await apiClient.get('/vehicle-activity/timeline', { params });
     return unwrap(response);
   },
+
+  async toggleVehicleOperationStatus(vehicleId) {
+    const response = await apiClient.patch(`/vehicle-activity/vehicles/${vehicleId}/operation-status`);
+    return unwrap(response);
+  },
 };

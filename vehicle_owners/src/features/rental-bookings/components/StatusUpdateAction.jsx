@@ -25,7 +25,7 @@ export default function StatusUpdateAction({ booking, loading, onSubmit }) {
   if (nextOptions.length === 0) {
     return (
       <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        Don o Trạng thái cuoi, Không thể Cập nhật them.
+        Đơn ở trạng thái cuối, Không thể cập nhật thêm.
       </p>
     );
   }
@@ -45,10 +45,10 @@ export default function StatusUpdateAction({ booking, loading, onSubmit }) {
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h4 className="text-base font-bold text-slate-900">Cập nhật Trạng thái don</h4>
+      <h4 className="text-base font-bold text-slate-900">Cập nhật trạng thái đơn</h4>
       <div className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_auto]">
         <select className="input-field" value={nextStatus} onChange={(event) => setNextStatus(event.target.value)}>
-          <option value="">Chọn Trạng thái moi</option>
+          <option value="">Chọn trạng thái mới</option>
           {nextOptions.map((status) => (
             <option key={status} value={status}>
               {RENTAL_ORDER_STATUS_LABELS[status]}
@@ -59,10 +59,10 @@ export default function StatusUpdateAction({ booking, loading, onSubmit }) {
           className="input-field"
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder={nextStatus === 'canceled' ? 'Nhập ghi chu Hủy (bat buoc)' : 'Ghi chu Cập nhật (neu co)'}
+          placeholder={nextStatus === 'canceled' ? 'Nhập ghi chú hủy (bắt buộc)' : 'Ghi chú cập nhật (nếu có)'}
         />
         <button type="button" className="btn btn-primary" onClick={submit} disabled={!nextStatus || loading}>
-          {loading ? 'Đang Cập nhật...' : 'Cập nhật'}
+          {loading ? 'Đang cập nhật...' : 'Cập nhật'}
         </button>
       </div>
     </article>

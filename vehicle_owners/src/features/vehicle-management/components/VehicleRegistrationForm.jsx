@@ -1,7 +1,9 @@
 ﻿import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { OWNER_ROUTES } from '../../../constants/routes';
 
 const vehicleSchema = z.object({
   vehicleType: z.string().min(1, 'Vui lòng chọn Loại xe.'),
@@ -45,6 +47,7 @@ export default function VehicleRegistrationForm({
   documentCatalog,
   submitting,
   duplicatePlateError,
+  isVerified = true,
   onSubmit,
 }) {
   const {
@@ -58,6 +61,8 @@ export default function VehicleRegistrationForm({
   });
 
   const [documentFiles, setDocumentFiles] = useState({});
+  const [vehiclePhoto, setVehiclePhoto] = useState(null);
+  const [vehiclePhotoPreview, setVehiclePhotoPreview] = useState('');
 
   const requiredMissing = useMemo(
     () =>
@@ -121,6 +126,7 @@ export default function VehicleRegistrationForm({
       plateNumber: values.plateNumber.toUpperCase(),
       vin: values.vin.toUpperCase(),
       documents: docs,
+      vehiclePhoto,
     });
   };
 
@@ -128,6 +134,17 @@ export default function VehicleRegistrationForm({
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="text-lg font-bold text-slate-900">Đăng ký xe mới</h3>
       <p className="mt-1 text-sm text-slate-500">Nhập thông tin xe và tải lên giấy tờ cần thiết để gửi duyệt.</p>
+
+      {!isVerified && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+          <p className="text-sm font-semibold text-rose-700">
+            Tài khoản chưa được xác minh — Bạn cần hoàn tất xác minh tài khoản trước khi đăng ký xe.
+          </p>
+          <Link className="btn btn-primary shrink-0" to={OWNER_ROUTES.ACCOUNT_VERIFICATION}>
+            Xác minh ngay
+          </Link>
+        </div>
+      )}
 
       <form className="mt-4 space-y-4" onSubmit={handleSubmit(submitForm)}>
         <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -213,6 +230,35 @@ export default function VehicleRegistrationForm({
               <span className="form-label">Ghi chú</span>
               <textarea rows={2} className="input-field resize-y" {...register('notes')} />
             </label>
+          </div>
+        </article>
+
+        <article className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <h4 className="text-sm font-bold text-slate-800">Ảnh xe</h4>
+          <p className="mt-1 text-xs text-slate-500">Tải lên ảnh đại diện của xe (JPG, PNG, WebP, tối đa 5MB).</p>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
+            <div className="flex-1">
+              <input
+                className="input-field p-2"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setVehiclePhoto(file);
+                  setVehiclePhotoPreview(file ? URL.createObjectURL(file) : '');
+                }}
+              />
+              {vehiclePhoto && (
+                <p className="mt-1 text-xs text-slate-500">{vehiclePhoto.name}</p>
+              )}
+            </div>
+            {vehiclePhotoPreview && (
+              <img
+                src={vehiclePhotoPreview}
+                alt="Ảnh xe xem trước"
+                className="h-32 w-48 rounded-lg border border-slate-200 object-cover"
+              />
+            )}
           </div>
         </article>
 
@@ -308,11 +354,13 @@ export default function VehicleRegistrationForm({
             onClick={() => {
               reset(defaultValues);
               setDocumentFiles({});
+              setVehiclePhoto(null);
+              setVehiclePhotoPreview('');
             }}
           >
             Làm mới form
           </button>
-          <button type="submit" className="btn btn-primary" disabled={submitting || requiredMissing}>
+          <button type="submit" className="btn btn-primary" disabled={submitting || requiredMissing || !isVerified}>
             {submitting ? 'Đang gửi yêu cầu đăng ký...' : 'Đăng ký xe'}
           </button>
         </div>

@@ -9,11 +9,14 @@ export const vehicleManagementService = {
   },
 
   async createVehicle(payload) {
-    const { documents = [], ...vehicleMeta } = payload;
+    const { documents = [], vehiclePhoto, ...vehicleMeta } = payload;
     const formData = new FormData();
     Object.entries(vehicleMeta).forEach(([k, v]) => {
       if (v !== undefined && v !== null) formData.append(k, v);
     });
+    if (vehiclePhoto instanceof File) {
+      formData.append('vehicle_photo', vehiclePhoto);
+    }
     const docsMeta = documents.map(({ file, fileUrl, ...rest }) => ({
       ...rest,
       fileUrl: file instanceof File ? '' : (fileUrl || ''),
@@ -49,6 +52,13 @@ export const vehicleManagementService = {
 
   async updateVehicle(vehicleId, payload) {
     const response = await apiClient.put(`/vehicle-management/vehicles/${vehicleId}`, payload);
+    return unwrap(response);
+  },
+
+  async updateVehiclePhoto(vehicleId, photoFile) {
+    const formData = new FormData();
+    formData.append('vehicle_photo', photoFile);
+    const response = await apiClient.put(`/vehicle-management/vehicles/${vehicleId}/photo`, formData);
     return unwrap(response);
   },
 };

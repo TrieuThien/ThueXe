@@ -6,10 +6,10 @@ export default function ContractList({ contracts, loading, onViewDetail }) {
 
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h4 className="text-base font-bold text-slate-900">Danh sach hop dong</h4>
-      {loading ? <p className="mt-2 text-sm text-slate-500">Đang tai hop dong...</p> : null}
+      <h4 className="text-base font-bold text-slate-900">Danh sách hợp đồng</h4>
+      {loading ? <p className="mt-2 text-sm text-slate-500">Đang tải hợp đồng...</p> : null}
       {!loading && rows.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-500">Chưa có hop dong lien quan.</p>
+        <p className="mt-2 text-sm text-slate-500">Chưa có hợp đồng liên quan.</p>
       ) : null}
       {!loading && rows.length > 0 ? (
         <div className="mt-3 space-y-2">

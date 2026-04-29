@@ -6,8 +6,10 @@ import VehicleRegistrationForm from '../features/vehicle-management/components/V
 import VehicleManagementTable from '../features/vehicle-management/components/VehicleManagementTable';
 import VehicleDetailModal from '../features/vehicle-management/components/VehicleDetailModal';
 import VehicleDocumentsModal from '../features/vehicle-management/components/VehicleDocumentsModal';
+import VerificationAlertBanner from '../features/owner-account/components/VerificationAlertBanner';
 import { vehicleManagementService } from '../services/vehicleManagementService';
 import { vehicleDocumentService } from '../services/vehicleDocumentService';
+import { ownerVerificationService } from '../services/ownerVerificationService';
 
 const initialQuery = {
   search: '',
@@ -22,6 +24,14 @@ export default function VehicleManagementPage() {
   const [activeVehicleId, setActiveVehicleId] = useState('');
   const [documentVehicleId, setDocumentVehicleId] = useState('');
   const [duplicatePlateError, setDuplicatePlateError] = useState('');
+
+  const verificationStatusQuery = useQuery({
+    queryKey: ['owner-verification-status'],
+    queryFn: ownerVerificationService.getVerificationStatus,
+  });
+
+  const verificationStatus = verificationStatusQuery.data?.status;
+  const isVerified = verificationStatus === 'verified';
 
   const vehicleTypesQuery = useQuery({
     queryKey: ['vehicle-management-type-options'],
@@ -79,6 +89,16 @@ export default function VehicleManagementPage() {
     onError: (error) => toast.error(error.message || 'Không thể cập nhật giấy tờ.'),
   });
 
+  const updateVehiclePhotoMutation = useMutation({
+    mutationFn: ({ vehicleId, photoFile }) =>
+      vehicleManagementService.updateVehiclePhoto(vehicleId, photoFile),
+    onSuccess: () => {
+      toast.success('Cập nhật ảnh xe thành công.');
+      queryClient.invalidateQueries({ queryKey: ['vehicle-management-detail', activeVehicleId] });
+    },
+    onError: (error) => toast.error(error.message || 'Không thể cập nhật ảnh xe.'),
+  });
+
   return (
     <section className="space-y-4">
       <PageHeader
@@ -86,11 +106,14 @@ export default function VehicleManagementPage() {
         description="Đăng ký xe mới, theo dõi trạng thái đăng ký và cập nhật giấy tờ theo từng phương tiện."
       />
 
+      <VerificationAlertBanner verificationStatus={verificationStatus} />
+
       <VehicleRegistrationForm
         vehicleTypes={vehicleTypesQuery.data?.items || []}
         documentCatalog={documentCatalogQuery.data?.items || []}
         submitting={createVehicleMutation.isPending}
         duplicatePlateError={duplicatePlateError}
+        isVerified={isVerified}
         onSubmit={(values) => {
           setDuplicatePlateError('');
           createVehicleMutation.mutate(values);
@@ -112,7 +135,11 @@ export default function VehicleManagementPage() {
         open={Boolean(activeVehicleId)}
         vehicle={activeVehicleDetailQuery.data}
         loading={activeVehicleDetailQuery.isLoading}
+        uploadingPhoto={updateVehiclePhotoMutation.isPending}
         onClose={() => setActiveVehicleId('')}
+        onUpdatePhoto={(photoFile) =>
+          updateVehiclePhotoMutation.mutate({ vehicleId: activeVehicleId, photoFile })
+        }
       />
 
       <VehicleDocumentsModal
