@@ -34,6 +34,9 @@ import { NotificationDetailScreen } from '../screens/notification/NotificationDe
 import { NotificationBell } from '../components/common';
 import { useUnreadNotificationsCountQuery } from '../hooks/useDriverQueries';
 import { useNotificationStore } from '../store/notificationStore';
+import { useAuthStore } from '../store/authStore';
+import { useRideRequests } from '../hooks/useRideRequests';
+import RideRequestModal from '../screens/booking/RideRequestModal';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -125,8 +128,12 @@ export const MainNavigator = () => {
   const insets = useSafeAreaInsets();
   useUnreadNotificationsCountQuery();
   const unreadCount = useNotificationStore((state) => state.unreadCount);
+  const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
+  const { rideRequest, dismissRideRequest } = useRideRequests(accessToken);
 
   return (
+    <>
+    <RideRequestModal request={rideRequest} onClose={dismissRideRequest} />
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
       headerTitleAlign: 'center',
@@ -158,5 +165,6 @@ export const MainNavigator = () => {
       <Tab.Screen name="WalletTab" component={WalletStackScreen} options={{ title: 'Thu nhập', headerShown: false }} />
       <Tab.Screen name="AccountTab" component={AccountStackScreen} options={{ title: 'Tài khoản', headerShown: false }} />
     </Tab.Navigator>
+    </>
   );
 };
