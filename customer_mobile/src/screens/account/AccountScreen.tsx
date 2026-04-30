@@ -42,32 +42,38 @@ export function AccountScreen({ navigation }: Props) {
     onPress: () => void;
     iconColor?: string;
   }> = [
-    {
-      id: "profile",
-      title: "Hồ sơ",
-      icon: "person-circle-outline",
-      onPress: () => navigation.navigate("AccountProfile"),
-    },
-    {
-      id: "trip-history",
-      title: "Lịch sử chuyến/thuê tài xế",
-      icon: "time-outline",
-      onPress: () => tabNavigation.navigate("Booking", { screen: "TripHistoryList" }),
-    },
-    {
-      id: "rental-history",
-      title: "Lịch sử thuê xe",
-      icon: "car-outline",
-      onPress: () => tabNavigation.navigate("Booking", { screen: "BookingHistory" }),
-    },
-    {
-      id: "logout",
-      title: "Đăng xuất",
-      icon: "log-out-outline",
-      onPress: handleLogout,
-      iconColor: theme.colors.danger,
-    },
-  ];
+      {
+        id: "profile",
+        title: "Hồ sơ",
+        icon: "person-circle-outline",
+        onPress: () => navigation.navigate("AccountProfile"),
+      },
+      {
+        id: "ride-history",
+        title: "Lịch sử gọi xe",
+        icon: "car-outline",
+        onPress: () => tabNavigation.navigate("Booking", { screen: "TripHistoryList" }),
+      },
+      {
+        id: "rental-car-history",
+        title: "Lịch sử thuê xe",
+        icon: "time-outline",
+        onPress: () => tabNavigation.navigate("Booking", { screen: "RentalHistory" }),
+      },
+      {
+        id: "driver-hire-history",
+        title: "Lịch sử thuê tài xế",
+        icon: "people-outline",
+        onPress: () => tabNavigation.navigate("Booking", { screen: "DriverHireHistory" }),
+      },
+      {
+        id: "logout",
+        title: "Đăng xuất",
+        icon: "log-out-outline",
+        onPress: handleLogout,
+        iconColor: theme.colors.danger,
+      },
+    ];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -103,7 +109,7 @@ export function AccountScreen({ navigation }: Props) {
             <Text style={[styles.subText, { color: theme.colors.textMuted }]}>{currentUser?.email ?? "--"}</Text>
           </View>
 
-          <View style={[styles.pointsBox, { backgroundColor: theme.colors.surfaceMuted }]}> 
+          <View style={[styles.pointsBox, { backgroundColor: theme.colors.surfaceMuted }]}>
             <Text style={[styles.pointsLabel, { color: theme.colors.textMuted }]}>Điểm tích lũy</Text>
             <Text style={[styles.pointsValue, { color: theme.colors.primary }]}>{rewardPoints.toLocaleString("vi-VN")}</Text>
           </View>

@@ -36,9 +36,9 @@ export function formatAddressFromGeocode(geo?: Location.LocationGeocodedAddress 
 }
 
 export function formatCoordinateAddress(latitude: number, longitude: number): string {
-  return `Vi tri hien tai (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
+  return `Vị trí hiện tại (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
 }
-
+  
 export async function reverseGeocodeToDisplayAddress(
   latitude: number,
   longitude: number,

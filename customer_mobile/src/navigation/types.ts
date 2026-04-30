@@ -96,6 +96,8 @@ export type BookingStackParamList = {
   RideBookingConfirm: undefined;
   RideSearchingDriver: { bookingId: string };
   BookingHistory: undefined;
+  RentalHistory: undefined;
+  DriverHireHistory: undefined;
   BookingDetail: { bookingId: string };
 };
 

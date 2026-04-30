@@ -4,11 +4,13 @@ import {
   BookingDetailScreen,
   BookingHistoryScreen,
   BookingHomeScreen,
+  DriverHireHistoryScreen,
   RentalBookingConfirmScreen,
   RentalBookingDetailScreen,
   RentalBookingFormScreen,
   RentalBookingSuccessScreen,
   RentalCarDetailScreen,
+  RentalHistoryScreen,
   RentalLocationMapPickerScreen,
   RentalLocationPickupScreen,
   RentalLocationDropoffScreen,
@@ -61,6 +63,8 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RideBookingConfirm" component={RideBookingConfirmScreen} />
       <Stack.Screen name="RideSearchingDriver" component={RideSearchingDriverScreen} />
       <Stack.Screen name="BookingHistory" component={BookingHistoryScreen} />
+      <Stack.Screen name="RentalHistory" component={RentalHistoryScreen} />
+      <Stack.Screen name="DriverHireHistory" component={DriverHireHistoryScreen} />
       <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />
     </Stack.Navigator>
   );

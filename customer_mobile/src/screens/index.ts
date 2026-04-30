@@ -8,6 +8,8 @@ export * from "./home/HomeScreen";
 
 export * from "./booking/BookingHomeScreen";
 export * from "./booking/BookingHistoryScreen";
+export * from "./booking/RentalHistoryScreen";
+export * from "./booking/DriverHireHistoryScreen";
 export * from "./booking/BookingDetailScreen";
 export * from "./booking/RentalServiceChooserScreen";
 export * from "./booking/RentalBookingFormScreen";

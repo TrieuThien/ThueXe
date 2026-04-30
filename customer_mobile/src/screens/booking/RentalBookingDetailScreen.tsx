@@ -1,7 +1,8 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useQuery } from "@tanstack/react-query";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 
 import { AppHeader, ErrorState, HeaderTextButton, LoadingState } from "../../components";
 import { QUERY_KEY_FACTORY } from "../../constants";
@@ -81,6 +82,42 @@ function Row({ label, value, valueColor, bold }: { label: string; value: string;
   );
 }
 
+function RowWithPhoneCall(
+  { label, value, phoneNumber, valueColor, bold }:
+    { label: string; value: string; phoneNumber?: string; valueColor?: string; bold?: boolean }
+) {
+  const { theme } = useTheme();
+  const handleCallDriver = (phone: string) => {
+    Linking.openURL(`tel:${phone}`);
+  };
+
+  return (
+    <View style={styles.rowWithButton}>
+      <View style={styles.rowContent}>
+        <Text style={[styles.rowLabel, { color: theme.colors.textMuted }]}>{label}</Text>
+        <Text
+          style={[
+            styles.rowValue,
+            { color: valueColor ?? theme.colors.text },
+            bold && { fontWeight: "700" },
+          ]}
+          numberOfLines={2}
+        >
+          {value}
+        </Text>
+      </View>
+      {phoneNumber && (
+        <Pressable
+          style={[styles.callButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => handleCallDriver(phoneNumber)}
+        >
+          <Ionicons name="call" size={16} color="#fff" />
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 function Divider() {
   const { theme } = useTheme();
   return <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />;
@@ -109,11 +146,10 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
     enabled: Boolean(bookingId),
   });
 
-  const b = query.data as Record<string, any> | undefined;
-
-  const orderStatus = String(b?.status ?? "").toLowerCase();
-  const paymentStatus = String(b?.payment_status ?? "").toLowerCase();
-  const serviceType = Number(b?.service_type ?? 1);
+  const orderData = query.data as Record<string, any> | undefined;
+  const orderStatus = String(orderData?.status ?? "").toLowerCase();
+  const paymentStatus = String(orderData?.payment_status ?? "").toLowerCase();
+  const serviceType = Number(orderData?.service_type ?? 1);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -122,7 +158,7 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
       {query.isLoading ? <LoadingState /> : null}
       {query.isError ? <ErrorState onRetry={query.refetch} description="Không tải được chi tiết đơn thuê" /> : null}
 
-      {b ? (
+      {orderData ? (
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
 
           {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -130,9 +166,11 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
             <View>
               <Text style={[styles.codeLabel, { color: theme.colors.textMuted }]}>MÃ ĐƠN</Text>
               <Text style={[styles.codeValue, { color: theme.colors.text }]}>
-                {String(b.rental_code ?? b.rental_id ?? "—")}
+                {String(orderData.rental_code ?? orderData.rental_id ?? "—")}
               </Text>
             </View>
+          </View>
+          <Section title="Trạng thái">
             <View style={styles.badges}>
               <Badge
                 label={ORDER_STATUS_LABEL[orderStatus] ?? orderStatus}
@@ -143,87 +181,94 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
                 color={PAYMENT_STATUS_COLOR[paymentStatus] ?? "#64748b"}
               />
             </View>
-          </View>
-
+          </Section>
           {/* ── Thông tin gói thuê ──────────────────────────────────────────── */}
           <Section title="Gói thuê">
-            <Row label="Tên gói" value={String(b.package_name ?? "—")} bold />
+            <Row label="Tên gói" value={String(orderData.package_name ?? "—")} bold />
             <Row label="Loại dịch vụ" value={SERVICE_TYPE_LABEL[serviceType] ?? "—"} />
           </Section>
 
           {/* ── Thời gian & địa điểm ───────────────────────────────────────── */}
           <Section title="Thời gian & Địa điểm">
-            <Row label="Bắt đầu" value={b.start_datetime ? formatDateTimeVN(String(b.start_datetime)) : "—"} />
+            <Row label="Bắt đầu" value={orderData.start_datetime ? formatDateTimeVN(String(orderData.start_datetime)) : "—"} />
             <Row
               label="Kết thúc"
               value={
-                b.actual_end_datetime
-                  ? formatDateTimeVN(String(b.actual_end_datetime))
-                  : b.end_datetime
-                    ? formatDateTimeVN(String(b.end_datetime))
+                orderData.actual_end_datetime
+                  ? formatDateTimeVN(String(orderData.actual_end_datetime))
+                  : orderData.end_datetime
+                    ? formatDateTimeVN(String(orderData.end_datetime))
                     : "—"
               }
             />
-            <Row label="Điểm đón" value={String(b.pickup_address ?? "—")} />
-            {b.dropoff_address ? <Row label="Điểm trả" value={String(b.dropoff_address)} /> : null}
+            <Row label="Điểm đón" value={String(orderData.pickup_address ?? "—")} />
+            {orderData.dropoff_address ? <Row label="Điểm trả" value={String(orderData.dropoff_address)} /> : null}
           </Section>
 
           {/* ── Xe & Tài xế ────────────────────────────────────────────────── */}
-          {(b.vehicle || b.driver) ? (
-            <Section title="Xe & Tài xế">
-              {b.vehicle ? (
+          {(orderData.vehicle || orderData.driver || orderData.owner_name || orderData.owner_phone) ? (
+            <Section title="Thông tin phương tiện">
+              {orderData.vehicle ? (
                 <>
-                  <Row label="Biển số xe" value={String(b.vehicle.plate_number ?? "—")} bold />
-                  {b.vehicle.vehicle_type ? (
-                    <Row label="Loại xe" value={String(b.vehicle.vehicle_type)} />
+                  <Row label="Biển số xe" value={String(orderData.vehicle.plate_number ?? "—")} bold />
+                  {orderData.vehicle.vehicle_type ? (
+                    <Row label="Loại xe" value={String(orderData.vehicle.vehicle_type)} />
                   ) : null}
                 </>
               ) : null}
-              {b.driver ? (
+              {orderData.owner_name || orderData.owner_phone ? (
+                <RowWithPhoneCall
+                  label="Chủ xe"
+                  value={String(orderData.owner_name ?? orderData.owner_phone ?? "—")}
+                  phoneNumber={orderData.owner_phone}
+                  bold
+                />
+              ) : null}
+              {orderData.driver ? (
                 <>
-                  <Row label="Tài xế" value={String(b.driver.name ?? "—")} bold />
-                  <Row label="Đánh giá" value={b.driver.rating ? `${Number(b.driver.rating).toFixed(1)} ★` : "Chưa có"} />
+                  <Row label="Tài xế" value={String(orderData.driver.name ?? "—")} bold />
+                  <Row label="Đánh giá" value={orderData.driver.rating ? `${Number(orderData.driver.rating).toFixed(1)} ★` : "Chưa có"} />
                 </>
               ) : null}
-              {Number(b.distance_limit_km) > 0 ? (
-                <Row label="Giới hạn quãng đường" value={`${b.distance_limit_km} km`} />
+              {Number(orderData.distance_limit_km) > 0 ? (
+                <Row label="Giới hạn quãng đường" value={`${orderData.distance_limit_km} km`} />
               ) : null}
-              {Number(b.distance_travelled_km) > 0 ? (
-                <Row label="Đã đi" value={`${b.distance_travelled_km} km`} />
+              {Number(orderData.distance_travelled_km) > 0 ? (
+                <Row label="Đã đi" value={`${orderData.distance_travelled_km} km`} />
               ) : null}
             </Section>
           ) : null}
 
           {/* ── Chi phí ────────────────────────────────────────────────────── */}
           <Section title="Chi phí">
-            <Row label="Giá thuê cơ bản" value={formatCurrencyVND(Number(b.base_price ?? 0))} />
-            {Number(b.extra_time_fee) > 0 ? (
-              <Row label="Phí thêm giờ" value={formatCurrencyVND(Number(b.extra_time_fee))} />
+            <Row label="Giá thuê cơ bản" value={formatCurrencyVND(Number(orderData.base_price ?? 0))} />
+            {Number(orderData.extra_time_fee) > 0 ? (
+              <Row label="Phí thêm giờ" value={formatCurrencyVND(Number(orderData.extra_time_fee))} />
             ) : null}
-            {Number(b.extra_distance_fee) > 0 ? (
-              <Row label="Phí thêm quãng đường" value={formatCurrencyVND(Number(b.extra_distance_fee))} />
+            {Number(orderData.extra_distance_fee) > 0 ? (
+              <Row label="Phí thêm quãng đường" value={formatCurrencyVND(Number(orderData.extra_distance_fee))} />
             ) : null}
-            {Number(b.deposit_amount) > 0 ? (
+            {Number(orderData.deposit_amount) > 0 ? (
               <Row
                 label="Tiền đặt cọc"
-                value={formatCurrencyVND(Number(b.deposit_amount))}
+                value={formatCurrencyVND(Number(orderData.deposit_amount))}
                 valueColor={theme.colors.textMuted}
               />
             ) : null}
             <Divider />
             <Row
-              label="Tổng tiền (chưa tính cọc)"
-              value={formatCurrencyVND(Number(b.total_price ?? 0))}
+              label="Tổng tiền (đã tính cọc)"
+              value={formatCurrencyVND(Number(orderData.total_price ?? 0))}
               bold
               valueColor={theme.colors.primary}
             />
           </Section>
 
           {/* ── Lý do hủy ──────────────────────────────────────────────────── */}
-          {b.cancel_reason ? (
+          {orderData.cancel_reason ? (
             <View style={[styles.cancelBox, { borderColor: "#ef444440", backgroundColor: "#ef444410" }]}>
               <Text style={[styles.cancelLabel, { color: "#ef4444" }]}>Lý do hủy</Text>
-              <Text style={[styles.cancelReason, { color: theme.colors.text }]}>{String(b.cancel_reason)}</Text>
+              <Text style={[styles.cancelReason, { color: theme.colors.text }]}>{String(orderData.cancel_reason)}</Text>
             </View>
           ) : null}
 
@@ -250,7 +295,7 @@ const styles = StyleSheet.create({
   },
   codeLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 0.8 },
   codeValue: { fontSize: 18, fontWeight: "800", marginTop: 2 },
-  badges: { gap: 6, alignItems: "flex-end" },
+  badges: { gap: 6, flexDirection: "row", flexWrap: "wrap" },
 
   badge: {
     borderWidth: 1,
@@ -281,6 +326,27 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 13, flex: 1 },
   rowValue: { fontSize: 13, flex: 2, textAlign: "right" },
+  rowWithButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  rowContent: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  callButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
 
   divider: { height: 1, marginVertical: 2 },
 
