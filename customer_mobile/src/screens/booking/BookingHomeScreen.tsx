@@ -31,7 +31,7 @@ export function BookingHomeScreen({ navigation }: Props) {
     setLocations(route.pickupAddress, route.destinationAddress);
 
     if (route.rideType === "CALL_RIDE") {
-      navigation.navigate("RideLocationPicker");
+      navigation.navigate("RideLocationPickup");
       return;
     }
 
@@ -45,44 +45,44 @@ export function BookingHomeScreen({ navigation }: Props) {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
   }> = [
-    {
-      id: "book-now",
-      title: "Đặt xe ngay",
-      icon: "car-sport-outline",
-      onPress: () => navigation.navigate("RideLocationPicker"),
-    },
-    {
-      id: "rental-car",
-      title: "Thuê xe",
-      icon: "car-outline",
-      onPress: () => {
-        setServiceType("RENTAL_CAR");
-        navigation.navigate("RentalBookingForm");
+      {
+        id: "book-now",
+        title: "Đặt xe ngay",
+        icon: "car-sport-outline",
+        onPress: () => navigation.navigate("RideLocationPickup"),
       },
-    },
-    {
-      id: "rental-driver",
-      title: "Thuê tài xế",
-      icon: "person-outline",
-      onPress: () => {
-        setServiceType("RENTAL_DRIVER");
-        navigation.navigate("RentalBookingForm");
+      {
+        id: "rental-car",
+        title: "Thuê xe",
+        icon: "car-outline",
+        onPress: () => {
+          setServiceType("RENTAL_CAR");
+          navigation.navigate("RentalBookingForm");
+        },
       },
-    },
-    {
-      id: "rental-car-with-driver",
-      title: "Thuê xe kèm tài xế",
-      icon: "people-outline",
-      onPress: () =>
-        Alert.alert("Sắp ra mắt", "Chức năng thuê xe kèm tài xế đang được phát triển và sẽ sớm ra mắt."),
-    },
-    {
-      id: "active-trip",
-      title: "Chuyến hiện tại",
-      icon: "navigate-outline",
-      onPress: () => navigation.navigate("ActiveTrip"),
-    },
-  ];
+      {
+        id: "rental-driver",
+        title: "Thuê tài xế",
+        icon: "person-outline",
+        onPress: () => {
+          setServiceType("RENTAL_DRIVER");
+          navigation.navigate("RentalBookingForm");
+        },
+      },
+      {
+        id: "rental-car-with-driver",
+        title: "Thuê xe kèm tài xế",
+        icon: "people-outline",
+        onPress: () =>
+          Alert.alert("Sắp ra mắt", "Chức năng thuê xe kèm tài xế đang được phát triển và sẽ sớm ra mắt."),
+      },
+      {
+        id: "active-trip",
+        title: "Chuyến hiện tại",
+        icon: "navigate-outline",
+        onPress: () => navigation.navigate("ActiveTrip"),
+      },
+    ];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>

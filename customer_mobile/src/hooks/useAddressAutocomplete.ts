@@ -2,10 +2,89 @@
 import * as Location from "expo-location";
 
 import { formatAddressFromGeocode } from "../utils/address";
+import { calculateRankingScore, applyDistancePenalty, calculateDistance, calculateMatchQuality } from "../utils/addressRanking";
+import { formatVietnameseAddress } from "../utils/vietnameseAddressParser";
+import { AddressCache, RequestDeduplicator } from "../utils/addressCache";
+
+/**
+ * Phase 4: Calculate dynamic zoom level based on location accuracy
+ * - Better accuracy (<50m) → zoom 18 (street level)
+ * - Medium accuracy (50-500m) → zoom 14 (neighborhood)
+ * - Poor accuracy (>500m) → zoom 12 (district)
+ */
+function getZoomFromAccuracy(accuracy?: number): number {
+  if (!accuracy) return 14; // default
+  if (accuracy < 50) return 18;
+  if (accuracy < 500) return 14;
+  return 12;
+}
+
+/**
+ * Phase 4: Calculate viewbox for Nominatim (bounding box around user location)
+ * Helps Nominatim prioritize results within ~5km radius
+ */
+function getViewboxParams(latitude: number, longitude: number): Record<string, string> {
+  const radiusKm = 5;
+  const latDelta = radiusKm / 111; // 1 degree ≈ 111 km
+  const lonDelta = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180)); // Adjust for latitude
+
+  return {
+    viewbox: `${longitude - lonDelta},${latitude - latDelta},${longitude + lonDelta},${latitude + latDelta}`,
+    bounded: "1", // Prioritize results within viewbox
+  };
+}
+
+/**
+ * Phase 6: Create fetch with timeout support
+ * Prevents hanging requests and UI freezes
+ */
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return response;
+  } catch (error) {
+    clearTimeout(timeout);
+    throw error;
+  }
+}
+
+/**
+ * Phase 6: Exponential backoff retry helper
+ */
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  initialDelayMs: number = 100,
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (attempt < maxRetries - 1) {
+        const delayMs = initialDelayMs * Math.pow(2, attempt); // 100ms → 200ms → 400ms
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
 
 interface GeoBias {
   latitude: number;
   longitude: number;
+  accuracy?: number; // Phase 4: For dynamic zoom calculation
 }
 
 export interface AddressSuggestion {
@@ -13,7 +92,12 @@ export interface AddressSuggestion {
   label: string;
   latitude?: number;
   longitude?: number;
+  score?: number; // Ranking score (0-1) for sorting
 }
+
+// Phase 2: Singleton cache and request deduplicator
+const addressCache = new AddressCache(50, 5); // 50 entries, 5 min TTL
+const requestDeduplicator = new RequestDeduplicator<AddressSuggestion[]>();
 
 function normalize(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -53,6 +137,13 @@ function buildLabelFromDisplayName(displayName?: string): string {
     return "";
   }
 
+  // Phase 3: Try Vietnamese parsing first for better formatting
+  const vietnamFormatted = formatVietnameseAddress(displayName);
+  if (vietnamFormatted.length > 0) {
+    return vietnamFormatted;
+  }
+
+  // Fallback to original logic
   const segments = displayName
     .split(",")
     .map((part) => normalize(part))
@@ -98,146 +189,230 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
 
     const seq = Date.now();
     requestSeqRef.current = seq;
-    const controller = new AbortController();
+
+    // Phase 6: Delay loading indicator to prevent flicker (only show after 1s)
+    let loadingTimeoutId: NodeJS.Timeout;
 
     const timer = setTimeout(async () => {
       try {
-        setLoading(true);
-        const nextSuggestions: AddressSuggestion[] = [];
-
-        // 1) Prefer Nominatim first for richer addressdetails.
-        const nominatimParams = new URLSearchParams({
-          q: keyword,
-          format: "jsonv2",
-          limit: "6",
-          addressdetails: "1",
-          "accept-language": "vi",
-        });
-
-        const nominatimResponse = await fetch(`https://nominatim.openstreetmap.org/search?${nominatimParams.toString()}`, {
-          signal: controller.signal,
-          headers: { Accept: "application/json" },
-        });
-
-        if (nominatimResponse.ok) {
-          const payload = (await nominatimResponse.json()) as Array<{
-            display_name?: string;
-            lat?: string;
-            lon?: string;
-            address?: Record<string, unknown>;
-          }>;
-
-          for (const item of payload ?? []) {
-            const fromStructured = buildLabelFromStructuredAddress(item.address ?? {});
-            const fromDisplay = buildLabelFromDisplayName(item.display_name);
-            const label = fromStructured || fromDisplay;
-            if (!label) {
-              continue;
-            }
-
-            const latitude = item.lat ? Number(item.lat) : undefined;
-            const longitude = item.lon ? Number(item.lon) : undefined;
-
-            nextSuggestions.push({
-              id: toSuggestionId("nominatim", label, latitude, longitude),
-              label,
-              latitude: Number.isFinite(latitude) ? latitude : undefined,
-              longitude: Number.isFinite(longitude) ? longitude : undefined,
-            });
+        // Phase 6: Set loading after 1 second delay to prevent UI flicker
+        loadingTimeoutId = setTimeout(() => {
+          if (requestSeqRef.current === seq) {
+            setLoading(true);
           }
+        }, 1000);
+
+        // Phase 2: Check cache first
+        const cachedResults = addressCache.get(keyword, bias?.latitude, bias?.longitude);
+        if (cachedResults && cachedResults.length > 0) {
+          clearTimeout(loadingTimeoutId);
+          if (requestSeqRef.current === seq) {
+            setSuggestions(cachedResults);
+            setLoading(false);
+          }
+          return;
         }
 
-        // 2) Add Photon as side-source if still short on results.
-        if (nextSuggestions.length < 6) {
-          const photonParams = new URLSearchParams({
+        // Phase 2: Use request deduplicator + cache storage
+        const cacheKey = `${keyword}_${bias?.latitude}_${bias?.longitude}`;
+        const results = await requestDeduplicator.execute(cacheKey, async () => {
+          const nextSuggestions: AddressSuggestion[] = [];
+
+          // 1) Prefer Nominatim first for richer addressdetails.
+          const nominatimParams = new URLSearchParams({
             q: keyword,
+            format: "jsonv2",
             limit: "6",
-            lang: "vi",
+            addressdetails: "1",
+            "accept-language": "vi",
           });
 
+          // Phase 4: Add geographic bias using viewbox
           if (bias) {
-            photonParams.set("lat", String(bias.latitude));
-            photonParams.set("lon", String(bias.longitude));
-            photonParams.set("zoom", "14");
+            const viewbox = getViewboxParams(bias.latitude, bias.longitude);
+            nominatimParams.set("viewbox", viewbox.viewbox);
+            nominatimParams.set("bounded", viewbox.bounded);
           }
 
-          const photonResponse = await fetch(`https://photon.komoot.io/api?${photonParams.toString()}`, {
-            signal: controller.signal,
-            headers: { Accept: "application/json" },
-          });
+          try {
+            const nominatimResponse = await fetchWithTimeout(
+              `https://nominatim.openstreetmap.org/search?${nominatimParams.toString()}`,
+              {
+                headers: { Accept: "application/json" },
+              },
+              5000, // Phase 6: 5-second timeout
+            );
 
-          if (photonResponse.ok) {
-            const payload = (await photonResponse.json()) as {
-              features?: Array<{
-                geometry?: { coordinates?: number[] };
-                properties?: Record<string, unknown>;
+            if (nominatimResponse.ok) {
+              const payload = (await nominatimResponse.json()) as Array<{
+                display_name?: string;
+                lat?: string;
+                lon?: string;
+                address?: Record<string, unknown>;
               }>;
-            };
 
-            for (const feature of payload.features ?? []) {
-              const label = buildLabelFromStructuredAddress(feature.properties ?? {});
-              if (!label) {
-                continue;
+              for (const item of payload ?? []) {
+                const fromStructured = buildLabelFromStructuredAddress(item.address ?? {});
+                const fromDisplay = buildLabelFromDisplayName(item.display_name);
+                const label = fromStructured || fromDisplay;
+                if (!label) {
+                  continue;
+                }
+
+                const latitude = item.lat ? Number(item.lat) : undefined;
+                const longitude = item.lon ? Number(item.lon) : undefined;
+
+                nextSuggestions.push({
+                  id: toSuggestionId("nominatim", label, latitude, longitude),
+                  label,
+                  latitude: Number.isFinite(latitude) ? latitude : undefined,
+                  longitude: Number.isFinite(longitude) ? longitude : undefined,
+                });
               }
-
-              const coordinates = feature.geometry?.coordinates ?? [];
-              const longitude = typeof coordinates[0] === "number" ? coordinates[0] : undefined;
-              const latitude = typeof coordinates[1] === "number" ? coordinates[1] : undefined;
-
-              nextSuggestions.push({
-                id: toSuggestionId("photon", label, latitude, longitude),
-                label,
-                latitude,
-                longitude,
-              });
             }
+          } catch {
+            // Nominatim failed, continue to fallback
           }
-        }
 
-        // 3) Final fallback: device geocoder.
-        if (nextSuggestions.length === 0) {
-          const geoResults = await Location.geocodeAsync(keyword);
-          for (const item of geoResults.slice(0, 5)) {
-            if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
-              continue;
+          // 2) Add Photon as side-source if still short on results.
+          if (nextSuggestions.length < 6) {
+            const photonParams = new URLSearchParams({
+              q: keyword,
+              limit: "6",
+              lang: "vi",
+            });
+
+            if (bias) {
+              photonParams.set("lat", String(bias.latitude));
+              photonParams.set("lon", String(bias.longitude));
+              // Phase 4: Dynamic zoom based on location accuracy
+              const zoom = getZoomFromAccuracy(bias.accuracy);
+              photonParams.set("zoom", String(zoom));
             }
 
             try {
-              const reverse = await Location.reverseGeocodeAsync({
-                latitude: item.latitude,
-                longitude: item.longitude,
-              });
-              const label =
-                formatAddressFromGeocode(reverse[0]) ??
-                buildLabelFromStructuredAddress((reverse[0] ?? {}) as Record<string, unknown>);
-              if (!label) {
-                continue;
-              }
+              const photonResponse = await fetchWithTimeout(
+                `https://photon.komoot.io/api?${photonParams.toString()}`,
+                {
+                  headers: { Accept: "application/json" },
+                },
+                5000, // Phase 6: 5-second timeout
+              );
 
-              nextSuggestions.push({
-                id: toSuggestionId("device", label, item.latitude, item.longitude),
-                label,
-                latitude: item.latitude,
-                longitude: item.longitude,
-              });
+              if (photonResponse.ok) {
+                const payload = (await photonResponse.json()) as {
+                  features?: Array<{
+                    geometry?: { coordinates?: number[] };
+                    properties?: Record<string, unknown>;
+                  }>;
+                };
+
+                for (const feature of payload.features ?? []) {
+                  const label = buildLabelFromStructuredAddress(feature.properties ?? {});
+                  if (!label) {
+                    continue;
+                  }
+
+                  const coordinates = feature.geometry?.coordinates ?? [];
+                  const longitude = typeof coordinates[0] === "number" ? coordinates[0] : undefined;
+                  const latitude = typeof coordinates[1] === "number" ? coordinates[1] : undefined;
+
+                  nextSuggestions.push({
+                    id: toSuggestionId("photon", label, latitude, longitude),
+                    label,
+                    latitude,
+                    longitude,
+                  });
+                }
+              }
             } catch {
-              // ignore single item failure
+              // Photon failed, continue to fallback
             }
           }
-        }
+
+          // 3) Final fallback: device geocoder.
+          if (nextSuggestions.length === 0) {
+            try {
+              const geoResults = await Location.geocodeAsync(keyword);
+              for (const item of geoResults.slice(0, 5)) {
+                if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
+                  continue;
+                }
+
+                try {
+                  const reverse = await Location.reverseGeocodeAsync({
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                  });
+                  const label =
+                    formatAddressFromGeocode(reverse[0]) ??
+                    buildLabelFromStructuredAddress((reverse[0] ?? {}) as Record<string, unknown>);
+                  if (!label) {
+                    continue;
+                  }
+
+                  nextSuggestions.push({
+                    id: toSuggestionId("device", label, item.latitude, item.longitude),
+                    label,
+                    latitude: item.latitude,
+                    longitude: item.longitude,
+                  });
+                } catch {
+                  // ignore single item failure
+                }
+              }
+            } catch {
+              // Device geocoder failed
+            }
+          }
+
+          // Deduplicate
+          const deduped = nextSuggestions.filter(
+            (item, index) => nextSuggestions.findIndex((x) => x.label.toLowerCase() === item.label.toLowerCase()) === index,
+          );
+
+          // Phase 1: Calculate ranking scores and sort by relevance
+          const scored = deduped.map((suggestion) => {
+            let score = 0;
+
+            if (bias && suggestion.latitude && suggestion.longitude) {
+              const distance = calculateDistance(
+                bias.latitude,
+                bias.longitude,
+                suggestion.latitude,
+                suggestion.longitude,
+              );
+              score = calculateRankingScore(distance, keyword, suggestion.label);
+              // Phase 4: Apply distance penalty for far results
+              score *= applyDistancePenalty(distance);
+            } else {
+              score = calculateMatchQuality(keyword, suggestion.label);
+            }
+
+            return { ...suggestion, score };
+          });
+
+          const sorted = scored.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+          return sorted.slice(0, 6);
+        });
 
         if (requestSeqRef.current !== seq) {
           return;
         }
 
-        const deduped = nextSuggestions.filter(
-          (item, index) => nextSuggestions.findIndex((x) => x.label.toLowerCase() === item.label.toLowerCase()) === index,
-        );
+        // Phase 2: Cache the results
+        clearTimeout(loadingTimeoutId);
+        addressCache.set(keyword, results, bias?.latitude, bias?.longitude);
 
-        setSuggestions(deduped.slice(0, 6));
-      } catch {
+        setSuggestions(results);
+      } catch (error) {
+        clearTimeout(loadingTimeoutId);
         if (requestSeqRef.current === seq) {
           setSuggestions([]);
+          // Phase 6: Show error message if all sources fail
+          if (error instanceof Error && error.name !== "AbortError") {
+            console.error("Address autocomplete failed:", error.message);
+          }
         }
       } finally {
         if (requestSeqRef.current === seq) {
@@ -248,7 +423,7 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
 
     return () => {
       clearTimeout(timer);
-      controller.abort();
+      clearTimeout(loadingTimeoutId);
     };
   }, [query, bias?.latitude, bias?.longitude]);
 

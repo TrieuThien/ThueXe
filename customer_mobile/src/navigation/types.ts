@@ -88,7 +88,10 @@ export type BookingStackParamList = {
   RentalBookingConfirm: undefined;
   RentalBookingDetail: { bookingId: string };
   RentalBookingSuccess: { bookingId: string; status: "PENDING" | "SCHEDULED"; message: string };
-  RideLocationPicker: undefined;
+  RideLocationPickup: undefined;
+  RideLocationDropoff: {
+    pickupLocation: { address: string; coordinate: { latitude: number; longitude: number } };
+  };
   RideVehicleSelection: undefined;
   RideBookingConfirm: undefined;
   RideSearchingDriver: { bookingId: string };

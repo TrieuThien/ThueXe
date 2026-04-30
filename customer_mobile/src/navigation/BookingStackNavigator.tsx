@@ -18,6 +18,8 @@ import {
   RentalVehicleConfirmScreen,
   RideBookingConfirmScreen,
   RideLocationPickerScreen,
+  RideLocationPickupScreen,
+  RideLocationDropoffScreen,
   RideSearchingDriverScreen,
   RideVehicleSelectionScreen,
 } from "../screens";
@@ -53,7 +55,8 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RentalBookingConfirm" component={RentalBookingConfirmScreen} />
       <Stack.Screen name="RentalBookingDetail" component={RentalBookingDetailScreen} />
       <Stack.Screen name="RentalBookingSuccess" component={RentalBookingSuccessScreen} />
-      <Stack.Screen name="RideLocationPicker" component={RideLocationPickerScreen} />
+      <Stack.Screen name="RideLocationPickup" component={RideLocationPickupScreen} />
+      <Stack.Screen name="RideLocationDropoff" component={RideLocationDropoffScreen} />
       <Stack.Screen name="RideVehicleSelection" component={RideVehicleSelectionScreen} />
       <Stack.Screen name="RideBookingConfirm" component={RideBookingConfirmScreen} />
       <Stack.Screen name="RideSearchingDriver" component={RideSearchingDriverScreen} />

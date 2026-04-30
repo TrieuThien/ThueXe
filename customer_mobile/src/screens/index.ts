@@ -22,6 +22,8 @@ export * from "./booking/RentalBookingConfirmScreen";
 export * from "./booking/RentalBookingDetailScreen";
 export * from "./booking/RentalBookingSuccessScreen";
 export * from "./booking/RideLocationPickerScreen";
+export * from "./booking/RideLocationPickupScreen";
+export * from "./booking/RideLocationDropoffScreen";
 export * from "./booking/RideVehicleSelectionScreen";
 export * from "./booking/RideBookingConfirmScreen";
 export * from "./booking/RideSearchingDriverScreen";
