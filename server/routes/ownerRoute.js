@@ -45,7 +45,6 @@ import {
     ownerRevenueLedgerHandler,
     ownerRevenuePaymentsHandler,
     ownerRevenueSummaryHandler,
-    ownerMomoIpnHandler,
     ownerRevenueTopupHandler,
     ownerRevenueWalletHandler,
     ownerRevenueWithdrawalsHandler,
@@ -90,7 +89,6 @@ import {
     ownerLoginValidator,
     ownerChangePasswordValidator,
 } from "../validators/ownerValidators.js";
-import { momoIpnValidator } from "../validators/customer/walletValidators.js";
 
 const router = Router();
 const ownerAuth = [requireAuth, requireRole("owner")];
@@ -185,8 +183,6 @@ router.get("/api/owner/owner-revenue/payments", ...ownerAuth, ownerPaginationVal
 router.get("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerPaginationValidator, validateRequest, ownerRevenueWithdrawalsHandler);
 router.post("/api/owner/owner-revenue/withdrawals", ...ownerAuth, ownerRevenueWithdrawalValidator, validateRequest, ownerRevenueCreateWithdrawalHandler);
 router.post("/api/owner/owner-revenue/topup", ...ownerAuth, ownerRevenueTopupValidator, validateRequest, ownerRevenueTopupHandler);
-// MoMo IPN callback — server-to-server, không cần auth
-router.post("/api/owner/payments/webhook/momo", momoIpnValidator, validateRequest, ownerMomoIpnHandler);
 
 // Rental packages (owner-facing) — gói thuê chuẩn cho xe
 router.get("/api/owner/rental-packages", ...ownerAuth, ownerRentalPackagesListHandler);

@@ -9,9 +9,6 @@ import {
     getWalletHandler,
     getWalletTransactionsHandler,
     getWithdrawalsHandler,
-    momoIpnHandler,
-    sepayIpnHandler,
-    sepayCheckoutPageHandler,
     payRentalBookingHandler,
     payRentalDepositHandler,
     payRideBookingHandler,
@@ -22,8 +19,6 @@ import {
     confirmTopupValidator,
     createTopupPaymentValidator,
     createWithdrawalValidator,
-    momoIpnValidator,
-    sepayIpnValidator,
     paymentIdParamValidator,
     rentalDepositValidator,
     rentalPaymentValidator,
@@ -79,23 +74,5 @@ router.post(
     webhookConfirmPaymentHandler
 );
 
-// SePay checkout relay – browser/WebView mở URL này, nhận HTML tự POST đến SePay
-router.get("/payments/checkout/sepay", sepayCheckoutPageHandler);
-
-// MoMo IPN endpoint – server-to-server callback, không cần requireAuth
-router.post(
-    "/payments/webhook/momo",
-    momoIpnValidator,
-    validateRequest,
-    momoIpnHandler
-);
-
-// SePay IPN endpoint – server-to-server callback, không cần requireAuth
-router.post(
-    "/payments/webhook/sepay",
-    sepayIpnValidator,
-    validateRequest,
-    sepayIpnHandler
-);
 
 export default router;

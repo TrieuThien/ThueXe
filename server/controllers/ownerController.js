@@ -1,5 +1,4 @@
 import { ownerPaginated, ownerSuccess } from "../utils/ownerApiResponse.js";
-import { verifyMomoIpnSignature } from "../services/payment/momoService.js";
 import {
     changeOwnerPassword,
     toggleVehicleOperationStatus,
@@ -7,7 +6,6 @@ import {
     createOwnerMaintenance,
     createOwnerRevenueTopup,
     createOwnerRevenueWithdrawal,
-    processOwnerMomoTopupIpn,
     createOwnerVehicleService,
     deleteOwnerAvailabilityBlock,
     deleteOwnerMaintenanceService,
@@ -547,24 +545,6 @@ export async function ownerRevenueTopupHandler(req, res, next) {
     }
 }
 
-// MoMo IPN cho owner topup (server-to-server, không cần auth)
-export async function ownerMomoIpnHandler(req, res, next) {
-    try {
-        const isValid = verifyMomoIpnSignature(req.body);
-        if (!isValid) {
-            return res.status(400).json({ resultCode: 1, message: "Invalid signature" });
-        }
-        await processOwnerMomoTopupIpn({
-            orderId: req.body.orderId,
-            resultCode: req.body.resultCode,
-            transId: req.body.transId,
-            message: req.body.message,
-        });
-        return res.status(200).json({ resultCode: 0, message: "ok" });
-    } catch (error) {
-        next(error);
-    }
-}
 
 // ─── Rental packages (owner-facing) ──────────────────────────────────────────
 

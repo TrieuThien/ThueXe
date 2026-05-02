@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { calcOwnerRequiredBalance } from "../repositories/walletRepository.js";
 import { createMomoPayment, mapMomoResultCode } from "./payment/momoService.js";
+import { publishRealtimeEvent } from "../utils/realtime.js";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import { uploadBufferToCloudinary } from "../config/cloudinary.js";
@@ -1524,7 +1525,7 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
                 paymentCode: thePaymentCode,
                 amount,
                 orderInfo: "Nạp tiền ví Chủ xe ThueXe",
-                ipnUrl: process.env.MOMO_OWNER_IPN_URL || process.env.MOMO_IPN_URL || "",
+                ipnUrl: process.env.MOMO_IPN_URL || "",
                 redirectUrl: process.env.MOMO_REDIRECT_URL || "",
                 extraData: "",
             });
@@ -1550,7 +1551,7 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
                 gateway_transaction_ref: null,
                 description: "Owner wallet topup via SePay",
             }, conn);
-            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/payments/checkout/sepay?code=${thePaymentCode}`;
             return {
                 paymentCode: thePaymentCode,
                 paymentId,
@@ -1629,6 +1630,51 @@ export async function processOwnerMomoTopupIpn({ orderId, resultCode, transId, m
         }
 
         return { ok: true, payment_id: Number(payment.payment_id), status: newStatus };
+    });
+}
+
+export async function confirmOwnerGatewayTopup(payment, status) {
+    return runInTx(async (conn) => {
+        const lockedPayment = await findPaymentByCodeForUpdate(payment.payment_code, conn);
+        if (!lockedPayment || Number(lockedPayment.actor_type) !== 2) return { ok: true, skipped: true };
+
+        const prevStatus = String(lockedPayment.status || "").toLowerCase();
+        if (prevStatus === status) return { ok: true, unchanged: true };
+
+        await updatePaymentStatus(Number(lockedPayment.payment_id), status, conn);
+
+        let walletAfter = null;
+        if (status === "paid" && prevStatus !== "paid") {
+            const wallet = await findWalletByIdForUpdate(Number(lockedPayment.payer_wallet_id), conn);
+            if (wallet && Number(wallet.status) === 1) {
+                const nextBalance = Number((Number(wallet.balance) + Number(lockedPayment.amount)).toFixed(2));
+                await updateWalletBalance(Number(wallet.wallet_id), nextBalance, conn);
+                await createWalletLedger({
+                    wallet_id: Number(wallet.wallet_id),
+                    payment_id: Number(lockedPayment.payment_id),
+                    amount: Number(lockedPayment.amount),
+                    balance_after: nextBalance,
+                    direction: "credit",
+                    entry_type: "topup",
+                    source_type: "gateway_payment",
+                    source_id: Number(lockedPayment.payment_id),
+                    description: `Owner wallet topup via ${lockedPayment.gateway_name || "gateway"}`,
+                }, conn);
+                walletAfter = { wallet_id: Number(wallet.wallet_id), balance: nextBalance };
+            }
+        }
+
+        const result = { ok: true, payment_id: Number(lockedPayment.payment_id), status };
+
+        if (walletAfter) {
+            publishRealtimeEvent("wallet.updated", {
+                wallet_id: walletAfter.wallet_id,
+                balance: walletAfter.balance,
+                updated_at: new Date().toISOString(),
+            }, { targetUserIds: [Number(lockedPayment.actor_id)] });
+        }
+
+        return result;
     });
 }
 

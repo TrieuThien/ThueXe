@@ -320,7 +320,7 @@ export async function createWalletTopupPayment(auth, payload) {
         }
 
         if (gatewayName === "sepay") {
-            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/payments/checkout/sepay?code=${thePaymentCode}`;
             return {
                 payment_id: paymentId,
                 payment_status: "pending",
@@ -646,7 +646,7 @@ export async function payRideBooking(auth, bookingIdInput, payload) {
         }
 
         if (gatewayName === "sepay") {
-            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/payments/checkout/sepay?code=${thePaymentCode}`;
             return {
                 payment_id: paymentId,
                 booking_id: bookingId,
@@ -793,7 +793,7 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
         }
 
         if (gatewayName === "sepay") {
-            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/payments/checkout/sepay?code=${thePaymentCode}`;
             return {
                 payment_id: paymentId,
                 rental_id: rentalId,

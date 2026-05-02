@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useOwnerRealtime } from '../hooks/useOwnerRealtime';
 import toast from 'react-hot-toast';
 import PageHeader from '../components/ui/PageHeader';
 import SummaryCard from '../components/ui/SummaryCard';
@@ -88,6 +89,15 @@ export default function WalletPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: ['owner-wallet'],
     queryFn: ownerService.getWalletOverview,
+  });
+
+  useOwnerRealtime({
+    'wallet.updated': () => {
+      queryClient.invalidateQueries({ queryKey: ['owner-revenue-wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-revenue-ledger'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-revenue-payment-history'] });
+      queryClient.invalidateQueries({ queryKey: ['owner-wallet'] });
+    },
   });
 
   const columns = useMemo(
