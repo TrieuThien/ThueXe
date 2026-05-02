@@ -97,8 +97,9 @@ function toPaymentMethods(payload: unknown): PaymentMethodOption[] {
   return [
     { id: "pm_wallet", type: "WALLET", title: "Ví ThueXe", isDefault: true, isAvailable: true },
     { id: "pm_cash", type: "CASH", title: "Tiền mặt", isDefault: false, isAvailable: true },
-    { id: "pm_momo", type: "MOMO", title: "Vi MOMO", isDefault: false, isAvailable: true },
-    { id: "pm_card", type: "BANK_CARD", title: "The/Online Banking", isDefault: false, isAvailable: true },
+    { id: "pm_momo", type: "MOMO", title: "Ví MoMo", isDefault: false, isAvailable: true },
+    { id: "pm_sepay", type: "SEPAY", title: "SePay (QR/Ngân hàng)", isDefault: false, isAvailable: true },
+    { id: "pm_card", type: "BANK_CARD", title: "Thẻ/Online Banking", isDefault: false, isAvailable: true },
   ];
 }
 
@@ -166,8 +167,9 @@ export const walletPaymentService = {
   },
 
   createTopUp: async (payload: CreateTopUpRequest): Promise<CreateTopUpResponse> => {
-    // Map paymentMethodId sang gateway_name server nhận ("momo", "mock", ...)
-    const gatewayName = String(payload.paymentMethodId).toLowerCase().includes("momo") ? "momo" : String(payload.paymentMethodId);
+    // Map paymentMethodId sang gateway_name server nhận ("momo", "sepay", "mock", ...)
+    const idLower = String(payload.paymentMethodId).toLowerCase();
+    const gatewayName = idLower.includes("momo") ? "momo" : idLower.includes("sepay") ? "sepay" : String(payload.paymentMethodId);
 
     const response = await apiClient.post<Record<string, unknown>>(`${APP_CONFIG.customerApiPrefix}/wallet/topup/create-payment`, {
       amount: payload.amount,
@@ -189,11 +191,15 @@ export const walletPaymentService = {
   },
 
   payBooking: async (payload: BookingPaymentRequest): Promise<BookingPaymentResponse> => {
-    const isMomo = String(payload.paymentMethodId ?? "").toLowerCase().includes("momo");
+    const idLowerPay = String(payload.paymentMethodId ?? "").toLowerCase();
+    const isMomo = idLowerPay.includes("momo");
+    const isSepay = idLowerPay.includes("sepay");
+    const isGateway = isMomo || isSepay;
     const requestBody: Record<string, unknown> = {
-      payment_type: isMomo ? 3 : 2,
+      payment_type: isGateway ? 3 : 2,
     };
     if (isMomo) requestBody.gateway_name = "momo";
+    if (isSepay) requestBody.gateway_name = "sepay";
 
     const response = await apiClient.post<Record<string, unknown>>(
       payload.bookingId

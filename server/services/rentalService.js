@@ -330,7 +330,7 @@ export async function createRentalBookingService({ payload, auth }) {
                 startDatetime: startStr,
                 endDatetime: endStr,
                 packageInfo: rentalPackage,
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         return { rental: created };
@@ -358,10 +358,19 @@ export async function getRentalBookingDetailService({ rentalId, auth }) {
     if (!Number.isInteger(numericRentalId) || numericRentalId < 1) {
         throw new AppError("Invalid rental id.", 422, "INVALID_RENTAL_ID");
     }
-    const rental = await findRentalBookingById(numericRentalId);
-    if (!rental) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
-    ensureActorCanAccessRental(auth, rental);
-    return { rental };
+    const booking = await findRentalBookingById(numericRentalId);
+    if (!booking) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
+    ensureActorCanAccessRental(auth, booking);
+
+    // Điều kiện: Chỉ trả về thông tin chủ xe/tài xế khi status = "in_progress"
+    let result = { ...booking };
+    if (booking.status !== "in_progress") {
+        result.owner_name = null;
+        result.owner_phone = null;
+        result.driver_phone = null;
+    }
+    
+    return { booking: result };
 }
 
 function calculateOvertimeHours(endDatetime, actualEndDatetime) {

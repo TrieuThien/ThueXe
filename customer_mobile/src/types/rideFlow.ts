@@ -75,7 +75,7 @@ export interface RidePricingEstimateResponse {
 
 export interface RidePaymentMethodOption {
   id: string;
-  type: "WALLET" | "CASH" | "BANK_CARD" | "MOMO";
+  type: "WALLET" | "CASH" | "BANK_CARD" | "MOMO" | "SEPAY";
   displayName: string;
   subtitle?: string;
 }

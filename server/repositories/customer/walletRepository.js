@@ -197,6 +197,23 @@ export async function findPaymentByCode(paymentCode, conn = null) {
     return rows[0] || null;
 }
 
+export async function findSepayPendingPaymentByContent(content, conn = null) {
+    if (!content) return null;
+    const [rows] = await db(conn).query(
+        `SELECT payment_id, payment_code, payer_wallet_id, actor_type, actor_id, service_domain,
+                booking_id, rental_id, gateway_name, gateway_transaction_ref, amount, currency_id,
+                status, description, created_at, updated_at
+         FROM payments
+         WHERE gateway_name = 'sepay'
+           AND status = 'pending'
+           AND ? LIKE CONCAT('%', payment_code, '%')
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [content]
+    );
+    return rows[0] || null;
+}
+
 export async function updatePaymentStatus(paymentId, status, conn) {
     await db(conn).query(
         `UPDATE payments

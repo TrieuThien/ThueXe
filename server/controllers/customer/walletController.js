@@ -14,7 +14,8 @@ import {
     webhookConfirmPayment,
 } from "../../services/customer/walletService.js";
 import { verifyMomoIpnSignature, mapMomoResultCode } from "../../services/payment/momoService.js";
-import { findPaymentByCode } from "../../repositories/customer/walletRepository.js";
+import { mapSepayIpnStatus, createSepayPayment, buildSepayFormHtml } from "../../services/payment/sepayService.js";
+import { findPaymentByCode, findSepayPendingPaymentByContent } from "../../repositories/customer/walletRepository.js";
 
 export async function getWalletHandler(req, res, next) {
     try {
@@ -161,5 +162,82 @@ export async function momoIpnHandler(req, res, next) {
     } catch (error) {
         // Vẫn trả 200 để tránh MoMo retry liên tục; log lỗi qua next
         next(error);
+    }
+}
+
+// SePay IPN handler (server-to-server, không cần auth)
+export async function sepayIpnHandler(req, res, next) {
+    try {
+        // 1. Tìm payment: ưu tiên field code, fallback sang khớp payment_code trong content
+        const code    = req.body.code    ? String(req.body.code).trim()    : null;
+        const content = req.body.content ? String(req.body.content).trim() : null;
+
+        let payment = null;
+        if (code) {
+            payment = await findPaymentByCode(code);
+        }
+        if (!payment && content) {
+            payment = await findSepayPendingPaymentByContent(content);
+        }
+
+        if (!payment) {
+            // Không xác định được payment → trả 200 để SePay không retry
+            return res.status(200).json({ success: true });
+        }
+
+        // 2. Map trạng thái IPN → trạng thái nội bộ
+        const status = mapSepayIpnStatus(req.body);
+
+        // 4. Gọi luồng confirm chuẩn
+        const callbackData = {
+            payment_id: Number(payment.payment_id),
+            status,
+            gateway_status: status,
+            gateway_name: "sepay",
+            gateway_transaction_ref: req.body.id != null ? String(req.body.id) : null,
+            p_transaction_ref: req.body.referenceCode != null ? String(req.body.referenceCode) : null,
+            gateway_resp: req.body.content || null,
+            currency: "VND",
+        };
+        await webhookConfirmPayment(callbackData);
+
+        // 5. Trả về {"success": true} theo yêu cầu SePay
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        // Vẫn trả 200 để tránh SePay retry liên tục; log lỗi qua next
+        next(error);
+    }
+}
+
+// Trang relay: browser/WebView mở URL này → nhận HTML tự động POST đến SePay
+// Không cần auth — chỉ cần payment_code hợp lệ trong DB
+export async function sepayCheckoutPageHandler(req, res, next) {
+    try {
+        const code = String(req.query.code || "").trim();
+        if (!code) return res.status(400).send("Missing payment code.");
+
+        const payment = await findPaymentByCode(code);
+        if (!payment) return res.status(404).send("Payment not found.");
+
+        // Đính kèm code vào success_url để trang kết quả có thể tự xác nhận thanh toán
+        const baseSuccessUrl = (process.env.SEPAY_SUCCESS_URL || "").split("?")[0];
+        const { fields } = createSepayPayment({
+            paymentCode: code,
+            amount: Number(payment.amount),
+            orderInfo: payment.description || `Thanh toán ThueXe`,
+            successUrl: baseSuccessUrl ? `${baseSuccessUrl}?code=${code}` : undefined,
+            errorUrl: process.env.SEPAY_ERROR_URL,
+            cancelUrl: process.env.SEPAY_CANCEL_URL,
+        });
+
+        const html = buildSepayFormHtml(fields);
+        // Override helmet's default CSP: cho phép inline script (auto-submit) và form POST tới SePay
+        res.setHeader("Content-Security-Policy",
+            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; form-action https://pay-sandbox.sepay.vn https://pay.sepay.vn"
+        );
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.send(html);
+    } catch (error) {
+        return next(error);
     }
 }

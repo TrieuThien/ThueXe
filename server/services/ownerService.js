@@ -1492,6 +1492,7 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
     if (!(amount > 0)) throw new AppError("Invalid amount.", 422, "INVALID_AMOUNT");
     const gatewayName = String(payload.method || "manual").toLowerCase();
     const isMomo = gatewayName === "momo";
+    const isSepay = gatewayName === "sepay";
     const key = idempotencyKey || "";
     if (key) {
         const cached = consumeCachedResponse(ownerId, key);
@@ -1532,6 +1533,29 @@ export async function createOwnerRevenueTopup(auth, payload, idempotencyKey = ""
                 paymentId,
                 status: "pending",
                 paymentUrl: momoResult.payUrl,
+                walletBalanceAfter: Number(locked.balance),
+            };
+        }
+
+        if (isSepay) {
+            const paymentId = await createPayment({
+                payment_code: thePaymentCode,
+                payer_wallet_id: locked.wallet_id,
+                owner_id: ownerId,
+                service_domain: 2,
+                amount,
+                currency_id: Number(locked.currency_id),
+                status: "pending",
+                gateway_name: "sepay",
+                gateway_transaction_ref: null,
+                description: "Owner wallet topup via SePay",
+            }, conn);
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            return {
+                paymentCode: thePaymentCode,
+                paymentId,
+                status: "pending",
+                paymentUrl: relayUrl,
                 walletBalanceAfter: Number(locked.balance),
             };
         }

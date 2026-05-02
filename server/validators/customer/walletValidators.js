@@ -71,6 +71,13 @@ export const webhookConfirmValidator = [
     body("gateway_transaction_ref").optional({ values: "falsy" }).isString().isLength({ max: 100 }).withMessage("gateway_transaction_ref must not exceed 100 characters"),
 ];
 
+// Validator cho IPN webhook từ SePay (server-to-server, không cần auth)
+export const sepayIpnValidator = [
+    body("id").notEmpty().withMessage("id is required"),
+    body("transferType").isString().notEmpty().withMessage("transferType is required"),
+    body("transferAmount").isNumeric().withMessage("transferAmount must be numeric"),
+];
+
 // Validator cho IPN callback từ MoMo (server-to-server, không cần auth)
 export const momoIpnValidator = [
     body("partnerCode").isString().notEmpty().withMessage("partnerCode is required"),

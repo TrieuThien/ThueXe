@@ -72,7 +72,7 @@ export default function WalletPage() {
     mutationFn: ownerRevenueService.createTopupTransaction,
     onSuccess: (data) => {
       if (data.paymentUrl) {
-        toast.success('Đang chuyển đến trang thanh toán MoMo...');
+        toast.success('Đang chuyển đến trang thanh toán...');
         window.open(data.paymentUrl, '_blank', 'noopener,noreferrer');
       } else {
         toast.success('Nạp tiền thành công!');

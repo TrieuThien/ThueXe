@@ -1,6 +1,6 @@
 import { AppDateTime, ID } from "./common";
 
-export type PaymentMethodType = "WALLET" | "CASH" | "BANK_CARD" | "MOMO" | "ZALOPAY";
+export type PaymentMethodType = "WALLET" | "CASH" | "BANK_CARD" | "MOMO" | "ZALOPAY" | "SEPAY";
 
 export interface PaymentMethod {
   id: ID;

@@ -443,13 +443,14 @@ export async function findRentalBookingById(rentalId, conn) {
                 rb.status, rb.cancel_reason, rb.created_at, rb.updated_at,
                 NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
                 NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name,
-                v.license_plate, v.brand, v.model, vo.fullname AS owner_name,
+                d.phone AS driver_phone,
+                v.license_plate, v.brand, v.model, vo.fullname AS owner_name, vo.phone AS owner_phone,
                 rp.package_name
          FROM rental_bookings rb
          LEFT JOIN users u ON u.user_id = rb.user_id
          LEFT JOIN drivers d ON d.driver_id = rb.driver_id
          LEFT JOIN vehicles v ON v.vehicle_id = rb.vehicle_id
-         LEFT JOIN vehicle_owners vo ON vo.owner_id = rb.owner_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = v.owner_id
          LEFT JOIN rental_packages rp ON rp.package_id = rb.package_id
          WHERE rb.rental_id = ?
          LIMIT 1`,
@@ -491,9 +492,11 @@ export async function findRentalBookingById(rentalId, conn) {
         updated_at: row.updated_at,
         user_name: row.user_name,
         driver_name: row.driver_name,
+        driver_phone: row.driver_phone,
         license_plate: row.license_plate,
         vehicle_name: [row.brand, row.model].filter(Boolean).join(" ").trim() || null,
         owner_name: row.owner_name,
+        owner_phone: row.owner_phone,
         package_name: row.package_name,
     };
 }

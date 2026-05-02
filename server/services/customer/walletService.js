@@ -319,6 +319,18 @@ export async function createWalletTopupPayment(auth, payload) {
             };
         }
 
+        if (gatewayName === "sepay") {
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            return {
+                payment_id: paymentId,
+                payment_status: "pending",
+                amount,
+                gateway_name: "sepay",
+                redirect_url: relayUrl,
+                payer_wallet_id: Number(wallet.wallet_id),
+            };
+        }
+
         return {
             payment_id: paymentId,
             payment_status: "pending",
@@ -633,6 +645,17 @@ export async function payRideBooking(auth, bookingIdInput, payload) {
             };
         }
 
+        if (gatewayName === "sepay") {
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            return {
+                payment_id: paymentId,
+                booking_id: bookingId,
+                status: "pending",
+                amount,
+                redirect_url: relayUrl,
+            };
+        }
+
         return {
             payment_id: paymentId,
             booking_id: bookingId,
@@ -766,6 +789,17 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
                 status: "pending",
                 amount,
                 redirect_url: momoResult.payUrl,
+            };
+        }
+
+        if (gatewayName === "sepay") {
+            const relayUrl = `${process.env.SERVER_BASE_URL || "http://localhost:8000"}/api/customer/payments/checkout/sepay?code=${thePaymentCode}`;
+            return {
+                payment_id: paymentId,
+                rental_id: rentalId,
+                status: "pending",
+                amount,
+                redirect_url: relayUrl,
             };
         }
 

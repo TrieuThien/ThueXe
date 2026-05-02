@@ -48,6 +48,7 @@ export type WalletStackParamList = {
     amount: number;
     paymentMethod: TopupPaymentMethod;
     expiresAt: string;
+    checkoutUrl?: string;
   };
   WalletTopUpResult: {
     paymentId: string;

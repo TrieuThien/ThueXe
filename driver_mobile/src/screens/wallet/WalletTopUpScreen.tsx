@@ -22,16 +22,17 @@ const schema = z.object({
     .refine((value) => /^\d+$/.test(value), 'Nhập số tiền hợp lệ')
     .refine((value) => Number(value) >= MIN_TOPUP, `Số tiền tối thiểu là ${MIN_TOPUP.toLocaleString('vi-VN')}`)
     .refine((value) => Number(value) <= MAX_TOPUP, `Số tiền tối đa là ${MAX_TOPUP.toLocaleString('vi-VN')}`),
-  paymentMethod: z.enum(['momo', 'zalopay', 'banking'])
+  paymentMethod: z.enum(['momo', 'sepay', 'zalopay', 'banking'])
 });
 
 type FormData = z.infer<typeof schema>;
 type Props = NativeStackScreenProps<WalletStackParamList, 'WalletTopUp'>;
 
-const paymentMethods: { id: TopupPaymentMethod; label: string }[] = [
-  { id: 'momo', label: 'MoMo' },
-  { id: 'zalopay', label: 'ZaloPay' },
-  { id: 'banking', label: 'Internet Banking' }
+const paymentMethods: { id: TopupPaymentMethod; label: string; color: string; activeColor: string; activeTextColor: string }[] = [
+  { id: 'momo',    label: 'MoMo',             color: '#FFE4EF', activeColor: '#FFE4EF', activeTextColor: '#B5004A' },
+  { id: 'sepay',   label: 'SePay',            color: '#DBEAFE', activeColor: '#DBEAFE', activeTextColor: '#1D4ED8' },
+  { id: 'zalopay', label: 'ZaloPay',          color: '#EEF2FF', activeColor: '#EEF2FF', activeTextColor: '#4338CA' },
+  { id: 'banking', label: 'Internet Banking', color: '#FEF9C3', activeColor: '#FEF9C3', activeTextColor: '#A16207' },
 ];
 
 export const WalletTopUpScreen = ({ navigation }: Props) => {
@@ -64,7 +65,8 @@ export const WalletTopUpScreen = ({ navigation }: Props) => {
       paymentId: response.paymentId,
       amount: response.amount,
       paymentMethod: response.paymentMethod,
-      expiresAt: response.expiresAt
+      expiresAt: response.expiresAt,
+      checkoutUrl: response.checkoutUrl || undefined,
     });
   });
 
@@ -102,9 +104,19 @@ export const WalletTopUpScreen = ({ navigation }: Props) => {
               <Pressable
                 key={item.id}
                 onPress={() => setValue('paymentMethod', item.id)}
-                style={[styles.methodChip, active && styles.methodChipActive]}
+                style={[
+                  styles.methodChip,
+                  active && { borderColor: item.activeTextColor, backgroundColor: item.activeColor },
+                ]}
               >
-                <Text style={[styles.methodText, active && styles.methodTextActive]}>{item.label}</Text>
+                <Text
+                  style={[
+                    styles.methodText,
+                    active && { color: item.activeTextColor, fontWeight: '800' },
+                  ]}
+                >
+                  {item.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -165,17 +177,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10
   },
-  methodChipActive: {
-    borderColor: '#0F766E',
-    backgroundColor: '#CCFBF1'
-  },
   methodText: {
     color: '#334155',
     fontWeight: '600'
-  },
-  methodTextActive: {
-    color: '#0F766E',
-    fontWeight: '800'
   },
   summaryCard: {
     borderRadius: 14,

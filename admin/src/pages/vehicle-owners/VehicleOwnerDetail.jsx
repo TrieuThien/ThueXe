@@ -162,7 +162,7 @@ export default function VehicleOwnerDetail() {
                             ) : null}
                             {tab === "walletLedger" ? (
                                 <table className="min-w-full divide-y divide-slate-200">
-                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID sổ cái</th><th className="px-6 py-4">Direction</th><th className="px-6 py-4">Loại</th><th className="px-6 py-4">Số tiền</th><th className="px-6 py-4">Số dư sau</th><th className="px-6 py-4">Ngày tạo</th></tr></thead>
+                                    <thead className="bg-slate-50"><tr className="text-left text-xs uppercase tracking-[0.2em] text-slate-500"><th className="px-6 py-4">ID</th><th className="px-6 py-4">Hình thức</th><th className="px-6 py-4">Loại giao dịch</th><th className="px-6 py-4">Số tiền</th><th className="px-6 py-4">Số dư sau</th><th className="px-6 py-4">Ngày tạo</th></tr></thead>
                                     <tbody className="divide-y divide-slate-100">{(detail?.walletLedger || []).map((item) => <tr key={item.ledger_id} className="text-sm text-slate-700"><td className="px-6 py-4">#{item.ledger_id}</td><td className="px-6 py-4">{item.direction || "--"}</td><td className="px-6 py-4">{item.entry_type || "--"}</td><td className="px-6 py-4">{formatMoney(item.amount)}</td><td className="px-6 py-4">{formatMoney(item.balance_after)}</td><td className="px-6 py-4">{formatDateTime(item.created_at)}</td></tr>)}</tbody>
                                 </table>
                             ) : null}
@@ -178,7 +178,7 @@ export default function VehicleOwnerDetail() {
             ) : (
                 <div className="rounded-[28px] border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500"><FileText className="h-6 w-6" /></div>
-                    <p className="mt-4 text-sm text-slate-500">Khong tim thay chu xe nay.</p>
+                    <p className="mt-4 text-sm text-slate-500">Không tìm thấy chủ xe này.</p>
                 </div>
             )}
 

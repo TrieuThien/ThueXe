@@ -62,11 +62,11 @@ export default function RentalBookingsPage() {
   const updateStatusMutation = useMutation({
     mutationFn: (payload) => rentalBookingService.updateRentalOrderStatus(quickViewId, payload),
     onSuccess: () => {
-      toast.success('Cập nhật Trạng thái don thành công.');
+      toast.success('Cập nhật trạng thái đơn thành công.');
       queryClient.invalidateQueries({ queryKey: ['rental-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['rental-order-quick-detail', quickViewId] });
     },
-    onError: (error) => toast.error(error.message || 'Cập nhật Trạng thái thất bại.'),
+    onError: (error) => toast.error(error.message || 'Cập nhật trạng thái thất bại.'),
   });
 
   const vehicles = useMemo(() => {

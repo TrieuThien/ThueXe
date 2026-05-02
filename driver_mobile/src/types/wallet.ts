@@ -40,7 +40,7 @@ export type WalletTimeFilter = {
   toDate?: string;
 };
 
-export type TopupPaymentMethod = 'momo' | 'zalopay' | 'banking';
+export type TopupPaymentMethod = 'momo' | 'sepay' | 'zalopay' | 'banking';
 export type TopupResultStatus = 'success' | 'failed' | 'timeout';
 
 export type CreateTopupPaymentPayload = {
