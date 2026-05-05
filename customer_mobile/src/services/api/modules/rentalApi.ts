@@ -28,6 +28,8 @@ export interface PackageCar {
   status: string;
   owner_name: string | null;
   owner_phone: string | null;
+  extra_km_fee: number;
+  extra_hour_fee: number;
   photo_url: string | null;
   interior_photo_urls: string[];
   avg_rating: number | null;

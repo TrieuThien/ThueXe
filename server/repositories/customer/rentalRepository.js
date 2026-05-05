@@ -243,12 +243,15 @@ export async function findRentalBookingByIdForUser(rentalId, userId, conn = null
                 rp.package_name,
                 v.license_plate,
                 vt.type_name AS vehicle_type,
+                vo.fullname AS owner_name,
+                vo.phone AS owner_phone,
                 d.driver_rating,
                 NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name
          FROM rental_bookings rb
          LEFT JOIN rental_packages rp ON rp.package_id = rb.package_id
          LEFT JOIN vehicles v ON v.vehicle_id = rb.vehicle_id
          LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
+         LEFT JOIN vehicle_owners vo ON vo.owner_id = v.owner_id
          LEFT JOIN drivers d ON d.driver_id = rb.driver_id
          WHERE rb.rental_id = ? AND rb.user_id = ?
          LIMIT 1${lockSql}`,

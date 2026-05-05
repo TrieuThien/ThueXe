@@ -241,6 +241,9 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
 
           {/* ── Chi phí ────────────────────────────────────────────────────── */}
           <Section title="Chi phí">
+            {orderData.payment_method ? (
+              <Row label="Phương thức" value={String(orderData.payment_method)} />
+            ) : null}
             <Row label="Giá thuê cơ bản" value={formatCurrencyVND(Number(orderData.base_price ?? 0))} />
             {Number(orderData.extra_time_fee) > 0 ? (
               <Row label="Phí thêm giờ" value={formatCurrencyVND(Number(orderData.extra_time_fee))} />

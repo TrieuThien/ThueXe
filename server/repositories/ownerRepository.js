@@ -1127,3 +1127,53 @@ export async function getOwnerRevenueByVehicle(ownerId, { page = 1, pageSize = 1
 
     return { items: rows, total: Number(countRows[0]?.total || 0) };
 }
+
+export async function getOwnerWithdrawalTotals(ownerId) {
+    const [rows] = await sqldb.query(
+        `SELECT
+            COALESCE(SUM(CASE WHEN wr.status = 'pending' THEN wr.amount ELSE 0 END), 0) AS pending_total,
+            COALESCE(SUM(CASE WHEN wr.status = 'processing' THEN wr.amount ELSE 0 END), 0) AS processing_total
+         FROM withdrawal_requests wr
+         INNER JOIN wallet_accounts wa ON wa.wallet_id = wr.wallet_id
+         WHERE wa.actor_type = 2 AND wa.actor_id = ?`,
+        [ownerId]
+    );
+    return rows[0] || { pending_total: 0, processing_total: 0 };
+}
+
+export async function getOwnerMonthlyRevenueTrend(ownerId) {
+    const [rows] = await sqldb.query(
+        `SELECT
+            MONTH(rb.start_datetime) AS month,
+            YEAR(rb.start_datetime) AS year,
+            COALESCE(SUM(CASE WHEN rb.status = 'completed' THEN rb.total_price ELSE 0 END), 0) AS revenue
+         FROM rental_bookings rb
+         WHERE rb.owner_id = ?
+           AND rb.start_datetime >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+         GROUP BY YEAR(rb.start_datetime), MONTH(rb.start_datetime)
+         ORDER BY year ASC, month ASC`,
+        [ownerId]
+    );
+    return rows.map((r) => ({ month: Number(r.month), revenue: Number(r.revenue) }));
+}
+
+export async function getOwnerDashboardSummary(ownerId) {
+    const [[row]] = await sqldb.query(
+        `SELECT
+            (SELECT COUNT(*) FROM vehicles WHERE owner_id = ? AND status = 'available') AS active_vehicles,
+            (SELECT COUNT(*) FROM rental_bookings WHERE owner_id = ? AND status = 'pending') AS pending_bookings,
+            COALESCE(
+                (SELECT SUM(total_price) FROM rental_bookings
+                 WHERE owner_id = ? AND status = 'completed'
+                   AND YEAR(start_datetime) = YEAR(CURDATE())
+                   AND MONTH(start_datetime) = MONTH(CURDATE())),
+                0
+            ) AS monthly_revenue`,
+        [ownerId, ownerId, ownerId]
+    );
+    return {
+        active_vehicles: Number(row?.active_vehicles || 0),
+        pending_bookings: Number(row?.pending_bookings || 0),
+        monthly_revenue: Number(row?.monthly_revenue || 0),
+    };
+}

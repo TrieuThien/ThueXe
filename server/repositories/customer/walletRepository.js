@@ -284,7 +284,7 @@ export async function markBookingPaid({ bookingId, paymentId, paymentType, amoun
 export async function findRentalForCustomerPayment(rentalId, userId, conn = null, forUpdate = false) {
     const lockSql = forUpdate ? " FOR UPDATE" : "";
     const [rows] = await db(conn).query(
-        `SELECT rental_id, user_id, package_id, total_price, payment_status, payment_type, transaction_id
+        `SELECT rental_id, user_id, owner_id, package_id, total_price, payment_status, payment_type, transaction_id
          FROM rental_bookings
          WHERE rental_id = ? AND user_id = ?
          LIMIT 1${lockSql}`,

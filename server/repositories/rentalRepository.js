@@ -259,12 +259,14 @@ export async function listPackageCars(packageId) {
                 v.license_plate, v.seat_count, v.transmission, v.fuel_type, v.status, v.photo_url, v.interior_photo_urls,
                 vt.type_name,
                 vo.fullname AS owner_name, vo.phone AS owner_phone,
+                rp.extra_km_fee, rp.extra_hour_fee, rp.deposit_amount AS package_deposit,
                 ROUND(AVG(rv.rating), 1) AS avg_rating,
                 COUNT(rv.id)            AS rating_count
          FROM vehicle_rental_packages vrp
          INNER JOIN vehicles v ON v.vehicle_id = vrp.vehicle_id
          LEFT JOIN vehicle_types vt  ON vt.type_id  = v.type_id
          LEFT JOIN vehicle_owners vo ON vo.owner_id = v.owner_id
+         LEFT JOIN rental_packages rp ON rp.package_id = vrp.package_id
          LEFT JOIN ratings_vehicles rv ON rv.vehicle_id = v.vehicle_id
          WHERE vrp.package_id = ?
            AND v.is_verified = 1
@@ -303,6 +305,8 @@ export async function listPackageCars(packageId) {
         status: row.status,
         owner_name: row.owner_name,
         owner_phone: row.owner_phone,
+        extra_km_fee: Number(row.extra_km_fee || 0),
+        extra_hour_fee: Number(row.extra_hour_fee || 0),
         photo_url: row.photo_url || null,
         interior_photo_urls: (() => { try { return JSON.parse(row.interior_photo_urls || "[]"); } catch { return []; } })(),
         avg_rating: row.avg_rating !== null ? Number(row.avg_rating) : null,

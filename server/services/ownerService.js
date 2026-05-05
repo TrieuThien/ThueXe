@@ -44,6 +44,9 @@ import {
     getDefaultCurrencyId,
     getOwnerRevenueByVehicle,
     getOwnerRevenueTotals,
+    getOwnerWithdrawalTotals,
+    getOwnerMonthlyRevenueTrend,
+    getOwnerDashboardSummary,
     listContractsByOwner,
     listOwnerDocuments,
     listOwnerMaintenanceRecords,
@@ -642,38 +645,47 @@ export async function changeOwnerPassword(auth, payload) {
 
 export async function getOwnerAccountSummary(auth) {
     const ownerId = ensureOwnerAuth(auth);
-    const [vehiclesData, rentalsData, wallet] = await Promise.all([
+    const [vehiclesData, stats] = await Promise.all([
         listOwnerVehicles(ownerId, { page: 1, pageSize: 1 }),
-        listOwnerRentals(ownerId, { page: 1, pageSize: 50 }),
-        ensureOwnerWallet(ownerId),
+        getOwnerDashboardSummary(ownerId),
     ]);
     return {
         totalVehicles: vehiclesData.total,
-        pendingVehicles: 0,
-        activeRentals: rentalsData.items.filter((item) => item.status === "in_progress").length,
-        walletBalance: Number(wallet.balance || 0),
+        activeVehicles: stats.active_vehicles,
+        pendingBookings: stats.pending_bookings,
+        monthlyRevenue: stats.monthly_revenue,
     };
 }
 
 export async function getOwnerDashboard(auth) {
     const ownerId = ensureOwnerAuth(auth);
-    const [profile, summary, rentals, withdrawals] = await Promise.all([
+    const [profile, summary, rentals, withdrawals, monthlyTrend] = await Promise.all([
         getOwnerAccountProfile(auth),
         getOwnerAccountSummary(auth),
         listOwnerRentals(ownerId, { page: 1, pageSize: 5 }),
         listOwnerWithdrawals(ownerId, { page: 1, pageSize: 5 }),
+        getOwnerMonthlyRevenueTrend(ownerId),
     ]);
     return {
         profile,
         summary,
+        monthlyTrend,
         latestBookings: rentals.items.map((item) => ({
             id: item.rental_id,
             code: item.rental_code,
+            vehicleName: [item.brand, item.model].filter(Boolean).join(' ') || null,
+            customerName: [item.firstname, item.lastname].filter(Boolean).join(' ') || null,
             startDate: item.start_datetime,
             status: BOOKING_STATUS_MAP[item.status] || item.status,
             totalAmount: Number(item.total_price || 0) - Number(item.deposit_amount || 0),
         })),
-        latestWithdrawals: withdrawals.items,
+        latestWithdrawals: withdrawals.items.map((item) => ({
+            id: String(item.withdrawal_id),
+            requestCode: `WD-${item.withdrawal_id}`,
+            amount: Number(item.amount || 0),
+            status: item.status,
+            createdAt: item.requested_at,
+        })),
     };
 }
 
@@ -1294,6 +1306,7 @@ export async function getOwnerBookingDetail(auth, rentalIdInput) {
         orderCode: rental.rental_code,
         orderStatus: BOOKING_STATUS_MAP[rental.status] || rental.status,
         paymentStatus: rental.payment_status,
+        paymentMethod: rental.payment_type === null ? null : (rental.payment_type === 2 ? 'Ví ThueXe' : 'Tiền mặt'),
         customer: { fullName: `${rental.firstname || ""} ${rental.lastname || ""}`.trim(), phoneNumber: rental.customer_phone || "" },
         vehicle: {
             id: String(rental.vehicle_id || ""),
@@ -1378,17 +1391,24 @@ export async function getOwnerBookingContractDetail(auth, contractIdInput) {
 
 export async function getOwnerRevenueSummary(auth, query) {
     const ownerId = ensureOwnerAuth(auth);
-    const totals = await getOwnerRevenueTotals(ownerId, {
-        dateFrom: ensureValidDate(query.dateFrom, "dateFrom"),
-        dateTo: ensureValidDate(query.dateTo, "dateTo"),
-    });
-    const wallet = await ensureOwnerWallet(ownerId);
+    const [totals, wallet, withdrawalTotals, monthlyTrend] = await Promise.all([
+        getOwnerRevenueTotals(ownerId, {
+            dateFrom: ensureValidDate(query.dateFrom, "dateFrom"),
+            dateTo: ensureValidDate(query.dateTo, "dateTo"),
+        }),
+        ensureOwnerWallet(ownerId),
+        getOwnerWithdrawalTotals(ownerId),
+        getOwnerMonthlyRevenueTrend(ownerId),
+    ]);
     return {
         totalRevenue: Number(totals.total_completed_revenue || 0),
         monthRevenue: Number(totals.total_completed_revenue || 0),
         pendingRevenue: Number(totals.pending_revenue || 0),
         walletBalance: Number(wallet.balance || 0),
         totalBookings: Number(totals.total_bookings || 0),
+        pendingWithdrawal: Number(withdrawalTotals.pending_total || 0),
+        processingWithdrawal: Number(withdrawalTotals.processing_total || 0),
+        monthlyTrend,
     };
 }
 
@@ -1401,7 +1421,8 @@ export async function getOwnerRevenueByVehicleService(auth, query) {
             vehicleId: String(item.vehicle_id),
             vehicleName: `${item.brand} ${item.model} ${item.year || ""}`.trim(),
             plateNumber: item.license_plate,
-            revenue: Number(item.revenue || 0),
+            grossRevenue: Number(item.revenue || 0),
+            netRevenue: Number(item.revenue || 0),
             totalBookings: Number(item.total_bookings || 0),
         })),
         page,

@@ -49,6 +49,8 @@ export type BookingStackParamList = {
       type_name: string;
       owner_name: string | null;
       owner_phone: string | null;
+      extra_km_fee?: number;
+      extra_hour_fee?: number;
       avg_rating: number | null;
       rating_count: number;
       photo_url?: string | null;

@@ -731,6 +731,30 @@ export async function payRentalBooking(auth, rentalIdInput, payload) {
 
             await markRentalPaid({ rentalId, paymentId, paymentType }, conn);
 
+            if (rental.owner_id) {
+                let ownerWallet = await findWalletByActorForUpdate(2, rental.owner_id, conn);
+                if (!ownerWallet) {
+                    const currency = await findDefaultCurrency(conn);
+                    await createWalletForActor({ actorType: 2, actorId: rental.owner_id, currencyId: Number(currency.id) }, conn);
+                    ownerWallet = await findWalletByActorForUpdate(2, rental.owner_id, conn);
+                }
+                if (ownerWallet) {
+                    const ownerNextBalance = round2(Number(ownerWallet.balance || 0) + amount);
+                    await updateWalletBalance(Number(ownerWallet.wallet_id), ownerNextBalance, conn);
+                    await insertWalletLedger({
+                        wallet_id: Number(ownerWallet.wallet_id),
+                        payment_id: paymentId,
+                        amount,
+                        balance_after: ownerNextBalance,
+                        direction: "credit",
+                        entry_type: "rental_payment",
+                        source_type: "rental_booking",
+                        source_id: rentalId,
+                        description: `Thu tiền thuê xe #${rentalId}`,
+                    }, conn);
+                }
+            }
+
             await emitWalletUpdated({
                 walletId: Number(wallet.wallet_id),
                 balance: nextBalance,

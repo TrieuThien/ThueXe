@@ -162,6 +162,22 @@ export function RentalCarDetailScreen({ navigation, route }: Props) {
               📦 {packageName}
             </Text>
           </View>
+
+          {/* Phí vượt km / giờ */}
+          {((car.extra_km_fee ?? 0) > 0 || (car.extra_hour_fee ?? 0) > 0) ? (
+            <View style={[styles.feeRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
+              {(car.extra_km_fee ?? 0) > 0 ? (
+                <Text style={[styles.feeText, { color: theme.colors.textMuted }]}>
+                  {"🛣️"} Vượt km: {new Intl.NumberFormat("vi-VN").format(car.extra_km_fee ?? 0)}₫/km
+                </Text>
+              ) : null}
+              {(car.extra_hour_fee ?? 0) > 0 ? (
+                <Text style={[styles.feeText, { color: theme.colors.textMuted }]}>
+                  {"⏱️"} Vượt giờ: {new Intl.NumberFormat("vi-VN").format(car.extra_hour_fee ?? 0)}₫/h
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         {/* ── Ảnh nội thất ─────────────────────────────────────────────────── */}
@@ -302,6 +318,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   packageBadgeText: { fontSize: 13, fontWeight: "600" },
+  feeRow: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    gap: 4,
+    alignItems: "center",
+  },
+  feeText: { fontSize: 12 },
 
   // Interior photo
   interiorCard: {
