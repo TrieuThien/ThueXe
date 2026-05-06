@@ -18,6 +18,7 @@ export * from "./queries/useNotification";
 export * from "./queries/useRealtime";
 export * from "./useCurrentLocation";
 export * from "./useAddressAutocomplete";
+export * from "./useRentalLocationTracking";
 export * from "./getAuthErrorMessage";
 export * from "./getApiErrorMessage";
 export * from "./getRideFlowErrorMessage";

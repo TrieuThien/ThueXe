@@ -23,11 +23,10 @@ export default function PaymentsPage() {
 
   const columns = useMemo(
     () => [
-      { key: 'bookingCode', header: 'Mã giao dịch' },
-      { key: 'customerName', header: 'Khách hàng' },
+      { key: 'paymentCode', header: 'Mã giao dịch' },
       { key: 'amount', header: 'Số tiền', render: (row) => formatCurrency(row.amount) },
       { key: 'method', header: 'Phương thức' },
-      { key: 'paidAt', header: 'Thời gian', render: (row) => formatDateTime(row.paidAt) },
+      { key: 'createdAt', header: 'Thời gian', render: (row) => formatDateTime(row.createdAt) },
       { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
     ],
     [],

@@ -334,6 +334,18 @@ export async function updateRentalAsCompleted(
     );
 }
 
+export async function updateVehicleLocationByRental(rentalId, userId, lat, lng, conn = null) {
+    const [result] = await db(conn).query(
+        `UPDATE vehicles v
+         INNER JOIN rental_bookings rb ON rb.vehicle_id = v.vehicle_id
+         SET v.current_lat = ?, v.current_long = ?
+         WHERE rb.rental_id = ? AND rb.user_id = ? AND rb.status = 'in_progress'
+         LIMIT 1`,
+        [lat, lng, rentalId, userId]
+    );
+    return Number(result.affectedRows || 0) > 0;
+}
+
 export async function findVehicleById(vehicleId, conn = null) {
     const [rows] = await db(conn).query(
         `SELECT vehicle_id, owner_id, type_id, status, is_verified

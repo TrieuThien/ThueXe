@@ -23,7 +23,6 @@ export default function DashboardPage() {
   const withdrawalColumns = [
     { key: 'requestCode', header: 'Mã rút tiền' },
     { key: 'amount', header: 'Số tiền', render: (row) => formatCurrency(row.amount) },
-    { key: 'bankName', header: 'Ngân hàng' },
     { key: 'createdAt', header: 'Thời gian', render: (row) => formatDate(row.createdAt) },
     { key: 'status', header: 'Trạng thái', render: (row) => <StatusBadge status={row.status} /> },
   ];
@@ -41,6 +40,29 @@ export default function DashboardPage() {
         <SummaryCard title="Đơn chờ xác nhận" value={data?.summary?.pendingBookings || 0} tone="warning" />
         <SummaryCard title="Doanh thu tháng" value={formatCurrency(data?.summary?.monthlyRevenue || 0)} tone="info" />
       </div>
+
+      {(() => {
+        const trend = data?.monthlyTrend || [];
+        const maxValue = Math.max(...trend.map((t) => t.revenue), 1);
+        return trend.length > 0 ? (
+          <article className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="text-base font-bold text-slate-900">Xu hướng doanh thu theo tháng</h3>
+            <div className="mt-3 grid grid-cols-4 gap-3">
+              {trend.map((item) => (
+                <div key={item.month} className="text-center">
+                  <div className="mx-auto flex h-32 w-12 items-end rounded-lg bg-slate-100 p-1">
+                    <div
+                      className="w-full rounded bg-gradient-to-t from-cyan-500 to-sky-500"
+                      style={{ height: `${Math.max(6, (item.revenue / maxValue) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Tháng {item.month}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        ) : null;
+      })()}
 
       <div className="mt-4 grid gap-4">
         <div>

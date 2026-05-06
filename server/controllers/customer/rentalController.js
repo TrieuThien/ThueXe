@@ -9,6 +9,7 @@ import {
     getRentalBookingDetail,
     getRentalBookingHistory,
     getRentalPackages,
+    updateRentalLocation,
 } from "../../services/customer/rentalService.js";
 
 export async function getRentalPackagesHandler(req, res, next) {
@@ -87,6 +88,15 @@ export async function getAvailableRentalDriversHandler(req, res, next) {
     try {
         const result = await getAvailableRentalDrivers(req.auth, req.query);
         return successResponse(res, result, "Available drivers fetched successfully.");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function updateRentalLocationHandler(req, res, next) {
+    try {
+        const result = await updateRentalLocation(req.auth, req.params.rentalId, req.body);
+        return successResponse(res, result, "Vehicle location updated successfully.");
     } catch (error) {
         return next(error);
     }

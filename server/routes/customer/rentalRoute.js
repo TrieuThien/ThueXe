@@ -11,6 +11,7 @@ import {
     getRentalBookingDetailHandler,
     getRentalBookingHistoryHandler,
     getRentalPackagesHandler,
+    updateRentalLocationHandler,
 } from "../../controllers/customer/rentalController.js";
 import {
     cancelRentalValidator,
@@ -37,6 +38,7 @@ router.post(
     validateRequest,
     cancelRentalBookingHandler
 );
+router.post("/bookings/:rentalId/location", requireAuth, rentalIdParamValidator, validateRequest, updateRentalLocationHandler);
 router.get(
     "/vehicles/available",
     requireAuth,

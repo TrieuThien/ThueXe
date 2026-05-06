@@ -75,4 +75,8 @@ export const rentalApi = {
   // ── GIS: lấy xe khả dụng của gói thuê ────────────────────────────────────
   getPackageCars: async (packageId: number | string) =>
     apiClient.get(`/api/mobile/rental-packages/${packageId}/cars`),
+
+  // ── Gửi vị trí GPS khách hàng trong lúc thuê xe ───────────────────────────
+  sendLocation: async (rentalId: string | number, payload: { lat: number; lng: number }) =>
+    apiClient.post(`${APP_CONFIG.customerApiPrefix}/rentals/bookings/${rentalId}/location`, payload),
 };

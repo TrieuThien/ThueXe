@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Package } from 'lucide-react';
+import { Package, Loader2 } from 'lucide-react';
 import PageHeader from '../components/ui/PageHeader';
 import { vehicleManagementService } from '../services/vehicleManagementService';
 import { rentalPackageService } from '../services/rentalPackageService';
@@ -15,6 +15,17 @@ function durationLabel(pkg) {
   if (pkg.duration_hours) parts.push(`${pkg.duration_hours} giờ`);
   if (pkg.duration_days) parts.push(`${pkg.duration_days} ngày`);
   return parts.join(' / ') || '—';
+}
+
+function VehicleAppliedPackages({ vehicleId }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['owner-vehicle-packages', vehicleId],
+    queryFn: () => rentalPackageService.getVehiclePackages(vehicleId),
+    select: (d) => d?.packages ?? [],
+  });
+  if (isLoading) return <span className="flex items-center gap-1 text-xs text-slate-400"><Loader2 className="h-3 w-3 animate-spin" />Đang tải...</span>;
+  if (!data?.length) return <span className="text-xs text-slate-400">Chưa gán gói</span>;
+  return <span className="text-xs text-slate-600">{data.map((p) => p.package_name).join(', ')}</span>;
 }
 
 export default function RentalPackagesPage() {
@@ -122,6 +133,7 @@ export default function RentalPackagesPage() {
                   <th className="px-4 py-3 text-left">Xe</th>
                   <th className="px-4 py-3 text-left">Biển số</th>
                   <th className="px-4 py-3 text-left">Trạng thái</th>
+                  <th className="px-4 py-3 text-left">Gói đang áp dụng</th>
                   <th className="px-4 py-3 text-left">Hành động</th>
                 </tr>
               </thead>
@@ -142,6 +154,9 @@ export default function RentalPackagesPage() {
                       >
                         {v.usageStatus}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <VehicleAppliedPackages vehicleId={v.id} />
                     </td>
                     <td className="px-4 py-3">
                       <button

@@ -15,6 +15,7 @@ import {
     findRentalBookingByIdForUser,
     findRentalPackageById,
     findVehicleById,
+    updateVehicleLocationByRental,
     findWalletByActorForUpdate,
     insertPayment,
     insertWalletLedger,
@@ -763,4 +764,22 @@ export async function completeRentalBooking(auth, rentalIdInput, payload) {
         const updated = await findRentalBookingByIdForUser(rentalId, userId, conn);
         return { booking: mapRentalBooking(updated) };
     });
+}
+
+export async function updateRentalLocation(auth, rentalIdInput, payload) {
+    const userId = assertCustomer(auth);
+    const rentalId = Number(rentalIdInput);
+    const lat = Number(payload.lat);
+    const lng = Number(payload.lng);
+
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90)
+        throw new AppError("lat không hợp lệ.", 422, "INVALID_LAT");
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180)
+        throw new AppError("lng không hợp lệ.", 422, "INVALID_LNG");
+
+    const updated = await updateVehicleLocationByRental(rentalId, userId, lat, lng);
+    if (!updated)
+        throw new AppError("Đơn thuê không tồn tại hoặc chưa bắt đầu.", 404, "RENTAL_NOT_IN_PROGRESS");
+
+    return { rental_id: rentalId, lat, lng };
 }

@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { AppHeader, ErrorState, HeaderTextButton, LoadingState } from "../../components";
 import { QUERY_KEY_FACTORY } from "../../constants";
+import { useRentalLocationTracking } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
 import { rentalApi } from "../../services";
 import { useTheme } from "../../theme";
@@ -150,6 +151,8 @@ export function RentalBookingDetailScreen({ navigation, route }: Props) {
   const orderStatus = String(orderData?.status ?? "").toLowerCase();
   const paymentStatus = String(orderData?.payment_status ?? "").toLowerCase();
   const serviceType = Number(orderData?.service_type ?? 1);
+
+  useRentalLocationTracking(orderData?.rental_id, orderStatus === "in_progress");
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>

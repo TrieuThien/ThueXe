@@ -96,6 +96,12 @@ export default function RentalOrderDetail({
       <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h4 className="text-base font-bold text-slate-900">Chi phi chi tiết</h4>
         <div className="mt-3 grid gap-2 text-sm">
+          {booking.paymentMethod ? (
+            <p className="flex justify-between text-slate-600">
+              <span>Phương thức thanh toán</span>
+              <span className="font-semibold">{booking.paymentMethod}</span>
+            </p>
+          ) : null}
           <p className="flex justify-between">
             <span>Giá thuê cơ bản</span>
             <span className="font-semibold">{formatCurrency(booking.costBreakdown.basePrice)}</span>

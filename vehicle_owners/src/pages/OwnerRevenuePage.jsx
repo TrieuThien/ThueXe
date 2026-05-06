@@ -32,7 +32,7 @@ export default function OwnerRevenuePage() {
   return (
     <section className="space-y-4">
       <PageHeader
-        title="Quản lý doanh thu Chủ xe"
+        title="Quản lý doanh thu chủ xe"
         description="Theo dõi doanh thu, ví, lịch sử giao dịch và thực hiện rút/nạp tiền."
       />
 
