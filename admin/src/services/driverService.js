@@ -100,4 +100,9 @@ export async function getDriverLocation(driverId) {
     return extractPayload(response);
 }
 
+export async function getOnlineDriversWithLocations() {
+    const response = await apiClient.get("/api/drivers/online-locations");
+    return extractPayload(response);
+}
+
 export { sanitizeQueryParams };

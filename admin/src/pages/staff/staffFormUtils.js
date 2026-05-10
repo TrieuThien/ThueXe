@@ -66,11 +66,11 @@ export function validateStaffImageFile(imageFile) {
     }
 
     if (!allowedImageTypes.includes(imageFile.type)) {
-        return "Anh phai la jpeg, png, webp hoac gif.";
+        return "Ảnh phải là jpeg, png, webp hoặc gif.";
     }
 
     if (imageFile.size > 2 * 1024 * 1024) {
-        return "Dung luong anh khong duoc vuot qua 2MB.";
+        return "Dung lượng ảnh không được vượt quá 2MB.";
     }
 
     return "";
@@ -156,7 +156,7 @@ export function validateAdminPasswordConfirm(password) {
     const normalizedPassword = String(password || "");
 
     if (!passwordRegex.test(normalizedPassword)) {
-        return "Mat khau admin khong hop le.";
+        return "Mật khẩu admin không hợp lệ.";
     }
 
     return "";

@@ -43,9 +43,13 @@ export default function VehicleActivityPage() {
 
   const mapVehiclesQuery = useQuery({
     queryKey: ['vehicle-activity-map', mapStatusFilter],
-    queryFn: () => vehicleActivityService.getVehicleLocations({ status: mapStatusFilter }),
+    queryFn: () =>
+      vehicleActivityService.getVehicleLocations(
+        mapStatusFilter === 'all' ? {} : { status: mapStatusFilter },
+      ),
+    refetchInterval: activeTab === 'map' ? 30_000 : false,
+    enabled: activeTab === 'map',
   });
-
   const availabilityWindow = useMemo(() => {
     const start = new Date(anchorDate);
     start.setHours(0, 0, 0, 0);

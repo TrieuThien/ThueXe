@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainLayout } from '../../layouts/MainLayout';
 import { AppButton } from '../../components/common';
@@ -165,6 +165,31 @@ export const CurrentTripScreen = ({ navigation }: Props) => {
     }
   };
 
+  const openNavigation = () => {
+    const isHeadingToPickup = trip.status === 'accepted';
+    const lat  = isHeadingToPickup ? trip.pickupLat  : trip.dropoffLat;
+    const lng  = isHeadingToPickup ? trip.pickupLng  : trip.dropoffLng;
+
+    if (lat == null || lng == null) return;
+
+    const url = Platform.select({
+      ios:     `comgooglemaps://?daddr=${lat},${lng}&directionsmode=driving`,
+      android: `google.navigation:q=${lat},${lng}&mode=d`,
+    }) ?? `https://maps.google.com/maps?daddr=${lat},${lng}`;
+
+    Linking.canOpenURL(url).then((supported) => {
+      const fallback = `https://maps.google.com/maps?daddr=${lat},${lng}`;
+      Linking.openURL(supported ? url : fallback);
+    });
+  };
+
+  const navCoords =
+    trip.status === 'accepted'
+      ? { lat: trip.pickupLat, lng: trip.pickupLng }
+      : { lat: trip.dropoffLat, lng: trip.dropoffLng };
+
+  const canNavigate = navCoords.lat != null && navCoords.lng != null;
+
   const onUpdateLocation = async () => {
     try {
       await locationMutation.mutateAsync({
@@ -180,10 +205,16 @@ export const CurrentTripScreen = ({ navigation }: Props) => {
   return (
     <MainLayout title="Chuyến hiện tại">
       <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapText}>Bản đồ điều hướng (placeholder)</Text>
         <Text style={styles.routeText}>
-          {trip.pickupAddress} {'->'} {trip.dropoffAddress}
+          {trip.pickupAddress} {'→'} {trip.dropoffAddress}
         </Text>
+        {canNavigate ? (
+          <TouchableOpacity style={styles.navButton} onPress={openNavigation} activeOpacity={0.8}>
+            <Text style={styles.navButtonText}>🗺 Mở điều hướng Google Maps</Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.mapText}>Không có tọa độ điều hướng</Text>
+        )}
       </View>
 
       {trip.status === 'incoming' ? (
@@ -232,13 +263,26 @@ const styles = StyleSheet.create({
     gap: 8
   },
   mapText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1E3A8A'
+    fontSize: 14,
+    color: '#1E3A8A',
+    textAlign: 'center',
   },
   routeText: {
     color: '#1E40AF',
-    textAlign: 'center'
+    textAlign: 'center',
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  navButton: {
+    backgroundColor: '#1E3A8A',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  navButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
   },
   meta: {
     color: '#334155',

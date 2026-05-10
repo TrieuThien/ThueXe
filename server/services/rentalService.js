@@ -340,11 +340,15 @@ export async function createRentalBookingService({ payload, auth }) {
 export async function listRentalBookingsService({ query, auth }) {
     const filters = {
         status: toNullableString(query.status),
-        serviceType: query.service_type === undefined || query.service_type === "" ? undefined : Number(query.service_type),
         search: toNullableString(query.search),
         page: query.page,
         limit: query.limit,
     };
+    if (query.service_types) {
+        filters.serviceTypes = String(query.service_types).split(",").map(Number).filter(Number.isFinite);
+    } else if (query.service_type !== undefined && query.service_type !== "") {
+        filters.serviceType = Number(query.service_type);
+    }
     if (auth.role === "passenger") {
         filters.userId = Number(auth.userId);
     } else if (auth.role === "driver") {

@@ -4,14 +4,14 @@ export function getRentalFlowErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case "NETWORK_ERROR":
-        return "Mat ket noi mang. Vui long thu lai.";
+        return "Mất kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.";
       case "RENTAL_PRICING_ERROR":
-        return "Khong tinh duoc gia goi thue.";
+        return "Không thể tính được giá gói thuê.";
       case "RENTAL_BOOKING_ERROR":
-        return "Khong tao duoc yeu cau thue. Thu lai sau.";
+        return "Không thể tạo được yêu cầu thuê. Vui lòng thử lại sau.";
       default:
         return error.message;
     }
   }
-  return "Co loi xay ra. Vui long thu lai.";
+  return "Có lỗi xảy ra. Vui lòng thử lại.";
 }

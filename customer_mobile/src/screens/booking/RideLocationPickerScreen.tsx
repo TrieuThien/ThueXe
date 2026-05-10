@@ -1,5 +1,6 @@
 ﻿import { zodResolver } from "@hookform/resolvers/zod";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -22,6 +23,7 @@ import {
   useCurrentLocation,
   useRideRouteEstimateMutation,
 } from "../../hooks";
+import { resolveGooglePlaceDetails } from "../../utils/googlePlaces";
 import { BookingStackParamList } from "../../navigation";
 import { useRideFlowStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -97,8 +99,22 @@ export function RideLocationPickerScreen({ navigation }: Props) {
     }
     : undefined;
 
-  const pickupAutocomplete = useAddressAutocomplete(pickupInput ?? "", locationBias);
-  const destinationAutocomplete = useAddressAutocomplete(destinationInput ?? "", locationBias);
+  // Pickup + destination get "current location" suggestion; stops do not
+  const biasWithCurrentLocation = location.data
+    ? {
+      ...locationBias!,
+      currentLocation: location.data.address
+        ? {
+          label: location.data.address,
+          latitude: location.data.latitude,
+          longitude: location.data.longitude,
+        }
+        : undefined,
+    }
+    : undefined;
+
+  const pickupAutocomplete = useAddressAutocomplete(pickupInput ?? "", biasWithCurrentLocation);
+  const destinationAutocomplete = useAddressAutocomplete(destinationInput ?? "", biasWithCurrentLocation);
   const stop1Autocomplete = useAddressAutocomplete(stop1Input ?? "", locationBias);
   const stop2Autocomplete = useAddressAutocomplete(stop2Input ?? "", locationBias);
 
@@ -193,17 +209,36 @@ export function RideLocationPickerScreen({ navigation }: Props) {
     navigation.navigate("RideVehicleSelection");
   };
 
-  const resolveSuggestionLabel = async (item: AddressSuggestion): Promise<string> => {
-    if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
-      return item.label;
+  const resolveSuggestionToAddressAndCoord = async (
+    item: AddressSuggestion,
+  ): Promise<{ label: string; coordinate?: Coordinate }> => {
+    if (item.isCurrentLocation) {
+      return {
+        label: item.label,
+        coordinate:
+          typeof item.latitude === "number" && typeof item.longitude === "number"
+            ? { latitude: item.latitude, longitude: item.longitude }
+            : undefined,
+      };
     }
-
-    try {
-      const resolved = await reverseGeocodeToDisplayAddress(item.latitude, item.longitude);
-      return resolved ?? item.label;
-    } catch {
-      return item.label;
+    if (item.placeId) {
+      const details = await resolveGooglePlaceDetails(item.placeId);
+      return {
+        label: details?.formattedAddress || item.label,
+        coordinate: details ? { latitude: details.latitude, longitude: details.longitude } : undefined,
+      };
     }
+    const resolved =
+      typeof item.latitude === "number" && typeof item.longitude === "number"
+        ? await reverseGeocodeToDisplayAddress(item.latitude, item.longitude).catch(() => null)
+        : null;
+    return {
+      label: resolved ?? item.label,
+      coordinate:
+        typeof item.latitude === "number" && typeof item.longitude === "number"
+          ? { latitude: item.latitude, longitude: item.longitude }
+          : undefined,
+    };
   };
 
   return (
@@ -235,7 +270,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               {!pickupAutocomplete.loading &&
                 showPickupSuggestions &&
                 (pickupInput ?? "").trim().length >= 2 &&
-                pickupAutocomplete.suggestions.length === 0 ? (
+                pickupAutocomplete.suggestions.filter((s) => !s.isCurrentLocation).length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
@@ -246,14 +281,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                       key={item.id}
                       onPress={async () => {
                         pickupAutoFilledRef.current = false;
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("pickupAddress", nextLabel, { shouldValidate: true });
-                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                          setPickupCoordinate({
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                          });
-                        }
+                        const resolved = await resolveSuggestionToAddressAndCoord(item);
+                        setValue("pickupAddress", resolved.label, { shouldValidate: true });
+                        if (resolved.coordinate) setPickupCoordinate(resolved.coordinate);
                         setShowPickupSuggestions(false);
                       }}
                       style={[
@@ -262,7 +292,13 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                         { borderBottomColor: theme.colors.border },
                       ]}
                     >
-                      <Text style={[styles.suggestionText, { color: theme.colors.text }]} numberOfLines={1}>
+                      <MaterialCommunityIcons
+                        name={item.isCurrentLocation ? "crosshairs-gps" : "map-marker-outline"}
+                        size={14}
+                        color={item.isCurrentLocation ? theme.colors.primary : theme.colors.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={[styles.suggestionText, { color: theme.colors.text, flex: 1 }]} numberOfLines={1}>
                         {item.label}
                       </Text>
                     </Pressable>
@@ -297,7 +333,7 @@ export function RideLocationPickerScreen({ navigation }: Props) {
               {!destinationAutocomplete.loading &&
                 showDestinationSuggestions &&
                 (destinationInput ?? "").trim().length >= 2 &&
-                destinationAutocomplete.suggestions.length === 0 ? (
+                destinationAutocomplete.suggestions.filter((s) => !s.isCurrentLocation).length === 0 ? (
                 <Text style={[styles.suggestionHint, { color: theme.colors.textMuted }]}>Không tìm thấy gợi ý phù hợp</Text>
               ) : null}
 
@@ -307,14 +343,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                     <Pressable
                       key={item.id}
                       onPress={async () => {
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("destinationAddress", nextLabel, { shouldValidate: true });
-                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                          setDestinationCoordinate({
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                          });
-                        }
+                        const resolved = await resolveSuggestionToAddressAndCoord(item);
+                        setValue("destinationAddress", resolved.label, { shouldValidate: true });
+                        if (resolved.coordinate) setDestinationCoordinate(resolved.coordinate);
                         setShowDestinationSuggestions(false);
                       }}
                       style={[
@@ -323,7 +354,13 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                         { borderBottomColor: theme.colors.border },
                       ]}
                     >
-                      <Text style={[styles.suggestionText, { color: theme.colors.text }]} numberOfLines={1}>
+                      <MaterialCommunityIcons
+                        name={item.isCurrentLocation ? "crosshairs-gps" : "map-marker-outline"}
+                        size={14}
+                        color={item.isCurrentLocation ? theme.colors.primary : theme.colors.textMuted}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={[styles.suggestionText, { color: theme.colors.text, flex: 1 }]} numberOfLines={1}>
                         {item.label}
                       </Text>
                     </Pressable>
@@ -368,14 +405,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                     <Pressable
                       key={item.id}
                       onPress={async () => {
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("stop1", nextLabel, { shouldValidate: true });
-                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                          setStop1Coordinate({
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                          });
-                        }
+                        const resolved = await resolveSuggestionToAddressAndCoord(item);
+                        setValue("stop1", resolved.label, { shouldValidate: true });
+                        if (resolved.coordinate) setStop1Coordinate(resolved.coordinate);
                         setShowStop1Suggestions(false);
                       }}
                       style={[
@@ -429,14 +461,9 @@ export function RideLocationPickerScreen({ navigation }: Props) {
                     <Pressable
                       key={item.id}
                       onPress={async () => {
-                        const nextLabel = await resolveSuggestionLabel(item);
-                        setValue("stop2", nextLabel, { shouldValidate: true });
-                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                          setStop2Coordinate({
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                          });
-                        }
+                        const resolved = await resolveSuggestionToAddressAndCoord(item);
+                        setValue("stop2", resolved.label, { shouldValidate: true });
+                        if (resolved.coordinate) setStop2Coordinate(resolved.coordinate);
                         setShowStop2Suggestions(false);
                       }}
                       style={[
@@ -556,6 +583,8 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,

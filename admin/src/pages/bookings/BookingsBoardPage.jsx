@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import BookingFilters from "../../components/bookings/BookingFilters";
 import BookingTable from "../../components/bookings/BookingTable";
 import { useBookingFilters } from "../../hooks/useBookingFilters";
+import { BOOKING_STATUS_OPTIONS, getStatusLabel } from "../../types/bookingTypes";
 import {
     assignDriver,
     getAssignableDrivers,
@@ -40,9 +41,14 @@ export default function BookingsBoardPage({ mode = "all" }) {
     const [busyId, setBusyId] = useState(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
+    const [statusModal, setStatusModal] = useState(null);
+    const [statusForm, setStatusForm] = useState({ status: "0", cancel_comment: "" });
     const [pagination, setPagination] = useState({ page: 1, totalPages: 0 });
     const [summary, setSummary] = useState({ immediate_count: 0, scheduled_count: 0 });
     const [totalItems, setTotalItems] = useState(0);
+    const [assignModal, setAssignModal] = useState(null);
+    const [assignForm, setAssignForm] = useState({ driver_id: "", driverList: [] });
+    const [assignModalLoading, setAssignModalLoading] = useState(false);
 
     const detailPathBase = useMemo(() => (role === "admin" ? "/admin/bookings" : "/dispatcher/bookings"), [role]);
 
@@ -86,69 +92,95 @@ export default function BookingsBoardPage({ mode = "all" }) {
         setBusyId(item.id);
         setErrorMessage("");
         setSuccessMessage("");
+        setAssignModalLoading(true);
 
         try {
             const drivers = await getAssignableDrivers({
-                route_id: item.route_id,
-                ride_id: item.ride_id,
+                route_id: item.route_id || undefined,
+                ride_id: item.ride_id || undefined,
                 limit: 15,
             });
 
-            const choices = (drivers.items || [])
-                .map((driver) => `${driver.driver_id}: ${driver.full_name} (${driver.phone || "--"})`)
-                .join("\n");
-
-            const selected = window.prompt(
-                `Nhập mã tài xế để gán:\n${choices || "Không có gợi ý phù hợp"}`,
-                item.driver_id ? String(item.driver_id) : ""
-            );
-
-            if (!selected) {
-                return;
-            }
-
-            const parsedDriverId = Number(selected);
-            if (!Number.isInteger(parsedDriverId) || parsedDriverId < 1) {
-                throw new Error("Mã tài xế không hợp lệ");
-            }
-
-            await assignDriver(item.id, parsedDriverId);
-            setSuccessMessage(`Đã gán tài xế #${parsedDriverId} cho booking #${item.id}.`);
-            await loadData();
+            setAssignModal(item);
+            setAssignForm({
+                driver_id: item.driver_id ? String(item.driver_id) : "",
+                driverList: drivers.items || [],
+            });
         } catch (error) {
-            setErrorMessage(error?.response?.data?.message || error.message || "Không thể gán tài xế.");
+            setErrorMessage(error?.response?.data?.message || error.message || "Không thể tải danh sách tài xế.");
         } finally {
+            setAssignModalLoading(false);
             setBusyId(null);
         }
     }
 
-    async function handleStatusChange(item) {
-        setBusyId(item.id);
+    function handleCloseAssignModal() {
+        if (assignModalLoading) return;
+        setAssignModal(null);
+        setAssignForm({ driver_id: "", driverList: [] });
+    }
+
+    async function handleSubmitAssignModal(event) {
+        event.preventDefault();
+        if (!assignModal) return;
+
+        const parsedDriverId = Number(assignForm.driver_id);
+        if (!Number.isInteger(parsedDriverId) || parsedDriverId < 1) {
+            setErrorMessage("Mã tài xế không hợp lệ");
+            return;
+        }
+
+        setBusyId(assignModal.id);
+        setErrorMessage("");
+        setSuccessMessage("");
+        setAssignModalLoading(true);
+
+        try {
+            await assignDriver(assignModal.id, parsedDriverId);
+            setSuccessMessage(`Đã gán tài xế #${parsedDriverId} cho booking #${assignModal.id}.`);
+            handleCloseAssignModal();
+            await loadData();
+        } catch (error) {
+            setErrorMessage(error?.response?.data?.message || error.message || "Không thể gán tài xế.");
+        } finally {
+            setAssignModalLoading(false);
+            setBusyId(null);
+        }
+    }
+
+    function handleStatusChange(item) {
+        setStatusModal(item);
+        setStatusForm({
+            status: String(item.status ?? 0),
+            cancel_comment: item.cancel_comment || "",
+        });
+    }
+
+    function handleCloseStatusModal() {
+        if (busyId) return;
+        setStatusModal(null);
+        setStatusForm({ status: "0", cancel_comment: "" });
+    }
+
+    async function handleSubmitStatusModal(event) {
+        event.preventDefault();
+        if (!statusModal) return;
+
+        setBusyId(statusModal.id);
         setErrorMessage("");
         setSuccessMessage("");
 
         try {
-            const nextStatus = window.prompt(
-                "Nhập trạng thái mới (0 chờ xử lý, 1 đang chở, 2 khách hủy, 3 hoàn thành, 4 tài xế hủy, 5 admin hủy, 6 đã đến điểm đón)",
-                String(item.status)
-            );
+            const parsedStatus = Number(statusForm.status);
+            const note = statusForm.cancel_comment.trim();
 
-            if (!nextStatus) {
-                return;
-            }
-
-            const parsedStatus = Number(nextStatus);
-            const cancelComment =
-                parsedStatus === 2 || parsedStatus === 4 || parsedStatus === 5
-                    ? window.prompt("Lý do hủy (không bắt buộc):", "") || undefined
-                    : undefined;
-
-            await updateBookingStatus(item.id, {
+            await updateBookingStatus(statusModal.id, {
                 status: parsedStatus,
-                cancel_comment: cancelComment,
+                cancel_comment: note || undefined,
             });
 
-            setSuccessMessage(`Đã cập nhật trạng thái booking #${item.id} thành ${parsedStatus}.`);
+            setSuccessMessage(`Đã cập nhật trạng thái booking #${statusModal.id} thành ${getStatusLabel(parsedStatus)}.`);
+            handleCloseStatusModal();
             await loadData();
         } catch (error) {
             setErrorMessage(error?.response?.data?.message || error.message || "Không thể cập nhật trạng thái.");
@@ -234,6 +266,146 @@ export default function BookingsBoardPage({ mode = "all" }) {
                     detailPathBase={detailPathBase}
                 />
             )}
+
+            {statusModal ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+                    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                        <h2 className="text-lg font-bold text-slate-900">Cập nhật trạng thái booking #{statusModal.id}</h2>
+                        <p className="mt-1 text-sm text-slate-500">Chọn trạng thái mới và nhập ghi chú nếu cần.</p>
+
+                        <form className="mt-4 space-y-4" onSubmit={handleSubmitStatusModal}>
+                            <label className="block">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Trạng thái</span>
+                                <select
+                                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    value={statusForm.status}
+                                    onChange={(event) =>
+                                        setStatusForm((prev) => ({ ...prev, status: event.target.value }))
+                                    }
+                                >
+                                    {BOOKING_STATUS_OPTIONS.map((option) => (
+                                        <option key={option.value} value={option.value}>
+                                            {option.value} - {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="block">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Lý do / Ghi chú</span>
+                                <textarea
+                                    rows={3}
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="Nhập ghi chú (nếu có)"
+                                    value={statusForm.cancel_comment}
+                                    onChange={(event) =>
+                                        setStatusForm((prev) => ({ ...prev, cancel_comment: event.target.value }))
+                                    }
+                                />
+                            </label>
+
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCloseStatusModal}
+                                    disabled={busyId === statusModal.id}
+                                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={busyId === statusModal.id}
+                                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                    {busyId === statusModal.id ? "Đang cập nhật..." : "Lưu trạng thái"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ) : null}
+
+            {assignModal ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+                    <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                        <h2 className="text-lg font-bold text-slate-900">Gán tài xế cho booking #{assignModal.id}</h2>
+                        <p className="mt-1 text-sm text-slate-500">Chọn tài xế từ danh sách hoặc nhập mã tài xế trực tiếp.</p>
+
+                        <form className="mt-4 space-y-4" onSubmit={handleSubmitAssignModal}>
+                            <div>
+                                <label className="mb-2 block text-sm font-medium text-slate-700">Danh sách tài xế có sẵn</label>
+                                {assignForm.driverList.length > 0 ? (
+                                    <div className="max-h-48 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                        {assignForm.driverList.map((driver) => (
+                                            <button
+                                                key={driver.driver_id}
+                                                type="button"
+                                                onClick={() =>
+                                                    setAssignForm((prev) => ({
+                                                        ...prev,
+                                                        driver_id: String(driver.driver_id),
+                                                    }))
+                                                }
+                                                className={`w-full text-left rounded-lg border-2 px-3 py-2 transition-all ${assignForm.driver_id === String(driver.driver_id)
+                                                        ? "border-indigo-500 bg-indigo-50"
+                                                        : "border-slate-200 bg-white hover:border-slate-300"
+                                                    }`}
+                                            >
+                                                <p className="font-semibold text-slate-900">
+                                                    #{driver.driver_id}: {driver.full_name}
+                                                </p>
+                                                <p className="text-sm text-slate-500">
+                                                    {driver.phone || "--"} {driver.vehicle_number ? `• ${driver.vehicle_number}` : ""}
+                                                </p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center text-sm text-slate-500">
+                                        Không có tài xế phù hợp
+                                    </div>
+                                )}
+                            </div>
+
+                            <label className="block">
+                                <span className="mb-1 block text-sm font-medium text-slate-700">Hoặc nhập mã tài xế</span>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="Nhập mã tài xế..."
+                                    value={assignForm.driver_id}
+                                    onChange={(event) =>
+                                        setAssignForm((prev) => ({
+                                            ...prev,
+                                            driver_id: event.target.value,
+                                        }))
+                                    }
+                                />
+                            </label>
+
+                            <div className="flex justify-end gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handleCloseAssignModal}
+                                    disabled={assignModalLoading}
+                                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={assignModalLoading || !assignForm.driver_id}
+                                    className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                                >
+                                    {assignModalLoading ? "Đang gán..." : "Gán tài xế"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 }

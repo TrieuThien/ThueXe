@@ -1,10 +1,10 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader, AuthErrorNotice, PrimaryButton, RentalSummaryCard } from "../../components";
-import { getRentalFlowErrorMessage, useCreateRentalBookingMutation, usePayRentalDepositMutation, useRentalPricingQuery, useWalletOverviewQuery } from "../../hooks";
+import { AppHeader, AuthErrorNotice, CouponSuggestionList, PrimaryButton, RentalSummaryCard, TextField } from "../../components";
+import { getRentalFlowErrorMessage, useCreateRentalBookingMutation, usePayRentalDepositMutation, useRentalPricingQuery, useRideCouponsQuery, useWalletOverviewQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
 import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -18,8 +18,13 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
   const selectedPackage = useRentalFlowStore((state) => state.selectedPackage);
   const couponCode = useRentalFlowStore((state) => state.couponCode);
   const note = useRentalFlowStore((state) => state.note);
+  const setExtraInfo = useRentalFlowStore((state) => state.setExtraInfo);
   const setPricing = useRentalFlowStore((state) => state.setPricing);
   const buildCreatePayload = useRentalFlowStore((state) => state.buildCreatePayload);
+
+  const [couponInput, setCouponInput] = useState(couponCode ?? "");
+  const couponsQuery = useRideCouponsQuery();
+  const safeCoupons = Array.isArray(couponsQuery.data) ? couponsQuery.data : [];
 
   const createMutation = useCreateRentalBookingMutation();
   const depositMutation = usePayRentalDepositMutation();
@@ -157,6 +162,27 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
           </View>
         ) : null}
 
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Coupon</Text>
+        <TextField
+          value={couponInput}
+          onChangeText={setCouponInput}
+          placeholder="Nhập mã coupon"
+        />
+        <PrimaryButton
+          title="Áp dụng coupon"
+          onPress={() => setExtraInfo(couponInput.trim() || undefined, note)}
+          style={styles.applyButton}
+        />
+        {safeCoupons.length > 0 ? (
+          <CouponSuggestionList
+            coupons={safeCoupons}
+            onSelectCoupon={(code) => {
+              setCouponInput(code);
+              setExtraInfo(code, note);
+            }}
+          />
+        ) : null}
+
         {pricingQuery.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(pricingQuery.error)} /> : null}
         {createMutation.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(createMutation.error)} /> : null}
         {depositMutation.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(depositMutation.error)} /> : null}
@@ -197,5 +223,13 @@ const styles = StyleSheet.create({
   balanceRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  applyButton: {
+    marginTop: -2,
   },
 });

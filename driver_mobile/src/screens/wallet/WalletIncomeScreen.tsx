@@ -129,7 +129,7 @@ export const WalletIncomeScreen = () => {
         incomePoints.length ? (
           <IncomeChart points={incomePoints} />
         ) : (
-          <EmptyState title="Không có dữ liệu doanh thu" description="ãy thử lại bộ lọc thời gian." />
+          <EmptyState title="Không có dữ liệu doanh thu" description="Hãy thử lại bộ lọc thời gian." />
         )
       ) : null}
 

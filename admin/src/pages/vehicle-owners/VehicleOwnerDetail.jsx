@@ -196,7 +196,7 @@ export default function VehicleOwnerDetail() {
                                 </div>
                             ) : (
                                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                                    Dinh dang tep nay khong ho tro preview truc tiep.
+                                    Định dạng tệp này không hỗ trợ xem trước. <a href={documentPreview.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Tải xuống</a>
                                 </div>
                             )}
                         </div>

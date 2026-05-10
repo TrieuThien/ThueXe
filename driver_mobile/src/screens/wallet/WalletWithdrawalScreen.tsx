@@ -28,10 +28,10 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const statusMeta: Record<'pending' | 'paid' | 'failed' | 'cancelled', { label: string; color: string }> = {
-  pending: { label: 'Dang xu ly', color: '#B45309' },
-  paid: { label: 'Da chi tra', color: '#15803D' },
-  failed: { label: 'That bai', color: '#B91C1C' },
-  cancelled: { label: 'Da huy', color: '#334155' }
+  pending: { label: 'Đang xử lý', color: '#B45309' },
+  paid: { label: 'Đã chi trả', color: '#15803D' },
+  failed: { label: 'Thất bại', color: '#B91C1C' },
+  cancelled: { label: 'Đã hủy', color: '#334155' }
 };
 
 export const WalletWithdrawalScreen = () => {

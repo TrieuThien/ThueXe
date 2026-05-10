@@ -1,3 +1,4 @@
+import * as Location from 'expo-location';
 import { apiClient } from '../api/client';
 import { locationService } from '../location/locationService';
 import type { ServiceTypeId, WorkingOverview } from '../../types/working';
@@ -70,9 +71,25 @@ export const workingStatusService = {
   },
 
   async toggleOnline(isOnline: boolean): Promise<WorkingOverview> {
-    const response = await apiClient.patch('/api/driver/working-status/online', {
-      online: isOnline ? 1 : 0
-    });
+    const body: { online: number; lat?: number; long?: number; b_angle?: number } = {
+      online: isOnline ? 1 : 0,
+    };
+
+    if (isOnline) {
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === Location.PermissionStatus.GRANTED) {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          body.lat    = loc.coords.latitude;
+          body.long   = loc.coords.longitude;
+          body.b_angle = loc.coords.heading ?? 0;
+        }
+      } catch {
+        // Proceed without coordinates if GPS unavailable
+      }
+    }
+
+    const response = await apiClient.patch('/api/driver/working-status/online', body);
     const data = response.data.data as BackendWorkingStatus;
     try {
       const full = await workingStatusService.getWorkingOverview();

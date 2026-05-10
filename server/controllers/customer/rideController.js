@@ -4,6 +4,7 @@ import {
     createBooking,
     estimateFare,
     estimateRoute,
+    getBookingCancelPolicy,
     getBookingDetail,
     getBookingHistory,
     getBookingStatusSnapshot,
@@ -69,6 +70,15 @@ export async function cancelBookingHandler(req, res, next) {
     try {
         const result = await cancelBooking(req.auth, req.params.bookingId, req.body);
         return successResponse(res, result, "Booking cancelled successfully.");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function getBookingCancelPolicyHandler(req, res, next) {
+    try {
+        const result = await getBookingCancelPolicy(req.auth, req.params.bookingId);
+        return successResponse(res, result, "Booking cancel policy fetched successfully.");
     } catch (error) {
         return next(error);
     }

@@ -9,7 +9,9 @@ import { clearInflightPromise, consumeCachedResponse, getInflightPromise, rememb
 import { withUserMutex } from "../utils/userMutex.js";
 import { generateCodeToken, signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/token.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
-import { sendOwnerRegisterVerificationEmail } from "./emailService.js";
+import { sendOwnerRegisterVerificationEmail, sendCustomerRentalCancelledEmail } from "./emailService.js";
+import { findWalletByActorForUpdate, insertPayment as insertCustomerPayment, insertWalletLedger as insertCustomerWalletLedger, updateWalletBalance as updateCustomerWalletBalance } from "../repositories/customer/rentalRepository.js";
+import { insertUserNotification } from "../repositories/customer/realtimeRepository.js";
 import {
     cancelPendingOwnerRegisterRequestsByIdentifier,
     createMaintenance,
@@ -82,6 +84,7 @@ import {
     listOwnerVehicleMaintenanceForCalendar,
     deleteOwnerVehicleMaintenance,
     listRentalStatusHistory,
+    updateRentalPaymentStatus,
 } from "../repositories/ownerRepository.js";
 
 const OWNER_USER_TYPE = 2;
@@ -106,7 +109,7 @@ const BOOKING_STATUS_REVERSE_MAP = {
 const BOOKING_TRANSITIONS = {
     pending: ["confirmed", "canceled"],
     confirmed: ["in_progress", "canceled"],
-    in_progress: ["completed", "canceled"],
+    in_progress: ["completed"],
     completed: [],
     canceled: [],
 };
@@ -1035,12 +1038,13 @@ export async function getOwnerActivityVehicles(auth, query) {
         page,
         pageSize,
         total: listed.total,
+        totalPages: Math.ceil(listed.total / pageSize),
     };
 }
 
 export async function getOwnerActivityVehicleLocations(auth, query) {
     const vehicles = await getOwnerActivityVehicles(auth, { page: 1, pageSize: 200, status: query.status || "all" });
-    return { items: vehicles.items.filter((item) => Boolean(item.location)) };
+    return { items: vehicles.items };
 }
 
 export async function getOwnerVehicleAvailability(auth, vehicleIdInput, query) {
@@ -1351,11 +1355,122 @@ export async function updateOwnerBookingStatus(auth, rentalIdInput, payload) {
     const rentalId = Number(rentalIdInput);
     const rental = await findOwnerRentalById(ownerId, rentalId);
     if (!rental) throw new AppError("Booking not found.", 404, "BOOKING_NOT_FOUND");
+
     const current = BOOKING_STATUS_MAP[rental.status] || rental.status;
     const next = String(payload.nextStatus || "").trim();
+    if (current === "in_progress" && next === "canceled") {
+        throw new AppError(
+            "Không thể hủy đơn khi đơn đang ở trạng thái Đang thuê.",
+            409,
+            "CANNOT_CANCEL_IN_PROGRESS_BOOKING"
+        );
+    }
     validateBookingTransition(current, next);
     const mapped = BOOKING_STATUS_REVERSE_MAP[next];
-    await updateOwnerRentalStatus(rentalId, mapped, next === "canceled" ? (payload.cancelNote || null) : null);
+    const cancelNote = next === "canceled" ? (payload.cancelNote || null) : null;
+
+    const isCanceling = next === "canceled";
+    const refundableStatuses = new Set(["deposit_paid", "paid"]);
+    const hasPayment = isCanceling && refundableStatuses.has(String(rental.payment_status));
+    const refundAmount = hasPayment
+        ? (String(rental.payment_status) === "paid" ? Number(rental.total_price || 0) : Number(rental.deposit_amount || 0))
+        : 0;
+
+    await runInTx(async (conn) => {
+        await updateOwnerRentalStatus(rentalId, mapped, cancelNote, conn);
+
+        if (hasPayment && refundAmount > 0) {
+            const paymentCode = `REF-${Date.now()}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
+
+            // Debit owner wallet
+            const ownerWalletSnap = await findOwnerWallet(ownerId, conn);
+            if (ownerWalletSnap && Number(ownerWalletSnap.status) === 1) {
+                const ownerWallet = await findWalletByIdForUpdate(Number(ownerWalletSnap.wallet_id), conn);
+                if (ownerWallet) {
+                    const ownerNextBalance = Math.max(0, Number(ownerWallet.balance) - refundAmount);
+                    const ownerPaymentId = await createPayment({
+                        payment_code: `${paymentCode}-OWN`,
+                        payer_wallet_id: Number(ownerWallet.wallet_id),
+                        owner_id: ownerId,
+                        service_domain: 1,
+                        rental_id: rentalId,
+                        amount: refundAmount,
+                        currency_id: Number(ownerWallet.currency_id || 1),
+                        status: "paid",
+                        description: `Refund to customer for cancelled rental #${rentalId}`,
+                    }, conn);
+                    await updateWalletBalance(Number(ownerWallet.wallet_id), ownerNextBalance, conn);
+                    await createWalletLedger({
+                        wallet_id: Number(ownerWallet.wallet_id),
+                        payment_id: ownerPaymentId,
+                        amount: refundAmount,
+                        balance_after: ownerNextBalance,
+                        direction: "debit",
+                        entry_type: "refund",
+                        source_type: "rental_booking",
+                        source_id: rentalId,
+                        description: `Refund to customer for cancelled rental #${rentalId}`,
+                    }, conn);
+                }
+            }
+
+            // Credit customer wallet
+            const customerId = Number(rental.user_id);
+            const customerWallet = await findWalletByActorForUpdate({ actorType: 0, actorId: customerId }, conn);
+            if (customerWallet && Number(customerWallet.status) === 1) {
+                const customerNextBalance = Number(customerWallet.balance) + refundAmount;
+                const customerPaymentId = await insertCustomerPayment({
+                    payment_code: `${paymentCode}-CUS`,
+                    payer_wallet_id: Number(customerWallet.wallet_id),
+                    actor_type: 0,
+                    actor_id: customerId,
+                    service_domain: 1,
+                    booking_id: null,
+                    rental_id: rentalId,
+                    amount: refundAmount,
+                    currency_id: Number(customerWallet.currency_id || 1),
+                    status: "paid",
+                    description: `Refund — rental #${rentalId} cancelled by owner`,
+                }, conn);
+                await updateCustomerWalletBalance(Number(customerWallet.wallet_id), customerNextBalance, conn);
+                await insertCustomerWalletLedger({
+                    wallet_id: Number(customerWallet.wallet_id),
+                    payment_id: customerPaymentId,
+                    amount: refundAmount,
+                    balance_after: customerNextBalance,
+                    direction: "credit",
+                    entry_type: "refund",
+                    source_type: "rental_booking",
+                    source_id: rentalId,
+                    description: `Refund — rental #${rentalId} cancelled by owner`,
+                }, conn);
+            }
+
+            await updateRentalPaymentStatus(rentalId, "refunded", conn);
+        }
+
+        if (isCanceling) {
+            const refundNote = hasPayment && refundAmount > 0 ? " Tiền đã thanh toán sẽ được hoàn vào ví của bạn." : "";
+            await insertUserNotification({
+                userId: Number(rental.user_id),
+                content: `Đơn thuê xe #${rental.rental_code} của bạn đã bị chủ xe hủy.${refundNote}`,
+                rentalId,
+                nType: 2,
+            }, conn);
+        }
+    });
+
+    if (isCanceling && rental.customer_email) {
+        const owner = await findOwnerById(ownerId);
+        sendCustomerRentalCancelledEmail({
+            toEmail: rental.customer_email,
+            customerName: `${rental.firstname || ""} ${rental.lastname || ""}`.trim(),
+            rentalCode: rental.rental_code,
+            ownerName: owner?.fullname || "Chủ xe",
+            cancelNote,
+        }).catch(() => {});
+    }
+
     return getOwnerBookingDetail(auth, rentalId);
 }
 

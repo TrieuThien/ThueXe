@@ -23,24 +23,24 @@ export class ApiError extends AppError {}
 
 export function getFriendlyErrorMessage(error: unknown): string {
   if (!(error instanceof AppError)) {
-    return "Co loi xay ra. Vui long thu lai.";
+    return "Có lỗi xảy ra. Vui lòng thử lại.";
   }
 
   switch (error.status) {
     case 400:
     case 422:
-      return "Thong tin nhap chua hop le. Vui long kiem tra va thu lai.";
+      return "Thông tin đăng nhập không hợp lệ. Vui lòng kiểm tra lại.";
     case 401:
-      return "Phien dang nhap da het han. Vui long dang nhap lai.";
+      return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
     case 403:
-      return "Ban khong co quyen thuc hien thao tac nay.";
+      return "Bạn không có quyền thực hiện thao tác này.";
     case 404:
-      return "Khong tim thay du lieu yeu cau.";
+      return "Không tìm thấy dữ liệu yêu cầu.";
     case 409:
-      return "Du lieu dang xung dot. Vui long tai lai va thu lai.";
+      return "Dữ liệu đang xung đột. Vui lòng tải lại và thử lại.";
     default:
       if (error.status >= 500) {
-        return "He thong tam thoi gian doan. Vui long thu lai sau.";
+        return "Hệ thống tạm thời gián đoạn. Vui lòng thử lại sau.";
       }
       return error.message;
   }

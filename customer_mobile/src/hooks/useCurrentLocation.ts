@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from "react";
 import * as Location from "expo-location";
 
-import { formatAddressFromGeocode, formatCoordinateAddress } from "../utils/address";
+import { formatCoordinateAddress, reverseGeocodeToDisplayAddress } from "../utils/address";
 
 export interface DeviceLocation {
   latitude: number;
@@ -34,16 +34,15 @@ export function useCurrentLocation(autoFetch = true) {
   const reverseGeocodeInBackground = useCallback(
     async (params: { latitude: number; longitude: number; requestId: number }) => {
       try {
-        const geocode = await Location.reverseGeocodeAsync({
-          latitude: params.latitude,
-          longitude: params.longitude,
-        });
+        const resolvedAddress = await reverseGeocodeToDisplayAddress(
+          params.latitude,
+          params.longitude,
+        );
 
         if (!mountedRef.current || activeRequestIdRef.current !== params.requestId) {
           return;
         }
 
-        const resolvedAddress = formatAddressFromGeocode(geocode[0]);
         if (!resolvedAddress) {
           return;
         }

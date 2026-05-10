@@ -120,13 +120,16 @@ async function _dispatchLoop(bookingId, lat, lng, expandedSearch) {
     // Guard: bail if booking is already assigned or terminal
     const state = await getBookingDispatchState(bookingId);
     if (!state || state.status !== 0 || state.driver_id !== null) {
+        console.log(`[RideDispatch] booking=${bookingId} skipped: status=${state?.status} driver=${state?.driver_id}`);
         bookingDispatchLock.delete(bookingId);
         return;
     }
 
-    const triedIds  = await getTriedDriverIdsForBooking(bookingId);
-    const radiusKm  = expandedSearch ? EXPANDED_RADIUS_KM : INITIAL_RADIUS_KM;
+    const triedIds   = await getTriedDriverIdsForBooking(bookingId);
+    const radiusKm   = expandedSearch ? EXPANDED_RADIUS_KM : INITIAL_RADIUS_KM;
     const candidates = await findNearbyDriversForRide(lat, lng, radiusKm, triedIds);
+
+    console.log(`[RideDispatch] booking=${bookingId} lat=${lat} lng=${lng} radius=${radiusKm}km candidates=${candidates.length} tried=${triedIds.length}`);
 
     if (candidates.length === 0) {
         if (!expandedSearch) {
@@ -134,6 +137,7 @@ async function _dispatchLoop(bookingId, lat, lng, expandedSearch) {
             return _dispatchLoop(bookingId, lat, lng, true);
         }
 
+        console.log(`[RideDispatch] booking=${bookingId} NO_DRIVER_FOUND — cancelling`);
         // Truly no driver found — cancel the booking
         const cancelled = await markBookingNoDriverFound(bookingId, "Không tìm được tài xế phù hợp.");
         if (cancelled) {
@@ -173,6 +177,8 @@ async function _dispatchLoop(bookingId, lat, lng, expandedSearch) {
         driverId: driver.driver_id,
         expiresAt,
     });
+
+    console.log(`[RideDispatch] booking=${bookingId} → dispatching to driver=${driver.driver_id} (${Number(driver.distance_km).toFixed(2)}km)`);
 
     // Notify the driver via SSE
     publishRealtimeEvent(

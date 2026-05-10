@@ -247,12 +247,14 @@ export const updateBookingStatusValidator = [
 
 export const listAssignableDriversValidator = [
     query("route_id")
-        .optional({ values: "falsy" })
+        .customSanitizer((v) => (v === "0" || v === "" ? undefined : v))
+        .optional()
         .isInt({ min: 1 })
         .withMessage("route_id must be a positive integer")
         .toInt(),
     query("ride_id")
-        .optional({ values: "falsy" })
+        .customSanitizer((v) => (v === "0" || v === "" ? undefined : v))
+        .optional()
         .isInt({ min: 1 })
         .withMessage("ride_id must be a positive integer")
         .toInt(),

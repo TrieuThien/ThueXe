@@ -54,7 +54,7 @@ export function TripChatScreen({ route }: Props) {
         {chatThreadQuery.isLoading ? <LoadingState message="Đang tải cuộc trò chuyện..." /> : null}
         {chatThreadQuery.isError ? <ErrorState description="Không tải được cuộc trò chuyện" onRetry={chatThreadQuery.refetch} /> : null}
 
-        {!chatThreadQuery.isLoading && !chatThreadQuery.isError && chatThreadQuery.data?.messages.length === 0 ? (
+        {!chatThreadQuery.isLoading && !chatThreadQuery.isError && chatThreadQuery.data?.messages?.length === 0 ? (
           <EmptyState title="Chưa có tin nhắn" description="Bắt đầu trò chuyện với tài xế." />
         ) : null}
 

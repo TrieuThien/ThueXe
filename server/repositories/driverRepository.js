@@ -699,7 +699,7 @@ export async function findDriverDocuments(driverId) {
 export async function findLatestDriverLocation(driverId) {
     const [rows] = await sqldb.query(
         `
-            SELECT driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+            SELECT driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration, updated_at
             FROM driver_current_locations
             WHERE driver_id = ?
             LIMIT 1
@@ -720,6 +720,45 @@ export async function findLatestDriverLocation(driverId) {
         loc_static_duration: row.loc_static_duration === null ? null : Number(row.loc_static_duration),
         location_date: row.updated_at,
     };
+}
+
+export async function findOnlineDriversWithLocations() {
+    const conn = await sqldb.getConnection();
+    try {
+        const [rows] = await conn.query(`
+            SELECT
+                d.driver_id,
+                d.firstname,
+                d.lastname,
+                d.phone,
+                d.driver_rating,
+                d.operation_status,
+                dcl.lat,
+                dcl.\`long\` AS lng,
+                dcl.updated_at AS location_date
+            FROM drivers d
+            LEFT JOIN driver_current_locations dcl ON dcl.driver_id = d.driver_id
+            WHERE d.available = 1
+              AND d.account_active = 1
+              AND d.is_activated = 1
+              AND d.account_deleted = 0
+            ORDER BY d.driver_id DESC
+        `);
+        return rows.map((row) => ({
+            driver_id:        Number(row.driver_id),
+            full_name:        `${row.firstname || ""} ${row.lastname || ""}`.trim(),
+            firstname:        row.firstname || "",
+            lastname:         row.lastname || "",
+            phone:            row.phone || "",
+            driver_rating:    row.driver_rating != null ? Number(row.driver_rating) : null,
+            operation_status: Number(row.operation_status),
+            lat:              row.lat != null ? Number(row.lat) : null,
+            lng:              row.lng != null ? Number(row.lng) : null,
+            location_date:    row.location_date || null,
+        }));
+    } finally {
+        conn.release();
+    }
 }
 
 export async function findAdminPasswordById(userId) {

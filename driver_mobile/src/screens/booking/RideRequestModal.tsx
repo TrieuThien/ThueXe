@@ -91,7 +91,7 @@ export default function RideRequestModal({ request, onClose }: Props) {
     if (!request || loading) return;
     setLoading(true);
     try {
-      await apiClient.post(`/api/driver/bookings/${request.booking_id}/accept`);
+      await apiClient.post(`/api/driver/trips/${request.booking_id}/accept`);
       onClose();
     } catch (err: any) {
       // If already responded, just close
@@ -103,7 +103,7 @@ export default function RideRequestModal({ request, onClose }: Props) {
     if (!request || loading) return;
     setLoading(true);
     try {
-      await apiClient.post(`/api/driver/bookings/${request.booking_id}/reject`);
+      await apiClient.post(`/api/driver/trips/${request.booking_id}/reject`);
     } finally {
       onClose();
     }

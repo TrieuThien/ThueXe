@@ -75,7 +75,7 @@ export default function AdminProfilePage() {
             <div className="flex flex-col gap-3 rounded-[28px] bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-900 px-6 py-6 text-white lg:flex-row lg:items-center lg:justify-between">
                 <div>
                     <p className="text-sm uppercase tracking-[0.35em] text-emerald-200">Profile account</p>
-                    <h1 className="mt-2 text-3xl font-bold">{staff?.full_name || "Tai khoan dang nhap"}</h1>
+                    <h1 className="mt-2 text-3xl font-bold">{staff?.full_name || "Tài khoản đăng nhập"}</h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-200">Thông tin tài khoản hiện tại và dữ liệu liên quan.</p>
                 </div>
 

@@ -1,11 +1,11 @@
-import { apiClient } from '../api/client';
+﻿import { apiClient } from '../api/client';
 import type { ServiceTypeId, UpdateServiceTypesPayload } from '../../types/working';
 
-// Backend chỉ có cờ available_for_rental (0/1), không có mảng service types.
-// Mapping: bất kỳ loại thuê nào (thue_tai_xe, xe_kem_tai_xe, lien_tinh) → available_for_rental=1
-// goi_xe luôn được coi là loại mặc định khi driver đang online.
+// Backend chá»‰ cÃ³ cá» available_for_rental (0/1), khÃ´ng cÃ³ máº£ng service types.
+// Mapping: báº¥t ká»³ loáº¡i thuÃª nÃ o (thue_tai_xe, xe_kem_tai_xe) â†’ available_for_rental=1
+// goi_xe luÃ´n Ä‘Æ°á»£c coi lÃ  loáº¡i máº·c Ä‘á»‹nh khi driver Ä‘ang online.
 
-const RENTAL_TYPES: ServiceTypeId[] = ['thue_tai_xe', 'xe_kem_tai_xe', 'lien_tinh'];
+const RENTAL_TYPES: ServiceTypeId[] = ['thue_tai_xe', 'xe_kem_tai_xe'];
 
 export const activeServiceTypesService = {
   async getActiveServiceTypes(): Promise<ServiceTypeId[]> {
@@ -35,3 +35,4 @@ export const activeServiceTypesService = {
     return types;
   }
 };
+

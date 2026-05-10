@@ -24,7 +24,7 @@ export function DriverInfoCard({ driver }: DriverInfoCardProps) {
         />
         <View style={styles.info}>
           <Text style={[styles.name, { color: theme.colors.text }]}>{driver.fullName}</Text>
-          <Text style={[styles.detail, { color: theme.colors.textMuted }]}>Đánh giá: {driver.rating.toFixed(1)} sao</Text>
+          <Text style={[styles.detail, { color: theme.colors.textMuted }]}>Đánh giá: {driver.rating != null ? driver.rating.toFixed(1) : "--"} sao</Text>
           {driver.vehicleName ? <Text style={[styles.detail, { color: theme.colors.textMuted }]}>{driver.vehicleName}</Text> : null}
           {driver.licensePlate ? (
             <Text style={[styles.detail, { color: theme.colors.textMuted }]}>Biển số: {driver.licensePlate}</Text>

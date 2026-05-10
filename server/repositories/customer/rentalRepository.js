@@ -339,8 +339,7 @@ export async function updateVehicleLocationByRental(rentalId, userId, lat, lng, 
         `UPDATE vehicles v
          INNER JOIN rental_bookings rb ON rb.vehicle_id = v.vehicle_id
          SET v.current_lat = ?, v.current_long = ?
-         WHERE rb.rental_id = ? AND rb.user_id = ? AND rb.status = 'in_progress'
-         LIMIT 1`,
+         WHERE rb.rental_id = ? AND rb.user_id = ? AND rb.status = 'in_progress'`,
         [lat, lng, rentalId, userId]
     );
     return Number(result.affectedRows || 0) > 0;

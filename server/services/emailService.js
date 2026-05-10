@@ -156,6 +156,42 @@ export async function sendOwnerRentalRequestEmail({
     });
 }
 
+export async function sendCustomerRentalCancelledEmail({ toEmail, customerName, rentalCode, ownerName, cancelNote }) {
+    const mailer = getTransporter();
+    if (!mailer) {
+        console.warn(`[rental] Email not configured. Skipping customer cancel notification for rental ${rentalCode}`);
+        return;
+    }
+    const safeName = String(customerName || "Quý khách");
+    const safeCode = String(rentalCode || "");
+    const safeOwner = String(ownerName || "Chủ xe");
+    const safeNote = cancelNote ? String(cancelNote) : "Không có lý do cụ thể.";
+
+    await mailer.sendMail({
+        from: process.env.EMAIL_FROM || process.env.EMAIL_APP_ADMIN,
+        to: toEmail,
+        subject: `ThueXe - Đơn thuê xe #${safeCode} đã bị hủy`,
+        text:
+            `Xin chào ${safeName},\n\n` +
+            `Đơn thuê xe #${safeCode} của bạn đã bị chủ xe hủy.\n` +
+            `Chủ xe: ${safeOwner}\n` +
+            `Lý do: ${safeNote}\n\n` +
+            `Số tiền đã thanh toán sẽ được hoàn lại vào ví của bạn trong hệ thống ThueXe.`,
+        html:
+            `<div style="font-family:sans-serif;max-width:520px;margin:0 auto">` +
+            `<h2 style="color:#dc2626">ThueXe – Đơn thuê xe bị hủy</h2>` +
+            `<p>Xin chào <strong>${safeName}</strong>,</p>` +
+            `<p>Đơn thuê xe <strong>#${safeCode}</strong> của bạn đã bị chủ xe hủy.</p>` +
+            `<table style="width:100%;border-collapse:collapse;margin:16px 0">` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280;width:40%">Mã đơn</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;font-weight:700">#${safeCode}</td></tr>` +
+            `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:#6b7280">Chủ xe</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${safeOwner}</td></tr>` +
+            `<tr><td style="padding:8px;color:#6b7280">Lý do hủy</td><td style="padding:8px">${safeNote}</td></tr>` +
+            `</table>` +
+            `<p>Số tiền đã thanh toán sẽ được <strong>hoàn lại vào ví ThueXe</strong> của bạn.</p>` +
+            `</div>`,
+    });
+}
+
 export async function sendOwnerRegisterVerificationEmail({ toEmail, ownerName, verifyLink, expiresMinutes = 3 }) {
     const mailer = getTransporter();
     if (!mailer) {

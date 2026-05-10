@@ -23,6 +23,10 @@ export type ActiveTrip = {
   paymentStatus: PaymentStatus;
   expiresAt?: string;
   cancelReason?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
 };
 
 export type TripSummary = {

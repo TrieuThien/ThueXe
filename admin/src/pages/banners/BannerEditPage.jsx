@@ -88,14 +88,14 @@ export default function BannerEditPage() {
     }
 
     if (loading || !form) {
-        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Dang tai du lieu chinh sua...</div>;
+        return <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-sm text-slate-600">Đang tải dữ liệu chỉnh sửa...</div>;
     }
 
     return (
         <div className="space-y-6">
             <div className="rounded-[28px] bg-gradient-to-r from-slate-950 via-slate-900 to-blue-900 px-6 py-6 text-white">
                 <p className="text-sm uppercase tracking-[0.35em] text-blue-200">Banners</p>
-                <h1 className="mt-2 text-3xl font-bold">Chinh sua banner #{id}</h1>
+                <h1 className="mt-2 text-3xl font-bold">Chỉnh sửa banner #{id}</h1>
             </div>
 
             {message ? <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{message}</p> : null}

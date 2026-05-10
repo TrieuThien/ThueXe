@@ -6,6 +6,7 @@ import {
     getDriverLocationHandler,
     getDriverMetaHandler,
     getDriverSummaryHandler,
+    getOnlineDriversWithLocationsHandler,
     softDeleteDriverAccountHandler,
     updateDriverAccountStateHandler,
     updateDriverPersonalInformationHandler,
@@ -32,6 +33,7 @@ const router = Router();
 
 router.get("/api/drivers/meta", requireAuth, requireRole("admin"), getDriverMetaValidator, validateRequest, getDriverMetaHandler);
 router.get("/api/drivers/summary", requireAuth, requireRole("admin"), getDriverSummaryValidator, validateRequest, getDriverSummaryHandler);
+router.get("/api/drivers/online-locations", requireAuth, requireRole("admin"), getOnlineDriversWithLocationsHandler);
 router.get("/api/drivers", requireAuth, requireRole("admin", "dispatcher"), getDriverListValidator, validateRequest, getDriverListHandler);
 router.get("/api/drivers/:driverId/location", requireAuth, requireRole("admin", "dispatcher"), getDriverLocationValidator, validateRequest, getDriverLocationHandler);
 router.get("/api/drivers/:driverId", requireAuth, requireRole("admin"), getDriverDetailValidator, validateRequest, getDriverDetailHandler);

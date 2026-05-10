@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { AppHeader, PrimaryButton } from "../../components";
 import type { AddressSuggestion } from "../../hooks";
 import { useAddressAutocomplete, useCurrentLocation } from "../../hooks";
+import { resolveGooglePlaceDetails } from "../../utils/googlePlaces";
 import { BookingStackParamList } from "../../navigation";
 import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -46,6 +47,13 @@ export function RentalLocationDropoffScreen({ route, navigation }: Props) {
             ? {
                 latitude: location.data.latitude,
                 longitude: location.data.longitude,
+                currentLocation: location.data.address
+                    ? {
+                        label: location.data.address,
+                        latitude: location.data.latitude,
+                        longitude: location.data.longitude,
+                    }
+                    : undefined,
             }
             : undefined,
     );
@@ -87,24 +95,31 @@ export function RentalLocationDropoffScreen({ route, navigation }: Props) {
         }
     }, [selectedCoord]);
 
-    const resolveSuggestionLabel = async (item: AddressSuggestion): Promise<string> => {
-        if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
-            return item.label;
-        }
-
-        try {
-            const resolved = await reverseGeocodeToDisplayAddress(item.latitude, item.longitude);
-            return resolved ?? item.label;
-        } catch {
-            return item.label;
-        }
-    };
-
     const handleSuggestionSelect = async (item: AddressSuggestion) => {
-        const nextLabel = await resolveSuggestionLabel(item);
-        setAddressInput(nextLabel);
-        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-            setSelectedCoord({ latitude: item.latitude, longitude: item.longitude });
+        if (item.isCurrentLocation) {
+            setAddressInput(item.label);
+            setSelectedAddress(item.label);
+            if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                setSelectedCoord({ latitude: item.latitude, longitude: item.longitude });
+            }
+        } else if (item.placeId) {
+            const details = await resolveGooglePlaceDetails(item.placeId);
+            const address = details?.formattedAddress || item.label;
+            setAddressInput(address);
+            setSelectedAddress(address);
+            if (details) {
+                setSelectedCoord({ latitude: details.latitude, longitude: details.longitude });
+            }
+        } else {
+            const resolved = typeof item.latitude === "number" && typeof item.longitude === "number"
+                ? await reverseGeocodeToDisplayAddress(item.latitude, item.longitude).catch(() => null)
+                : null;
+            const nextLabel = resolved ?? item.label;
+            setAddressInput(nextLabel);
+            setSelectedAddress(nextLabel);
+            if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                setSelectedCoord({ latitude: item.latitude, longitude: item.longitude });
+            }
         }
         setShowSuggestions(false);
     };
@@ -288,7 +303,7 @@ export function RentalLocationDropoffScreen({ route, navigation }: Props) {
                     {!autocomplete.loading &&
                         showSuggestions &&
                         addressInput.trim().length >= 2 &&
-                        autocomplete.suggestions.length === 0 ? (
+                        autocomplete.suggestions.filter((s) => !s.isCurrentLocation).length === 0 ? (
                         <Text style={[styles.hint, { color: theme.colors.textMuted }]}>
                             Không tìm thấy gợi ý phù hợp
                         </Text>
@@ -313,8 +328,14 @@ export function RentalLocationDropoffScreen({ route, navigation }: Props) {
                                         { borderBottomColor: theme.colors.border },
                                     ]}
                                 >
+                                    <MaterialCommunityIcons
+                                        name={item.isCurrentLocation ? "crosshairs-gps" : "map-marker-outline"}
+                                        size={14}
+                                        color={item.isCurrentLocation ? theme.colors.primary : theme.colors.textMuted}
+                                        style={{ marginRight: 6 }}
+                                    />
                                     <Text
-                                        style={[styles.suggestionText, { color: theme.colors.text }]}
+                                        style={[styles.suggestionText, { color: theme.colors.text, flex: 1 }]}
                                         numberOfLines={1}
                                     >
                                         {item.label}
@@ -437,6 +458,8 @@ const styles = StyleSheet.create({
         maxHeight: 120,
     },
     suggestionItem: {
+        flexDirection: "row",
+        alignItems: "center",
         paddingHorizontal: 10,
         paddingVertical: 8,
         borderBottomWidth: 1,

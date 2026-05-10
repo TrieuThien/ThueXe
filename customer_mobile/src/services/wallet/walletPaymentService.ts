@@ -1,4 +1,4 @@
-import { APP_CONFIG, QUERY_KEYS } from "../../constants";
+﻿import { APP_CONFIG, QUERY_KEYS } from "../../constants";
 import {
   BookingPaymentRequest,
   BookingPaymentResponse,
@@ -91,15 +91,13 @@ function toPaymentMethods(payload: unknown): PaymentMethodOption[] {
     .filter((item) => item.id.length > 0);
 
   if (normalized.length > 0) {
-    return normalized;
+    return normalized.filter((item) => item.type !== "BANK_CARD" && item.type !== "SEPAY");
   }
 
   return [
-    { id: "pm_wallet", type: "WALLET", title: "Ví ThueXe", isDefault: true, isAvailable: true },
-    { id: "pm_cash", type: "CASH", title: "Tiền mặt", isDefault: false, isAvailable: true },
-    { id: "pm_momo", type: "MOMO", title: "Ví MoMo", isDefault: false, isAvailable: true },
-    { id: "pm_sepay", type: "SEPAY", title: "SePay (QR/Ngân hàng)", isDefault: false, isAvailable: true },
-    { id: "pm_card", type: "BANK_CARD", title: "Thẻ/Online Banking", isDefault: false, isAvailable: true },
+    { id: "pm_wallet", type: "WALLET", title: "VÃ­ ThueXe", isDefault: true, isAvailable: true },
+    { id: "pm_cash", type: "CASH", title: "Tiá»n máº·t", isDefault: false, isAvailable: true },
+    { id: "pm_momo", type: "MOMO", title: "VÃ­ MoMo", isDefault: false, isAvailable: true },
   ];
 }
 
@@ -167,7 +165,7 @@ export const walletPaymentService = {
   },
 
   createTopUp: async (payload: CreateTopUpRequest): Promise<CreateTopUpResponse> => {
-    // Map paymentMethodId sang gateway_name server nhận ("momo", "sepay", "mock", ...)
+    // Map paymentMethodId sang gateway_name server nháº­n ("momo", "sepay", "mock", ...)
     const idLower = String(payload.paymentMethodId).toLowerCase();
     const gatewayName = idLower.includes("momo") ? "momo" : idLower.includes("sepay") ? "sepay" : String(payload.paymentMethodId);
 
@@ -259,3 +257,4 @@ export const walletPaymentQueryKeys = {
     rentalBookingId ?? "none",
   ] as const,
 };
+

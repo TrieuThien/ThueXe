@@ -37,6 +37,7 @@ import {
     rememberInflightPromise,
 } from "../utils/idempotencyCache.js";
 import { emitBookingStatusUpdated } from "./customer/realtimeService.js";
+import { startRideDispatch } from "./rideDispatchService.js";
 
 const BOOKING_STATUS = {
     PENDING: 0,
@@ -527,13 +528,17 @@ export function createBookingService(overrides = {}) {
 
                     let autoDispatchResult = null;
                     if (normalizedPayload.auto_dispatch === 1) {
-                        autoDispatchResult = await tryAutoDispatch({
-                            conn,
-                            bookingId,
-                            routeId: normalizedPayload.route_id,
-                            rideId: normalizedPayload.ride_id,
-                            scheduled: normalizedPayload.scheduled,
-                        });
+                        if (normalizedPayload.scheduled === 1) {
+                            autoDispatchResult = await tryAutoDispatch({
+                                conn,
+                                bookingId,
+                                routeId: normalizedPayload.route_id,
+                                rideId: normalizedPayload.ride_id,
+                                scheduled: normalizedPayload.scheduled,
+                            });
+                        } else {
+                            autoDispatchResult = { assigned: false, reason: "gps_dispatch_queued" };
+                        }
                     }
 
                     const detail = await findBookingDetailById(bookingId);
@@ -568,6 +573,15 @@ export function createBookingService(overrides = {}) {
             try {
                 const result = await operation;
                 rememberIdempotentResponse(auth.userId, effectiveIdempotencyKey, result);
+
+                if (normalizedPayload.auto_dispatch === 1 && normalizedPayload.scheduled !== 1) {
+                    const pickupLat = Number(normalizedPayload.pickup_lat);
+                    const pickupLng = Number(normalizedPayload.pickup_long);
+                    if (Number.isFinite(pickupLat) && Number.isFinite(pickupLng)) {
+                        startRideDispatch(result.booking.id, pickupLat, pickupLng);
+                    }
+                }
+
                 return result;
             } finally {
                 clearInflightPromise(auth.userId, effectiveIdempotencyKey);

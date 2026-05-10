@@ -116,8 +116,8 @@ export default function VehicleEditModal({ open, vehicle, vehicleTypes, document
   }
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4 overflow-y-auto">
-      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl my-4">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-900/35 p-4">
+      <div className="mx-auto my-4 w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-slate-900">Cập nhật thông tin xe</h3>

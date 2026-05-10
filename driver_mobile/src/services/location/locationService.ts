@@ -2,7 +2,7 @@ import * as Location from 'expo-location';
 import { apiClient } from '../api/client';
 import type { DriverLocation, LocationError, LocationPermissionStatus, WorkingOverview } from '../../types/working';
 
-let autoTimer: ReturnType<typeof setInterval> | null = null;
+let locationSubscription: Location.LocationSubscription | null = null;
 
 const normalizeError = (error: unknown): LocationError => {
   if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
@@ -80,33 +80,37 @@ export const locationService = {
       lastLocation: data.location
         ? { lat: data.location.lat, lng: data.location.long, updatedAt: data.location.updated_at ?? new Date().toISOString() }
         : { lat: coords.latitude, lng: coords.longitude, updatedAt: new Date().toISOString() },
-      autoUpdating: autoTimer !== null
+      autoUpdating: locationSubscription !== null
     };
   },
 
   startPeriodicLocationUpdate(
-    onTick: (overview: WorkingOverview) => void,
+    onTick: (lat: number, lng: number) => void,
     onError?: (error: LocationError) => void
   ) {
-    if (autoTimer) {
-      return;
-    }
+    if (locationSubscription) return;
 
-    autoTimer = setInterval(async () => {
-      try {
-        const data = await locationService.updateCurrentLocationManual();
-        onTick(data);
-      } catch (error) {
-        onError?.(normalizeError(error));
+    Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 50 },
+      async (loc) => {
+        const { latitude, longitude, heading } = loc.coords;
+        try {
+          await apiClient.post('/api/driver/location', {
+            lat: latitude,
+            long: longitude,
+            b_angle: heading ?? 0,
+          });
+          onTick(latitude, longitude);
+        } catch (error) {
+          onError?.(normalizeError(error));
+        }
       }
-    }, 15000);
+    ).then((sub) => { locationSubscription = sub; });
   },
 
   stopPeriodicLocationUpdate() {
-    if (autoTimer) {
-      clearInterval(autoTimer);
-      autoTimer = null;
-    }
+    locationSubscription?.remove();
+    locationSubscription = null;
   },
 
   // setPeriodicUpdate: chỉ bật/tắt flag phía backend heartbeat, không tự động gửi vị trí

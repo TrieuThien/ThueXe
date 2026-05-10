@@ -224,7 +224,8 @@ export async function listRidesWithTariffs(routeId = null) {
         }
     }
 
-    return [...grouped.values()];
+    const result = [...grouped.values()];
+    return routeId ? result.filter((ride) => ride.tariffs.length > 0) : result;
 }
 
 export async function listQuickDestinationCandidatesByUser(userId, limit = 8) {

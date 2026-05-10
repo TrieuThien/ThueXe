@@ -660,7 +660,7 @@ export async function findBookingAllocations(bookingId) {
 
 export async function findLatestDriverLocation(driverId) {
     const [rows] = await sqldb.query(
-        `SELECT driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+        `SELECT driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration, updated_at
          FROM driver_current_locations
          WHERE driver_id = ?
          LIMIT 1`,
@@ -911,14 +911,14 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
             d.lastname,
             d.phone,
             d.driver_rating,
-            dcl.current_lat,
-            dcl.current_lng,
+            dcl.lat,
+            dcl.long,
             (
                 6371 * ACOS(
                     GREATEST(-1, LEAST(1,
-                        COS(RADIANS(?)) * COS(RADIANS(dcl.current_lat))
-                        * COS(RADIANS(dcl.current_lng) - RADIANS(?))
-                        + SIN(RADIANS(?)) * SIN(RADIANS(dcl.current_lat))
+                        COS(RADIANS(?)) * COS(RADIANS(dcl.lat))
+                        * COS(RADIANS(dcl.long) - RADIANS(?))
+                        + SIN(RADIANS(?)) * SIN(RADIANS(dcl.lat))
                     ))
                 )
             ) AS distance_km
@@ -929,9 +929,9 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
            AND d.account_deleted = 0
            AND d.available = 1
            AND d.operation_status = 0
-           AND dcl.current_lat BETWEEN ? AND ?
-           AND dcl.current_lng BETWEEN ? AND ?
-           AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+           AND dcl.lat BETWEEN ? AND ?
+           AND dcl.long BETWEEN ? AND ?
+           AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
            AND NOT EXISTS (
                SELECT 1 FROM bookings ab
                WHERE ab.driver_id = d.driver_id
@@ -951,8 +951,8 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
         lastname: row.lastname,
         phone: row.phone,
         driver_rating: Number(row.driver_rating || 0),
-        current_lat: Number(row.current_lat),
-        current_lng: Number(row.current_lng),
+        current_lat: Number(row.lat),
+        current_lng: Number(row.long),
         distance_km: Number(Number(row.distance_km).toFixed(2)),
     }));
 }

@@ -21,7 +21,7 @@ export const supportChatListValidator = [
 
 export const sendSupportChatValidator = [
     body("chat_msg").trim().isLength({ min: 1, max: 5000 }).withMessage("chat_msg must be between 1 and 5000 characters"),
-    body("session_status").optional({ values: "falsy" }).isIn([0, 1, "0", "1"]).withMessage("session_status must be 0 or 1").toInt(),
+    body("session_status").optional({ values: "falsy" }).isIn([0, 1, 2, "0", "1", "2"]).withMessage("session_status must be 0, 1 or 2").toInt(),
     body("user_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("user_id must be positive integer").toInt(),
     body("driver_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("driver_id must be positive integer").toInt(),
     body("rider_recipient_id").optional({ values: "falsy" }).isInt({ min: 1 }).withMessage("rider_recipient_id must be positive integer").toInt(),

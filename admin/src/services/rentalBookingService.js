@@ -15,7 +15,18 @@ function sanitize(params = {}) {
 
 export async function getRentalBookings(params = {}) {
     const res = await apiClient.get("/api/rentals/bookings", { params: sanitize(params) });
-    return extractPayload(res);
+    const raw = extractPayload(res);
+    const totalItems = Number(raw.totalItems || 0);
+    const page = Number(raw.page || 1);
+    const limit = Number(raw.limit || 15);
+    return {
+        items: raw.items || [],
+        pagination: {
+            page,
+            total: totalItems,
+            totalPages: limit > 0 ? Math.ceil(totalItems / limit) : 0,
+        },
+    };
 }
 
 export async function getRentalBookingDetail(rentalId) {

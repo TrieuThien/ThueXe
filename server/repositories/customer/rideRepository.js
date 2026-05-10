@@ -298,7 +298,11 @@ export async function findBookingByIdForUser(bookingId, userId, conn = null, for
             rd.ride_type,
             d.account_active AS driver_account_active,
             d.available AS driver_available,
-            d.operation_status AS driver_operation_status
+            d.operation_status AS driver_operation_status,
+            d.driver_rating AS driver_rating,
+            d.car_plate_num AS driver_car_plate_num,
+            d.car_model AS driver_car_model,
+            d.photo_file AS driver_photo_file
          FROM bookings b
          LEFT JOIN routes r ON r.id = b.route_id
          LEFT JOIN rides rd ON rd.id = b.ride_id
@@ -327,7 +331,7 @@ export async function findCurrentBookingByUser(userId, conn = null) {
 
 export async function findDriverCurrentLocation(driverId, conn = null) {
     const [rows] = await db(conn).query(
-        `SELECT id, driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+        `SELECT driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration, updated_at
          FROM driver_current_locations
          WHERE driver_id = ?
          LIMIT 1`,
