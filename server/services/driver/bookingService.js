@@ -21,7 +21,13 @@ import {
 } from "../../repositories/driver/bookingRepository.js";
 import { findDriverById } from "../../repositories/driver/authRepository.js";
 import { findDriverWallet } from "../../repositories/driver/walletRepository.js";
-import { insertWalletLedger, updateWalletBalance } from "../../repositories/walletRepository.js";
+import {
+    findWalletByActor,
+    findWalletByIdForUpdate,
+    insertWalletLedger,
+    updateWalletBalance,
+    updatePaymentStatusById,
+} from "../../repositories/walletRepository.js";
 import { findSystemSettingByKey, findTariffWaitData } from "../../repositories/bookingRepository.js";
 import { notifyRideAccepted, notifyRideRejected } from "../rideDispatchService.js";
 
@@ -431,39 +437,63 @@ export async function completeRide(auth, bookingId, payload = {}) {
             driver_settled: 0,
         }, conn);
 
-        // ── 5. Settle driver earnings ─────────────────────────────────────────
-        const commissionRate = Number(booking.driver_commision || 0)
-            || Number(await findSystemSettingByKey("driver_commission_rate", conn) || 80);
-        const driverEarnings = Number(((actualCost * commissionRate) / 100).toFixed(2));
+        // ── 5. Driver wallet settlement ───────────────────────────────────────
+        // Idempotency guard: skip if already settled (handles duplicate complete calls).
+        if (Number(booking.driver_settled || 0) !== 1) {
+            const commissionRate  = Number(booking.driver_commision || 0)
+                || Number(await findSystemSettingByKey("driver_commission_rate", conn) || 80);
+            const platformFeeRate = 100 - commissionRate;
+            const paymentType     = Number(booking.payment_type || 0);
 
-        if (driverEarnings > 0) {
-            let driverWallet = await findDriverWallet(driverId, conn, true);
+            let walletDelta, direction, description;
 
-            if (!driverWallet) {
-                const [[curRow]] = await conn.query(
-                    `SELECT id FROM currencies ORDER BY \`default\` DESC, id ASC LIMIT 1`
-                );
-                const currencyId = Number(curRow?.id || 1);
-                await createDriverWalletAccount({ driverId, currencyId }, conn);
-                driverWallet = await findDriverWallet(driverId, conn, true);
+            if (paymentType === 1) {
+                // CASH: driver collected full amount from customer in cash.
+                // Platform recoups its share by debiting the driver's wallet.
+                // Negative balance is allowed (debt tracking).
+                walletDelta = Number(((actualCost * platformFeeRate) / 100).toFixed(2));
+                direction   = "debit";
+                description = `Platform commission for cash booking #${bId}`;
+            } else {
+                // WALLET / CARD / other: platform already collected from customer.
+                // Credit driver their commission share.
+                walletDelta = Number(((actualCost * commissionRate) / 100).toFixed(2));
+                direction   = "credit";
+                description = `Driver earning for booking #${bId}`;
             }
 
-            if (driverWallet && Number(driverWallet.status) === 1) {
-                const nextBalance = Number((driverWallet.balance + driverEarnings).toFixed(2));
-                await updateWalletBalance(driverWallet.wallet_id, nextBalance, conn);
-                await insertWalletLedger({
-                    wallet_id: driverWallet.wallet_id,
-                    payment_id: null,
-                    amount: driverEarnings,
-                    balance_after: nextBalance,
-                    direction: "credit",
-                    entry_type: "commission",
-                    source_type: "ride_booking",
-                    source_id: bId,
-                    description: `Thu nhập chuyến xe #${bId}`,
-                }, conn);
+            if (walletDelta > 0) {
+                let driverWallet = await findDriverWallet(driverId, conn, true);
 
-                await setBookingCompletionData(bId, { driver_settled: 1 }, conn);
+                if (!driverWallet) {
+                    const [[curRow]] = await conn.query(
+                        `SELECT id FROM currencies ORDER BY \`default\` DESC, id ASC LIMIT 1`
+                    );
+                    const currencyId = Number(curRow?.id || 1);
+                    await createDriverWalletAccount({ driverId, currencyId }, conn);
+                    driverWallet = await findDriverWallet(driverId, conn, true);
+                }
+
+                if (driverWallet && Number(driverWallet.status) === 1) {
+                    const nextBalance = direction === "credit"
+                        ? Number((Number(driverWallet.balance) + walletDelta).toFixed(2))
+                        : Number((Number(driverWallet.balance) - walletDelta).toFixed(2));
+
+                    await updateWalletBalance(driverWallet.wallet_id, nextBalance, conn);
+                    await insertWalletLedger({
+                        wallet_id:     driverWallet.wallet_id,
+                        payment_id:    null,
+                        amount:        walletDelta,
+                        balance_after: nextBalance,
+                        direction,
+                        entry_type:    "commission",    // ✅ valid enum value
+                        source_type:   "ride_booking",  // ✅ valid enum value
+                        source_id:     bId,
+                        description,
+                    }, conn);
+
+                    await setBookingCompletionData(bId, { driver_settled: 1 }, conn);
+                }
             }
         }
 
@@ -520,6 +550,35 @@ export async function cancelRide(auth, bookingId, payload = {}) {
             cancel_comment: cancelComment,
         });
         await incrementDriverCancelCount(driverId, conn);
+
+        // Refund customer wallet if they paid via wallet.
+        if (Number(booking.haspaid || 0) === 1 && Number(booking.payment_type) === 2) {
+            const refundAmount = Number(booking.paid_amount || 0);
+            if (refundAmount > 0 && booking.user_id) {
+                const customerWallet = await findWalletByActor(
+                    { actorType: 0, actorId: Number(booking.user_id) }, conn
+                );
+                if (customerWallet) {
+                    const locked     = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+                    const newBalance = Math.round((Number(locked.balance) + refundAmount) * 100) / 100;
+                    await updateWalletBalance(customerWallet.wallet_id, newBalance, conn);
+                    await insertWalletLedger({
+                        wallet_id:     customerWallet.wallet_id,
+                        payment_id:    booking.transaction_id ?? null,
+                        amount:        refundAmount,
+                        balance_after: newBalance,
+                        direction:     "credit",
+                        entry_type:    "refund",
+                        source_type:   "ride_booking",
+                        source_id:     bId,
+                        description:   `Refund for driver-cancelled ride #${bId}`,
+                    }, conn);
+                    if (booking.transaction_id) {
+                        await updatePaymentStatusById(booking.transaction_id, "refunded", conn);
+                    }
+                }
+            }
+        }
 
         await conn.commit();
 

@@ -32,7 +32,7 @@ export const useBootstrapApp = () => {
           setSession(profile, tokens);
           const unread = await driverService.getNotificationsUnreadCount();
           setUnreadCount(unread.unreadCount);
-          
+
           // Request location permission after user is authenticated
           await permissionService.ensureLocationPermission();
         }

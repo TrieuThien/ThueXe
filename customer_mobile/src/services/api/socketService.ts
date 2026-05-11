@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 import { APP_CONFIG } from "../../constants";
-import { getAuthToken } from "./authApiClient";
+import { useAuthStore } from "../../store";
 
 let socket: Socket | null = null;
 
@@ -12,7 +12,7 @@ export function initSocketConnection() {
         return socket;
     }
 
-    const token = getAuthToken();
+    const token = useAuthStore.getState().accessToken;
     if (!token) {
         console.warn("[Socket] No auth token available, skipping socket connection");
         return null;

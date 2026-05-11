@@ -67,16 +67,6 @@ export const MENU_BY_ROLE = {
             ],
         },
         {
-            label: "Quản lý đơn gọi xe",
-            icon: ShieldCheck,
-            subItems: [
-                { label: "Tạo đơn gọi xe", path: "booking/create", icon: CirclePlus },
-                { label: "Điều phối", path: "booking/dispatch", icon: Waypoints },
-                { label: "Danh sách đơn gọi xe", path: "bookings", icon: List },
-                { label: "Lên lịch", path: "scheduled-bookings", icon: CalendarCheck2 },
-            ],
-        },
-        {
             label: "Khách hàng",
             icon: User,
             subItems: [
@@ -125,6 +115,16 @@ export const MENU_BY_ROLE = {
         { label: "Gói thuê chuẩn", path: "rental-packages", icon: Package },
         { label: "Đơn thuê xe", path: "rental-car-bookings", icon: Car },
         { label: "Đơn thuê tài xế", path: "rental-driver-bookings", icon: CircleUserRound },
+        {
+            label: "Quản lý đơn gọi xe",
+            icon: ShieldCheck,
+            subItems: [
+                { label: "Tạo đơn gọi xe", path: "booking/create", icon: CirclePlus },
+                { label: "Điều phối", path: "booking/dispatch", icon: Waypoints },
+                { label: "Danh sách đơn gọi xe", path: "bookings", icon: List },
+                { label: "Lên lịch", path: "scheduled-bookings", icon: CalendarCheck2 },
+            ],
+        },
         { label: "Mã giảm giá", path: "coupons", icon: TicketPercent },
         { label: "Chương trình tích điểm", path: "reward-points", icon: ShieldCheck },
         { label: "Giao dịch", path: "transactions", icon: Receipt },

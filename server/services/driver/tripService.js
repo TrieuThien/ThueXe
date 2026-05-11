@@ -398,29 +398,54 @@ export async function completeTrip(auth, bookingId, payload = {}) {
 
         await incrementDriverCompletedCount(driverId, conn);
 
-        // ── 5. Credit driver wallet ───────────────────────────────────────────
-        const commissionRate = Number(booking.driver_commision || 0)
-            || Number(await findSystemSettingByKey("driver_commission_rate", conn) || 80);
-        const driverEarning = Number(((actualCost * commissionRate) / 100).toFixed(2));
+        // ── 5. Driver wallet settlement ───────────────────────────────────────
+        // Idempotency guard: skip if already settled (handles duplicate complete calls).
+        if (Number(booking.driver_settled || 0) !== 1) {
+            const commissionRate = Number(booking.driver_commision || 0)
+                || Number(await findSystemSettingByKey("driver_commission_rate", conn) || 80);
+            const platformFeeRate = 100 - commissionRate;
+            const paymentType     = Number(booking.payment_type || 0);
 
-        if (driverEarning > 0) {
-            const driverWallet = await findOrCreateWallet(
-                { actorType: 1, actorId: driverId, currencyId: 1 }, conn
-            );
-            const locked     = await findWalletByIdForUpdate(driverWallet.wallet_id, conn);
-            const newBalance = Math.round((Number(locked.balance) + driverEarning) * 100) / 100;
-            await updateWalletBalance(driverWallet.wallet_id, newBalance, conn);
-            await insertWalletLedger({
-                wallet_id:     driverWallet.wallet_id,
-                payment_id:    booking.transaction_id ?? null,
-                amount:        driverEarning,
-                balance_after: newBalance,
-                direction:     'credit',
-                entry_type:    'commission',
-                source_type:   'ride_booking',
-                source_id:     bId,
-                description:   `Thu nhập chuyến xe #${bId}`,
-            }, conn);
+            let walletDelta, direction, description;
+
+            if (paymentType === 1) {
+                // CASH: driver collected full amount from customer in cash.
+                // Platform recoups its share by debiting the driver's wallet.
+                // Negative balance is allowed (debt tracking).
+                walletDelta = Number(((actualCost * platformFeeRate) / 100).toFixed(2));
+                direction   = "debit";
+                description = `Platform commission for cash booking #${bId}`;
+            } else {
+                // WALLET / CARD / other: platform already collected from customer.
+                // Credit driver their commission share.
+                walletDelta = Number(((actualCost * commissionRate) / 100).toFixed(2));
+                direction   = "credit";
+                description = `Driver earning for booking #${bId}`;
+            }
+
+            if (walletDelta > 0) {
+                const driverWallet = await findOrCreateWallet(
+                    { actorType: 1, actorId: driverId, currencyId: 1 }, conn
+                );
+                const locked  = await findWalletByIdForUpdate(driverWallet.wallet_id, conn);
+                const newBalance = direction === "credit"
+                    ? Math.round((Number(locked.balance) + walletDelta) * 100) / 100
+                    : Math.round((Number(locked.balance) - walletDelta) * 100) / 100;
+
+                await updateWalletBalance(driverWallet.wallet_id, newBalance, conn);
+                await insertWalletLedger({
+                    wallet_id:     driverWallet.wallet_id,
+                    payment_id:    booking.transaction_id ?? null,
+                    amount:        walletDelta,
+                    balance_after: newBalance,
+                    direction,
+                    entry_type:    "commission",    // ✅ valid enum value
+                    source_type:   "ride_booking",  // ✅ valid enum value
+                    source_id:     bId,
+                    description,
+                }, conn);
+            }
+
             await setBookingCompletionData(bId, { driver_settled: 1 }, conn);
         }
 

@@ -45,6 +45,8 @@ import {
     updateWalletBalance,
     insertWalletLedger,
     updatePaymentStatusById,
+    insertPayment,
+    markBookingPaidByWallet,
 } from "../repositories/walletRepository.js";
 
 const BOOKING_STATUS = {
@@ -523,6 +525,73 @@ export function createBookingService(overrides = {}) {
                         },
                         conn
                     );
+
+                    // ── Wallet payment: lock, verify balance, charge atomically ─────────
+                    // This must happen inside the same transaction so that a failed
+                    // balance check rolls back the booking insert as well.
+                    if (normalizedPayload.payment_type === 2) {
+                        const chargeAmount = normalizedPayload.estimated_cost;
+                        if (!(chargeAmount > 0)) {
+                            throw new AppError(
+                                "estimated_cost must be positive for wallet payment.",
+                                422,
+                                "INVALID_ESTIMATED_COST"
+                            );
+                        }
+
+                        const customerWallet = await findWalletByActor(
+                            { actorType: 0, actorId: normalizedPayload.user_id },
+                            conn
+                        );
+                        if (!customerWallet || Number(customerWallet.status) !== 1) {
+                            throw new AppError(
+                                "Insufficient wallet balance. Please top up your wallet before booking.",
+                                402,
+                                "INSUFFICIENT_WALLET_BALANCE"
+                            );
+                        }
+
+                        // Pessimistic lock — prevents concurrent deductions from the same wallet.
+                        const lockedWallet = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+                        if (Number(lockedWallet.balance) < chargeAmount) {
+                            throw new AppError(
+                                "Insufficient wallet balance. Please top up your wallet before booking.",
+                                402,
+                                "INSUFFICIENT_WALLET_BALANCE"
+                            );
+                        }
+
+                        const walletPaymentId = await insertPayment({
+                            payment_code:             `RIDE-${Date.now()}-${crypto.createHash("md5").update(String(bookingId)).digest("hex").slice(0, 8).toUpperCase()}`,
+                            payer_wallet_id:          lockedWallet.wallet_id,
+                            actor_type:               0,
+                            actor_id:                 normalizedPayload.user_id,
+                            service_domain:           0,
+                            booking_id:               bookingId,
+                            amount:                   chargeAmount,
+                            currency_id:              lockedWallet.currency_id,
+                            status:                   "paid",
+                            gateway_name:             null,
+                            gateway_transaction_ref:  null,
+                            description:              `Wallet payment for booking #${bookingId}`,
+                        }, conn);
+
+                        const nextBalance = Math.round((Number(lockedWallet.balance) - chargeAmount) * 100) / 100;
+                        await updateWalletBalance(lockedWallet.wallet_id, nextBalance, conn);
+                        await insertWalletLedger({
+                            wallet_id:     lockedWallet.wallet_id,
+                            payment_id:    walletPaymentId,
+                            amount:        chargeAmount,
+                            balance_after: nextBalance,
+                            direction:     "debit",
+                            entry_type:    "ride_payment",    // ✅ valid enum value
+                            source_type:   "ride_booking",    // ✅ valid enum value
+                            source_id:     bookingId,
+                            description:   `Wallet payment for booking #${bookingId}`,
+                        }, conn);
+
+                        await markBookingPaidByWallet({ bookingId, paymentId: walletPaymentId, amount: chargeAmount }, conn);
+                    }
 
                     await insertNotification(
                         {

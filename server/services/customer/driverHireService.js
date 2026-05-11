@@ -154,8 +154,8 @@ export async function createDriverHireBookingService(auth, body) {
             const currentBalance = Number(wallet.balance || 0);
             if (currentBalance < totalPrice) {
                 throw new AppError(
-                    `Số dư ví không đủ (cần ${totalPrice}, hiện có ${currentBalance}).`,
-                    409,
+                    "Insufficient wallet balance. Please top up your wallet before booking.",
+                    402,
                     "INSUFFICIENT_WALLET_BALANCE"
                 );
             }
@@ -179,7 +179,7 @@ export async function createDriverHireBookingService(auth, body) {
                 amount:        totalPrice,
                 balance_after: newBalance,
                 direction:     "debit",
-                entry_type:    "payment",
+                entry_type:    "rental_payment",  // ✅ valid enum value (was "payment")
                 source_type:   "rental_booking",
                 source_id:     rentalId,
                 description:   `Thanh toán thuê tài xế #${rentalId}`,
