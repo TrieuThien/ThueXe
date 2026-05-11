@@ -2,6 +2,8 @@ import crypto from "crypto";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import { isPointInCoverage, getDistanceKm } from "../utils/locationUtils.js";
+import { emitToDriver } from "../socket/index.js";
+import { sendExpoPush } from "../utils/expoPush.js";
 import {
     assignRentalDriverVehicle,
     countExistingRentalNotificationsForDrivers,
@@ -366,9 +368,10 @@ export async function getRentalBookingDetailService({ rentalId, auth }) {
     if (!booking) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
     ensureActorCanAccessRental(auth, booking);
 
-    // Điều kiện: Chỉ trả về thông tin chủ xe/tài xế khi status = "in_progress"
+    // Điều kiện: Ẩn thông tin chủ xe/tài xế với passenger/driver khi chưa in_progress
     let result = { ...booking };
-    if (booking.status !== "in_progress") {
+    const isPrivileged = auth?.role === "admin" || auth?.role === "dispatcher";
+    if (!isPrivileged && booking.status !== "in_progress") {
         result.owner_name = null;
         result.owner_phone = null;
         result.driver_phone = null;
@@ -454,7 +457,7 @@ export async function assignRentalService({ rentalId, payload }) {
     const driverId = payload.driver_id === undefined || payload.driver_id === null || payload.driver_id === "" ? null : Number(payload.driver_id);
     const vehicleId = payload.vehicle_id === undefined || payload.vehicle_id === null || payload.vehicle_id === "" ? null : Number(payload.vehicle_id);
 
-    return runInTransaction(async (conn) => {
+    const result = await runInTransaction(async (conn) => {
         const rental = await findRentalByIdForUpdate(numericRentalId, conn);
         if (!rental) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
         if (rental.status === "completed" || rental.status === "cancelled") {
@@ -490,6 +493,47 @@ export async function assignRentalService({ rentalId, payload }) {
 
         return { rental: await findRentalBookingById(numericRentalId, conn) };
     });
+
+    // Fire-and-forget notifications after DB commit — does not affect API response
+    if (driverId) {
+        _notifyDriverAssigned(driverId, result.rental).catch((err) => {
+            console.error(`[AssignRental] notification failed driverId=${driverId}:`, err.message);
+        });
+    }
+
+    return result;
+}
+
+async function _notifyDriverAssigned(driverId, rental) {
+    const eventPayload = {
+        type: "RENTAL_ASSIGNED_BY_ADMIN",
+        rentalId: rental.rental_id,
+        rentalCode: rental.rental_code,
+        startDatetime: String(rental.start_datetime),
+        endDatetime: String(rental.end_datetime),
+        pickupAddress: rental.pickup_address ?? "",
+        totalPrice: Number(rental.total_price || 0),
+    };
+
+    // Socket: foreground delivery
+    emitToDriver(driverId, "RENTAL_ASSIGNED_BY_ADMIN", eventPayload);
+
+    // Push: background / killed app delivery
+    const [rows] = await sqldb.query(
+        `SELECT push_notification_token FROM drivers WHERE driver_id = ? LIMIT 1`,
+        [driverId]
+    );
+    const pushToken = rows[0]?.push_notification_token;
+    if (pushToken) {
+        const dt = new Date(rental.start_datetime);
+        const timeStr = dt.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        await sendExpoPush(pushToken, {
+            title: "Bạn được gán vào đơn thuê",
+            body: `Đơn ${rental.rental_code} – Bắt đầu ${timeStr}`,
+            channelId: "driver-requests",
+            data: eventPayload,
+        });
+    }
 }
 
 // ─── Owner: xem gói thuê chuẩn dành cho xe (service_type=1, active=1) ─────────

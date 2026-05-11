@@ -60,12 +60,15 @@ export const driverScheduleService = {
       toDate = d.toISOString().slice(0, 10);
     }
 
+    // Bookings: always from today onwards so future-assigned trips always appear
+    const todayDate = new Date().toISOString().slice(0, 10);
+
     const [availRes, bookingRes, profileRes] = await Promise.all([
       apiClient.get('/api/driver/rental/availability', {
         params: { fromDate, toDate, limit: 50 }
       }),
       apiClient.get('/api/driver/rental/bookings', {
-        params: { fromDate, toDate, limit: 50 }
+        params: { fromDate: todayDate, limit: 50 }
       }),
       apiClient.get('/api/driver/working-status')
     ]);

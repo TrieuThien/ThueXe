@@ -44,7 +44,9 @@ import { useRideRequests } from '../hooks/useRideRequests';
 import { useRentRequests } from '../hooks/useRentRequests';
 import RideRequestModal from '../screens/booking/RideRequestModal';
 import RequestModal, { type RentRequest } from '../screens/rental/RequestModal';
+import RentalAssignedModal from '../screens/rental/RentalAssignedModal';
 import { setupAndRegisterPushToken } from '../services/notifications/pushNotificationService';
+import { useRentalAssignedNotification, type RentalAssignedNotif } from '../hooks/useRentalAssignedNotification';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -150,7 +152,9 @@ export const MainNavigator = () => {
   const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
   const { rideRequest, dismissRideRequest } = useRideRequests(accessToken);
   const { rentRequest, dismissRentRequest } = useRentRequests(accessToken);
+  const { assignedNotif, dismissAssignedNotif, setAssignedNotif } = useRentalAssignedNotification(accessToken);
   const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
+  const setPendingRentalDetailId = useDriverHireStore((state) => state.setPendingRentalDetailId);
 
   // Push notification: request received while app is background/killed
   const [notifRentRequest, setNotifRentRequest] = useState<RentRequest | null>(null);
@@ -167,6 +171,8 @@ export const MainNavigator = () => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
         setNotifRentRequest(data as unknown as RentRequest);
+      } else if (data?.type === 'RENTAL_ASSIGNED_BY_ADMIN') {
+        setAssignedNotif(data as unknown as RentalAssignedNotif);
       }
     });
 
@@ -176,6 +182,8 @@ export const MainNavigator = () => {
       const data = response.notification.request.content.data as Record<string, unknown>;
       if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
         setNotifRentRequest(data as unknown as RentRequest);
+      } else if (data?.type === 'RENTAL_ASSIGNED_BY_ADMIN') {
+        setAssignedNotif(data as unknown as RentalAssignedNotif);
       }
     });
 
@@ -199,10 +207,16 @@ export const MainNavigator = () => {
     });
   }, [effectiveRentRequest, setPendingRentalNav]);
 
+  // Admin-assigned booking: store rentalId → DriverScheduleScreen sẽ navigate
+  const handleViewAssignedDetail = useCallback((rentalId: number) => {
+    setPendingRentalDetailId(String(rentalId));
+  }, [setPendingRentalDetailId]);
+
   return (
     <>
     <RideRequestModal request={rideRequest} onClose={dismissRideRequest} />
     <RequestModal request={effectiveRentRequest} onClose={dismissEffectiveRentRequest} onAccepted={handleRentAccepted} />
+    <RentalAssignedModal notif={assignedNotif} onClose={dismissAssignedNotif} onViewDetail={handleViewAssignedDetail} />
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
       headerTitleAlign: 'center',

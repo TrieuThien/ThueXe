@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -11,6 +11,7 @@ import {
 import type { DriverScheduleSlot, ScheduleViewMode } from '../../types/schedule';
 import type { WorkStackParamList } from '../../types/navigation';
 import { formatDateTime } from '../../utils/format';
+import { useDriverHireStore } from '../../store/driverHireStore';
 
 const DATE_FORMAT = new Intl.DateTimeFormat('vi-VN', {
   day: '2-digit',
@@ -87,6 +88,17 @@ export const DriverScheduleScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<WorkStackParamList>>();
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('day');
   const [focusDate, setFocusDate] = useState(new Date());
+
+  const pendingRentalDetailId = useDriverHireStore((s) => s.pendingRentalDetailId);
+  const setPendingRentalDetailId = useDriverHireStore((s) => s.setPendingRentalDetailId);
+
+  // Navigate to RentalBookingDetail when admin-assigned notification tapped
+  useEffect(() => {
+    if (pendingRentalDetailId) {
+      setPendingRentalDetailId(null);
+      navigation.navigate('RentalBookingDetail', { bookingId: pendingRentalDetailId });
+    }
+  }, [pendingRentalDetailId]);
 
   const dateIso = useMemo(() => {
     const d = new Date(focusDate);
