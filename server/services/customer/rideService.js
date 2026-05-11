@@ -195,6 +195,31 @@ async function estimateByGoogleMaps(points) {
     };
 }
 
+async function estimateByOSRM(points) {
+    const coordStr = points.map((p) => `${p.lng},${p.lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=polyline`;
+
+    const response = await fetch(url, {
+        headers: { "User-Agent": "ThueXe-Server/1.0" },
+        signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    if (payload.code !== "Ok" || !payload.routes?.[0]) return null;
+
+    const route = payload.routes[0];
+    const distanceKm = Number((route.distance / 1000).toFixed(2));
+    const durationMin = Number((route.duration / 60).toFixed(1));
+
+    return {
+        distance_km: Math.max(distanceKm, 0.2),
+        duration_min: Math.max(durationMin, 1),
+        polyline: route.geometry,
+        provider: "osrm",
+    };
+}
+
 function estimateByFallback(points) {
     let totalDistance = 0;
     for (let i = 0; i < points.length - 1; i += 1) {
@@ -345,12 +370,24 @@ function resolveCancellationPolicy({ booking, customer, tariff, nowMs = Date.now
     };
 }
 
+function toBookingStatusString(status) {
+    switch (status) {
+        case 0: return "PENDING";
+        case 1: return "IN_PROGRESS";
+        case 2: case 4: case 5: return "CANCELLED";
+        case 3: return "COMPLETED";
+        case 6: return "ARRIVED";
+        default: return "PENDING";
+    }
+}
+
 function mapBookingRow(booking, { location = null, allocation = null } = {}) {
     if (!booking) return null;
     return {
         id: Number(booking.id),
         booking_code: booking.b_uuid,
         status: Number(booking.status || 0),
+        booking_status: toBookingStatusString(Number(booking.status || 0)),
         user_id: Number(booking.user_id),
         route_id: Number(booking.route_id || 0),
         route_name: booking.route_name,
@@ -392,6 +429,16 @@ function mapBookingRow(booking, { location = null, allocation = null } = {}) {
         distance_travelled: booking.distance_travelled === null ? null : Number(booking.distance_travelled),
         estimated_cost: Number(booking.estimated_cost || 0),
         actual_cost: Number(booking.actual_cost || 0),
+        // Aliases for customer mobile field name compatibility
+        pickup_lat:                 booking.pickup_lat  === null ? null : Number(booking.pickup_lat),
+        pickup_lng:                 booking.pickup_long === null ? null : Number(booking.pickup_long),
+        destination_address:        booking.dropoff_address ?? null,
+        destination_lat:            booking.dropoff_lat  === null ? null : Number(booking.dropoff_lat),
+        destination_lng:            booking.dropoff_long === null ? null : Number(booking.dropoff_long),
+        distance_km:                Number(booking.est_distance  || 0),
+        estimated_duration_minutes: Number(booking.est_duration  || 0),
+        estimated_fare:             Number(booking.estimated_cost || 0),
+        final_fare:                 Number(booking.actual_cost   || 0) > 0 ? Number(booking.actual_cost) : null,
         cancel_amount: Number(booking.cancel_amount || 0),
         haspaid: Number(booking.haspaid || 0),
         paid_amount: Number(booking.paid_amount || 0),
@@ -410,6 +457,7 @@ function mapBookingRow(booking, { location = null, allocation = null } = {}) {
                   driver_id: Number(booking.driver_id),
                   firstname: booking.driver_firstname,
                   lastname: booking.driver_lastname,
+                  full_name: [booking.driver_firstname, booking.driver_lastname].filter(Boolean).join(' ') || null,
                   phone: booking.driver_phone,
                   rating: booking.driver_rating !== undefined && booking.driver_rating !== null
                       ? Number(booking.driver_rating)
@@ -417,6 +465,9 @@ function mapBookingRow(booking, { location = null, allocation = null } = {}) {
                   car_plate_num: booking.driver_car_plate_num || null,
                   car_model: booking.driver_car_model || null,
                   photo_file: booking.driver_photo_file || null,
+                  avatar_url:    booking.driver_photo_file    || null,
+                  vehicle_name:  booking.driver_car_model     || null,
+                  license_plate: booking.driver_car_plate_num || null,
                   account_active: Number(booking.driver_account_active || 0),
                   available: Number(booking.driver_available || 0),
                   operation_status: Number(booking.driver_operation_status || 0),
@@ -457,7 +508,8 @@ export async function estimateRoute(auth, payload) {
     const waypoints = normalizeWaypointList(payload.waypoints || []);
     const points = [pickup, ...waypoints, dropoff];
     const fromGoogle = await estimateByGoogleMaps(points).catch(() => null);
-    const estimate = fromGoogle || estimateByFallback(points);
+    const fromOSRM = fromGoogle ? null : await estimateByOSRM(points).catch(() => null);
+    const estimate = fromGoogle || fromOSRM || estimateByFallback(points);
     return {
         ...estimate,
         route_id: customer.route_id ? Number(customer.route_id) : null,

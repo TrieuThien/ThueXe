@@ -36,6 +36,8 @@ export function getFriendlyErrorMessage(error: unknown): string {
       return "Bạn không có quyền thực hiện thao tác này.";
     case 404:
       return "Không tìm thấy dữ liệu yêu cầu.";
+    case 429:
+      return "Bạn đã thực hiện quá nhiều yêu cầu. Vui lòng thử lại sau.";
     case 409:
       return "Dữ liệu đang xung đột. Vui lòng tải lại và thử lại.";
     default:

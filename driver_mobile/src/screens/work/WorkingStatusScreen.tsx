@@ -143,7 +143,6 @@ export const WorkingStatusScreen = () => {
 
     try {
       await toggleOnlineMutation.mutateAsync(nextValue);
-      await workingQuery.refetch();
 
       if (nextValue) {
         locationService.startPeriodicLocationUpdate(

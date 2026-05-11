@@ -1,5 +1,5 @@
 import { apiClient } from '../api/client';
-import type { ActiveTrip, TripLocationPayload, TripMutationPayload, TripSummary } from '../../types/trip';
+import type { ActiveTrip, PaymentMethod, TripLocationPayload, TripMutationPayload, TripSummary } from '../../types/trip';
 
 // Backend booking → ActiveTrip mapper
 type BackendBooking = {
@@ -27,6 +27,8 @@ type BackendBooking = {
   user_lastname?: string;
   user_phone?: string;
   payment_status?: string;
+  payment_type?: number | null;
+  haspaid?: number | null;
   expires_at?: string | null;
 };
 
@@ -39,6 +41,14 @@ const BOOKING_STATUS_MAP: Record<number, ActiveTrip['status']> = {
   5: 'cancelled',
   6: 'arrived_pickup'
 };
+
+function mapPaymentType(paymentType: number | null | undefined): PaymentMethod | undefined {
+  if (paymentType === null || paymentType === undefined) return undefined;
+  const numeric = Number(paymentType);
+  if (numeric === 1) return 'CASH';
+  if (numeric === 2) return 'WALLET';
+  return undefined;
+}
 
 function mapBookingToActiveTrip(b: BackendBooking): ActiveTrip {
   const customerName =
@@ -58,7 +68,10 @@ function mapBookingToActiveTrip(b: BackendBooking): ActiveTrip {
     estimatedFare: b.estimated_cost ?? 0,
     actualFare: b.actual_cost ?? undefined,
     status: BOOKING_STATUS_MAP[b.status ?? 0] ?? 'accepted',
-    paymentStatus: 'pending',
+    paymentStatus: b.haspaid === 1
+      ? (b.payment_type === 1 ? 'paid_cash' : 'paid_wallet')
+      : 'pending',
+    paymentMethod: mapPaymentType(b.payment_type),
     expiresAt: b.expires_at ?? undefined,
     cancelReason: b.cancel_comment ?? undefined,
     pickupLat: b.pickup_lat ?? undefined,
@@ -84,6 +97,7 @@ function mapBookingToTripSummary(b: BackendBooking): TripSummary {
     estimatedFare: b.estimated_cost ?? 0,
     actualFare: b.actual_cost ?? b.estimated_cost ?? 0,
     paymentStatus: 'pending',
+    paymentMethod: mapPaymentType(b.payment_type),
     completedAt: new Date().toISOString()
   };
 }

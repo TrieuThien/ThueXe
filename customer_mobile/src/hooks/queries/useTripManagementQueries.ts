@@ -34,7 +34,7 @@ export function useDriverTrackingQuery(bookingId?: string, enabled = true) {
     queryKey: tripManagementQueryKeys.tracking(bookingId ?? "none"),
     queryFn: () => tripManagementService.getDriverTracking(bookingId ?? ""),
     enabled: Boolean(bookingId) && enabled,
-    refetchInterval: 3000,
+    refetchInterval: 15_000,
   });
 }
 

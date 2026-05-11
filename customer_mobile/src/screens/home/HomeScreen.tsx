@@ -132,7 +132,7 @@ export function HomeScreen({ navigation }: Props) {
     setLocations(location.data?.address ?? "", destinationAddress ?? "");
 
     if (rideType === "CALL_RIDE") {
-      navigation.navigate("Booking", { screen: "RideLocationPicker" });
+      navigation.navigate("Booking", { screen: "RideLocationPickup" });
       return;
     }
 

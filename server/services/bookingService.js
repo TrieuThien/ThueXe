@@ -38,6 +38,14 @@ import {
 } from "../utils/idempotencyCache.js";
 import { emitBookingStatusUpdated } from "./customer/realtimeService.js";
 import { startRideDispatch } from "./rideDispatchService.js";
+import { publishRealtimeEvent } from "../utils/realtime.js";
+import {
+    findWalletByActor,
+    findWalletByIdForUpdate,
+    updateWalletBalance,
+    insertWalletLedger,
+    updatePaymentStatusById,
+} from "../repositories/walletRepository.js";
 
 const BOOKING_STATUS = {
     PENDING: 0,
@@ -443,7 +451,7 @@ export function createBookingService(overrides = {}) {
             {
                 personId: driver.driver_id,
                 userType: 1,
-                content: `You have a new booking assignment #${bookingId}`,
+                content: `Bạn có yêu cầu chuyến xe mới #${bookingId}`,
                 nType: 2,
             },
             conn
@@ -521,6 +529,8 @@ export function createBookingService(overrides = {}) {
                             personId: normalizedPayload.user_id,
                             userType: 0,
                             content: `Booking #${bookingId} created successfully`,
+                            title: `Yêu cầu chuyến xe mới`,
+                            body: `Bạn có yêu cầu chuyến xe mới #${bookingId}`,
                             nType: 2,
                         },
                         conn
@@ -676,13 +686,13 @@ export function createBookingService(overrides = {}) {
                     conn
                 );
 
-                await createDriverAllocation(
+                const allocationId = await createDriverAllocation(
                     { bookingId: numericBookingId, driverId: driver.driver_id, status: DRIVER_ALLOCATE_STATUS.PENDING_RESPONSE },
                     conn
                 );
 
                 await insertNotification(
-                    { personId: driver.driver_id, userType: 1, content: `You have a new booking assignment #${numericBookingId}`, nType: 2 },
+                    { personId: driver.driver_id, userType: 1, content: `Bạn có yêu cầu chuyến xe mới #${numericBookingId}`, nType: 2 },
                     conn
                 );
 
@@ -696,8 +706,28 @@ export function createBookingService(overrides = {}) {
                     metadata: { old_driver_id: booking.driver_id, new_driver_id: driver.driver_id },
                 });
 
-                return detail;
+                return { ...detail, manualAllocationId: allocationId };
             });
+
+            // Emit SSE immediately to the assigned driver so they see the request modal
+            publishRealtimeEvent(
+                "NEW_RIDE_REQUEST",
+                {
+                    allocation_id:   result.manualAllocationId,
+                    booking_id:      numericBookingId,
+                    expires_at:      new Date(Date.now() + 60_000).toISOString(),
+                    timeout_sec:     60,
+                    pickup_address:  result.booking?.pickup_address  ?? null,
+                    dropoff_address: result.booking?.dropoff_address ?? null,
+                    estimated_cost:  result.booking?.estimated_cost  ?? null,
+                    pickup: {
+                        lat:         result.booking?.pickup_lat  ?? null,
+                        lng:         result.booking?.pickup_long ?? null,
+                        distance_km: null,
+                    },
+                },
+                { targetUserIds: [numericDriverId] }
+            );
 
             return { booking: serializeBooking(result.booking) };
         },
@@ -727,6 +757,38 @@ export function createBookingService(overrides = {}) {
 
                 if (TERMINAL_STATUSES.has(numericStatus)) {
                     await finalizeNonAcceptedAllocations(numericBookingId, conn);
+                }
+
+                if (numericStatus === BOOKING_STATUS.CANCELLED_BY_RIDER) {
+                    const haspaid      = Number(booking.haspaid || 0);
+                    const paymentType  = Number(booking.payment_type);
+                    const refundAmount = Number(booking.paid_amount || 0);
+                    const paymentId    = booking.transaction_id ?? null;
+
+                    if (haspaid === 1 && paymentType === 2 && refundAmount > 0) {
+                        const customerWallet = await findWalletByActor(
+                            { actorType: 0, actorId: Number(booking.user_id) }, conn
+                        );
+                        if (customerWallet) {
+                            const locked     = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+                            const newBalance = Math.round((Number(locked.balance) + refundAmount) * 100) / 100;
+                            await updateWalletBalance(customerWallet.wallet_id, newBalance, conn);
+                            await insertWalletLedger({
+                                wallet_id:     customerWallet.wallet_id,
+                                payment_id:    paymentId,
+                                amount:        refundAmount,
+                                balance_after: newBalance,
+                                direction:     'credit',
+                                entry_type:    'refund',
+                                source_type:   'ride_booking',
+                                source_id:     numericBookingId,
+                                description:   `Refund for customer-cancelled ride #${numericBookingId}`,
+                            }, conn);
+                            if (paymentId) {
+                                await updatePaymentStatusById(paymentId, 'refunded', conn);
+                            }
+                        }
+                    }
                 }
 
                 const detailAfterUpdate = await findBookingDetailById(numericBookingId);

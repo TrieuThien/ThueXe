@@ -356,7 +356,7 @@ export async function findDriverAllocationForBooking(bookingId, conn = null) {
 
 export async function listBookingHistoryByUser(userId, { status, limit, offset }, conn = null) {
     const params = [userId];
-    let whereSql = "b.status IN (2, 3, 4, 5)";
+    let whereSql = "b.status IN (0, 1, 2, 3, 4, 5, 6)";
 
     if (status !== undefined && status !== null) {
         whereSql += " AND b.status = ?";
@@ -367,7 +367,7 @@ export async function listBookingHistoryByUser(userId, { status, limit, offset }
         `SELECT b.id
          FROM bookings b
          WHERE b.user_id = ? AND ${whereSql}
-         ORDER BY b.date_created DESC, b.id DESC
+         ORDER BY CASE WHEN b.status IN (0, 1, 6) THEN 0 ELSE 1 END ASC, b.date_created DESC, b.id DESC
          LIMIT ? OFFSET ?`,
         [...params, limit, offset]
     );
@@ -377,7 +377,7 @@ export async function listBookingHistoryByUser(userId, { status, limit, offset }
 
 export async function countBookingHistoryByUser(userId, { status }, conn = null) {
     const params = [userId];
-    let whereSql = "status IN (2, 3, 4, 5)";
+    let whereSql = "status IN (0, 1, 2, 3, 4, 5, 6)";
 
     if (status !== undefined && status !== null) {
         whereSql += " AND status = ?";

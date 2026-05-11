@@ -334,7 +334,7 @@ export default function RewardPointsPage() {
                         </select>
                     </div>
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Tiền để nhận 1 điểm</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Số tiền để nhận 1 điểm</label>
                         <input
                             type="number"
                             min="0.01"
@@ -346,7 +346,7 @@ export default function RewardPointsPage() {
                         />
                     </div>
                     <div>
-                        <label className="mb-2 block text-sm font-semibold text-slate-700">Giá trị tiền của 1 điểm</label>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">Số tiền quy đổi 1 điểm</label>
                         <input
                             type="number"
                             min="0.01"

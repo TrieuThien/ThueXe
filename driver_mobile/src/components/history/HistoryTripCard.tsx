@@ -11,11 +11,10 @@ const statusMap: Record<TripHistoryListItem['status'], { label: string; color: s
 
 export const HistoryTripCard = ({ item, onPress }: { item: TripHistoryListItem; onPress: () => void }) => {
   const status = statusMap[item.status];
-
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, { opacity: pressed ? 0.9 : 1 }]}>
       <View style={styles.rowTop}>
-        <Text style={styles.code}>{item.tripCode}</Text>
+        <Text style={styles.code}>#{item.tripCode}</Text>
         <Text style={[styles.status, { color: status.color }]}>{status.label}</Text>
       </View>
       <Text style={styles.route}>{item.pickupAddress} {'->'} {item.dropoffAddress}</Text>

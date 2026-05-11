@@ -19,24 +19,25 @@ import {
   Vibration,
   ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import { apiClient } from '../../services/api/client';
 
 const TIMEOUT_SECONDS = 30;
 
 export interface RideRequest {
   allocation_id: number;
-  booking_id:    number;
-  expires_at:    string;
-  timeout_sec:   number;
+  booking_id: number;
+  expires_at: string;
+  timeout_sec: number;
   pickup: {
-    lat:         number;
-    lng:         number;
+    lat: number;
+    lng: number;
     distance_km: number;
   };
   // Fields fetched after receiving the event (optional preview)
-  pickup_address?:  string;
+  pickup_address?: string;
   dropoff_address?: string;
-  estimated_cost?:  number;
+  estimated_cost?: number;
 }
 
 interface Props {
@@ -46,9 +47,10 @@ interface Props {
 
 export default function RideRequestModal({ request, onClose }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(TIMEOUT_SECONDS);
-  const [loading, setLoading]         = useState(false);
+  const [loading, setLoading] = useState(false);
   const progressAnim = useRef(new Animated.Value(1)).current;
-  const intervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     if (!request) return;
@@ -64,9 +66,16 @@ export default function RideRequestModal({ request, onClose }: Props) {
 
     Vibration.vibrate([0, 400, 200, 400]);
 
+    Audio.Sound.createAsync(require('../../../assets/sounds/notification.mp3'), { shouldPlay: true })
+      .then(({ sound }) => {
+        soundRef.current = sound;
+        sound.playAsync();
+      })
+      .catch(() => { });
+
     Animated.timing(progressAnim, {
-      toValue:         0,
-      duration:        remaining * 1000,
+      toValue: 0,
+      duration: remaining * 1000,
       useNativeDriver: false,
     }).start();
 
@@ -84,6 +93,8 @@ export default function RideRequestModal({ request, onClose }: Props) {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       Vibration.cancel();
+      soundRef.current?.unloadAsync();
+      soundRef.current = null;
     };
   }, [request?.allocation_id]);
 
@@ -115,7 +126,7 @@ export default function RideRequestModal({ request, onClose }: Props) {
       : '—';
 
   const progressWidth = progressAnim.interpolate({
-    inputRange:  [0, 1],
+    inputRange: [0, 1],
     outputRange: ['0%', '100%'],
   });
 
@@ -140,7 +151,7 @@ export default function RideRequestModal({ request, onClose }: Props) {
 
           <View style={styles.body}>
             <InfoRow label="Khoảng cách" value={`${request?.pickup.distance_km?.toFixed(1) ?? '—'} km`} />
-            {request?.pickup_address  && <InfoRow label="Điểm đón"  value={request.pickup_address} />}
+            {request?.pickup_address && <InfoRow label="Điểm đón" value={request.pickup_address} />}
             {request?.dropoff_address && <InfoRow label="Điểm đến" value={request.dropoff_address} />}
             {request?.estimated_cost != null && (
               <InfoRow label="Giá ước tính" value={formatCurrency(request.estimated_cost)} highlight />
@@ -195,70 +206,70 @@ function InfoRow({
 
 const styles = StyleSheet.create({
   overlay: {
-    flex:            1,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent:  'flex-end',
+    justifyContent: 'flex-end',
   },
   card: {
-    backgroundColor:  '#FFFFFF',
-    borderTopLeftRadius:  24,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom:    32,
-    overflow:         'hidden',
+    paddingBottom: 32,
+    overflow: 'hidden',
   },
   timerTrack: {
-    height:          4,
+    height: 4,
     backgroundColor: '#E5E7EB',
   },
   timerFill: {
-    height:          4,
+    height: 4,
     backgroundColor: '#F59E0B',
   },
   header: {
-    flexDirection:  'row',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems:     'center',
-    padding:        20,
-    paddingBottom:  8,
+    alignItems: 'center',
+    padding: 20,
+    paddingBottom: 8,
   },
   title: {
-    fontSize:   20,
+    fontSize: 20,
     fontWeight: '800',
-    color:      '#111827',
+    color: '#111827',
   },
   timer: {
-    fontSize:   18,
+    fontSize: 18,
     fontWeight: '700',
-    color:      '#F59E0B',
+    color: '#F59E0B',
   },
   body: {
     paddingHorizontal: 20,
-    paddingBottom:     16,
+    paddingBottom: 16,
   },
   infoRow: {
-    flexDirection:    'row',
-    justifyContent:   'space-between',
-    paddingVertical:  8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
-  infoLabel:          { color: '#6B7280', fontSize: 14, flex: 1 },
-  infoValue:          { color: '#111827', fontSize: 14, fontWeight: '600', flex: 2, textAlign: 'right' },
+  infoLabel: { color: '#6B7280', fontSize: 14, flex: 1 },
+  infoValue: { color: '#111827', fontSize: 14, fontWeight: '600', flex: 2, textAlign: 'right' },
   infoValueHighlight: { color: '#F59E0B', fontSize: 16 },
   actions: {
-    flexDirection:  'row',
-    gap:            12,
+    flexDirection: 'row',
+    gap: 12,
     paddingHorizontal: 20,
-    marginTop:      8,
+    marginTop: 8,
   },
   btn: {
-    flex:           1,
+    flex: 1,
     paddingVertical: 14,
-    borderRadius:   12,
-    alignItems:     'center',
+    borderRadius: 12,
+    alignItems: 'center',
   },
-  rejectBtn:  { backgroundColor: '#FEE2E2' },
-  acceptBtn:  { backgroundColor: '#F59E0B' },
+  rejectBtn: { backgroundColor: '#FEE2E2' },
+  acceptBtn: { backgroundColor: '#F59E0B' },
   rejectText: { color: '#EF4444', fontSize: 15, fontWeight: '700' },
   acceptText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 });

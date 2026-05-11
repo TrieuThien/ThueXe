@@ -133,24 +133,28 @@ export async function updateBookingStarted(bookingId, { long = null, lat = null 
 
 /**
  * Transition booking → COMPLETED (3).
- * Writes drv_comp_long, drv_comp_lat, actual_cost, distance_travelled if provided.
+ * Writes drv_comp_long/lat, actual_cost, distance_travelled, wait time if provided.
  */
 export async function updateBookingCompleted(bookingId, {
     long = null,
     lat  = null,
     actualCost = null,
     distanceTravelled = null,
+    totalWaitTime = null,
+    totalWaitTimeCost = null,
 } = {}, conn) {
     const [result] = await db(conn).query(
         `UPDATE bookings
-         SET status             = 3,
-             date_completed     = COALESCE(date_completed, NOW()),
-             drv_comp_long      = COALESCE(?, drv_comp_long),
-             drv_comp_lat       = COALESCE(?, drv_comp_lat),
-             actual_cost        = COALESCE(?, actual_cost),
-             distance_travelled = COALESCE(?, distance_travelled)
+         SET status               = 3,
+             date_completed       = COALESCE(date_completed, NOW()),
+             drv_comp_long        = COALESCE(?, drv_comp_long),
+             drv_comp_lat         = COALESCE(?, drv_comp_lat),
+             actual_cost          = COALESCE(?, actual_cost),
+             distance_travelled   = COALESCE(?, distance_travelled),
+             total_wait_time      = COALESCE(?, total_wait_time),
+             total_wait_time_cost = COALESCE(?, total_wait_time_cost)
          WHERE id = ? LIMIT 1`,
-        [long, lat, actualCost, distanceTravelled, bookingId]
+        [long, lat, actualCost, distanceTravelled, totalWaitTime, totalWaitTimeCost, bookingId]
     );
     return result.affectedRows === 1;
 }

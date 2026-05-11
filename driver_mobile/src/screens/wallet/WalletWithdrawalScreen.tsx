@@ -175,8 +175,8 @@ export const WalletWithdrawalScreen = () => {
       <View style={styles.card}>
         <Text style={styles.title}>Lịch sử yêu cầu rút tiền</Text>
         {historyItems.length ? (
-          historyItems.map((item) => (
-            <View key={item.id} style={styles.historyItem}>
+          historyItems.map((item, index) => (
+            <View key={`withdrawal-${item.createdAt}-${index}`} style={styles.historyItem}>
               <View style={styles.historyTop}>
                 <Text style={styles.item}>{formatCurrency(item.amount)}</Text>
                 <Text style={[styles.status, { color: statusMeta[item.status].color }]}>{statusMeta[item.status].label}</Text>

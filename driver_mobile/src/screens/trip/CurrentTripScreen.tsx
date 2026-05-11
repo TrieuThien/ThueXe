@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Linking, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Location from 'expo-location';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MainLayout } from '../../layouts/MainLayout';
 import { AppButton } from '../../components/common';
@@ -19,6 +20,7 @@ import {
   useStartTripMutation,
   useUpdateTripLocationMutation
 } from '../../hooks/useCurrentTripFlow';
+import { locationService } from '../../services/location/locationService';
 import type { WorkStackParamList } from '../../types/navigation';
 
 const toCountdown = (expiresAt?: string) => {
@@ -70,6 +72,13 @@ export const CurrentTripScreen = ({ navigation }: Props) => {
       setShowDecisionSheet(false);
     }
   }, [trip?.status]);
+
+  useEffect(() => {
+    locationService.setLocationMode('assigned');
+    return () => {
+      locationService.setLocationMode('searching');
+    };
+  }, []);
 
   const busy = useMemo(
     () =>
@@ -192,10 +201,11 @@ export const CurrentTripScreen = ({ navigation }: Props) => {
 
   const onUpdateLocation = async () => {
     try {
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       await locationMutation.mutateAsync({
         tripId: trip.tripId,
-        lat: 10.7769 + Math.random() * 0.002,
-        lng: 106.7009 + Math.random() * 0.002
+        lat: loc.coords.latitude,
+        lng: loc.coords.longitude
       });
     } catch {
       setUiError('Lỗi mạng khi cập nhật vị trí.');

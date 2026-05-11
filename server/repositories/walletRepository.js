@@ -148,6 +148,17 @@ export async function insertPayment(payload, conn) {
     return Number(result.insertId);
 }
 
+export async function updatePaymentStatusById(paymentId, status, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE payments
+         SET status = ?, updated_at = NOW()
+         WHERE payment_id = ?
+         LIMIT 1`,
+        [status, paymentId]
+    );
+}
+
 export async function insertWithdrawalRequest({ walletId, amount, note }, conn) {
     const db = dbConnection(conn);
     const [result] = await db.query(

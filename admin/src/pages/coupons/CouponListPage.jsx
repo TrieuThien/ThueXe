@@ -233,7 +233,7 @@ export default function CouponListPage() {
                                     <th className="px-6 py-4">Tiêu đề</th>
                                     <th className="px-6 py-4">Thành phố</th>
                                     <th className="px-6 py-4">Giảm giá</th>
-                                    <th className="px-6 py-4">Badge</th>
+                                    <th className="px-6 py-4">Trạng thái</th>
                                     <th className="px-6 py-4">Lượt dùng</th>
                                     <th className="px-6 py-4">Hành động</th>
                                 </tr>

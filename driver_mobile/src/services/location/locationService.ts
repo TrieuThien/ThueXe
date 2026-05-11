@@ -2,7 +2,22 @@ import * as Location from 'expo-location';
 import { apiClient } from '../api/client';
 import type { DriverLocation, LocationError, LocationPermissionStatus, WorkingOverview } from '../../types/working';
 
+export type LocationMode = 'idle' | 'searching' | 'assigned';
+
 let locationSubscription: Location.LocationSubscription | null = null;
+let currentMode: LocationMode = 'searching';
+let currentOnTick: ((lat: number, lng: number) => void) | null = null;
+let currentOnError: ((error: LocationError) => void) | null = null;
+
+const getWatchConfig = (mode: LocationMode): Location.LocationOptions => {
+  if (mode === 'assigned') {
+    return { accuracy: Location.Accuracy.High, timeInterval: 5_000, distanceInterval: 10 };
+  }
+  if (mode === 'idle') {
+    return { accuracy: Location.Accuracy.Balanced, timeInterval: 30_000, distanceInterval: 100 };
+  }
+  return { accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 50 };
+};
 
 const normalizeError = (error: unknown): LocationError => {
   if (typeof error === 'object' && error !== null && 'code' in error && 'message' in error) {
@@ -86,12 +101,17 @@ export const locationService = {
 
   startPeriodicLocationUpdate(
     onTick: (lat: number, lng: number) => void,
-    onError?: (error: LocationError) => void
+    onError?: (error: LocationError) => void,
+    mode: LocationMode = 'searching'
   ) {
     if (locationSubscription) return;
 
+    currentMode = mode;
+    currentOnTick = onTick;
+    currentOnError = onError ?? null;
+
     Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.Balanced, timeInterval: 15_000, distanceInterval: 50 },
+      getWatchConfig(mode),
       async (loc) => {
         const { latitude, longitude, heading } = loc.coords;
         try {
@@ -100,17 +120,45 @@ export const locationService = {
             long: longitude,
             b_angle: heading ?? 0,
           });
-          onTick(latitude, longitude);
+          currentOnTick?.(latitude, longitude);
         } catch (error) {
-          onError?.(normalizeError(error));
+          currentOnError?.(normalizeError(error));
         }
       }
     ).then((sub) => { locationSubscription = sub; });
   },
 
+  setLocationMode(mode: LocationMode) {
+    if (!locationSubscription || currentMode === mode) return;
+    locationSubscription.remove();
+    locationSubscription = null;
+    currentMode = mode;
+
+    if (currentOnTick) {
+      Location.watchPositionAsync(
+        getWatchConfig(mode),
+        async (loc) => {
+          const { latitude, longitude, heading } = loc.coords;
+          try {
+            await apiClient.post('/api/driver/location', {
+              lat: latitude,
+              long: longitude,
+              b_angle: heading ?? 0,
+            });
+            currentOnTick?.(latitude, longitude);
+          } catch (error) {
+            currentOnError?.(normalizeError(error));
+          }
+        }
+      ).then((sub) => { locationSubscription = sub; });
+    }
+  },
+
   stopPeriodicLocationUpdate() {
     locationSubscription?.remove();
     locationSubscription = null;
+    currentOnTick = null;
+    currentOnError = null;
   },
 
   // setPeriodicUpdate: chỉ bật/tắt flag phía backend heartbeat, không tự động gửi vị trí

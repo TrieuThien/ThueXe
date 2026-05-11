@@ -3,17 +3,26 @@ import AppError from "../../utils/appError.js";
 import {
     assignDriverToBooking,
     countBookingHistoryByDriver,
+    createDriverWalletAccount,
     findActiveBookingByDriver,
     findAllocationForDriverBooking,
     findBookingByIdForDriver,
+    findDriverCurrentLocationForService,
     findPendingAllocationForDriver,
     incrementDriverCancelCount,
     incrementDriverCompletedCount,
     listBookingHistoryByDriver,
+    setBookingAcceptanceData,
+    setBookingArrivedLocation,
+    setBookingCompletionData,
+    setBookingStartLocation,
     updateAllocationStatus,
     updateBookingStatus,
 } from "../../repositories/driver/bookingRepository.js";
 import { findDriverById } from "../../repositories/driver/authRepository.js";
+import { findDriverWallet } from "../../repositories/driver/walletRepository.js";
+import { insertWalletLedger, updateWalletBalance } from "../../repositories/walletRepository.js";
+import { findSystemSettingByKey, findTariffWaitData } from "../../repositories/bookingRepository.js";
 import { notifyRideAccepted, notifyRideRejected } from "../rideDispatchService.js";
 
 // ─── Booking status constants (must stay in sync with bookings.status) ─────
@@ -169,6 +178,18 @@ export async function acceptBooking(auth, bookingId) {
         // Assign driver to booking if not already set
         await assignDriverToBooking(bId, { driver_id: driverId, firstname: driver.firstname, lastname: driver.lastname, phone: driver.phone }, conn);
 
+        // Save driver acceptance location and commission rate
+        const driverLocation = await findDriverCurrentLocationForService(driverId, conn);
+        const commissionRaw = Number(driver.driver_commision || 0);
+        const commissionRate = commissionRaw > 0
+            ? commissionRaw
+            : Number((await findSystemSettingByKey("driver_commission_rate", conn)) || 80);
+        await setBookingAcceptanceData(bId, {
+            drv_acc_long: driverLocation?.long ?? null,
+            drv_acc_lat: driverLocation?.lat ?? null,
+            driver_commision: commissionRate,
+        }, conn);
+
         await conn.commit();
 
         const booking = await findBookingByIdForDriver(bId, driverId);
@@ -180,8 +201,8 @@ export async function acceptBooking(auth, bookingId) {
                 lastname:      driver.lastname,
                 phone:         driver.phone,
                 driver_rating: driver.driver_rating ?? null,
-                current_lat:   null,
-                current_lng:   null,
+                current_lat:   driverLocation?.lat ?? null,
+                current_lng:   driverLocation?.long ?? null,
             });
         }
 
@@ -273,6 +294,12 @@ export async function markArrived(auth, bookingId) {
 
         await updateBookingStatus(bId, BOOKING_STATUS.ARRIVED, conn);
 
+        const driverLocation = await findDriverCurrentLocationForService(driverId, conn);
+        await setBookingArrivedLocation(bId, {
+            drv_arv_long: driverLocation?.long ?? null,
+            drv_arv_lat: driverLocation?.lat ?? null,
+        }, conn);
+
         await conn.commit();
 
         const updated = await findBookingByIdForDriver(bId, driverId);
@@ -313,6 +340,12 @@ export async function startRide(auth, bookingId) {
 
         await updateBookingStatus(bId, BOOKING_STATUS.ONRIDE, conn);
 
+        const driverLocation = await findDriverCurrentLocationForService(driverId, conn);
+        await setBookingStartLocation(bId, {
+            drv_start_long: driverLocation?.long ?? null,
+            drv_start_lat: driverLocation?.lat ?? null,
+        }, conn);
+
         await conn.commit();
 
         const updated = await findBookingByIdForDriver(bId, driverId);
@@ -328,7 +361,7 @@ export async function startRide(auth, bookingId) {
 /**
  * Complete the ride.
  * Booking must be ONRIDE (1).
- * Accepts optional actual_cost and distance_travelled.
+ * Calculates wait time, actual cost, credits driver wallet, marks driver_settled.
  */
 export async function completeRide(auth, bookingId, payload = {}) {
     const driverId = assertDriver(auth);
@@ -352,15 +385,88 @@ export async function completeRide(auth, bookingId, payload = {}) {
             );
         }
 
-        const extras = {};
-        if (payload.actual_cost !== undefined) {
-            extras.actual_cost = Number(payload.actual_cost);
-        }
-        if (payload.distance_travelled !== undefined) {
-            extras.distance_travelled = Number(payload.distance_travelled);
+        // ── 1. Calculate wait time ────────────────────────────────────────────
+        const arrivedAt = booking.date_arrived ? new Date(booking.date_arrived) : null;
+        const startedAt = booking.date_started ? new Date(booking.date_started) : null;
+        const rawWaitSecs = (arrivedAt && startedAt)
+            ? Math.max(0, (startedAt.getTime() - arrivedAt.getTime()) / 1000)
+            : 0;
+
+        const tariffWait = booking.route_id && booking.ride_id
+            ? await findTariffWaitData({ routeId: booking.route_id, rideId: booking.ride_id, serviceType: booking.service_type || 0 }, conn)
+            : null;
+
+        const nowHour = new Date().getHours();
+        const isNight = nowHour >= 22 || nowHour < 5;
+        const freeWaitMinutes = isNight
+            ? (tariffWait?.nwait_time ?? tariffWait?.wait_time ?? Number(await findSystemSettingByKey("free_waiting_minutes", conn) || 5))
+            : (tariffWait?.wait_time ?? Number(await findSystemSettingByKey("free_waiting_minutes", conn) || 5));
+        const freeWaitSecs = freeWaitMinutes * 60;
+        const totalWaitTime = Math.max(0, Math.round(rawWaitSecs - freeWaitSecs));
+
+        const waitCostPerMin = isNight
+            ? (tariffWait?.nwait_cost_per_minute || tariffWait?.wait_cost_per_minute || 0)
+            : (tariffWait?.wait_cost_per_minute || 0);
+        const totalWaitTimeCost = Number(((totalWaitTime / 60) * waitCostPerMin).toFixed(2));
+
+        // ── 2. Calculate actual cost ──────────────────────────────────────────
+        const baseCost = Number(booking.estimated_cost || 0);
+        const actualCost = payload.actual_cost !== undefined
+            ? Number(payload.actual_cost)
+            : Number((baseCost + totalWaitTimeCost).toFixed(2));
+
+        // ── 3. Update booking status + actual cost ────────────────────────────
+        await updateBookingStatus(bId, BOOKING_STATUS.COMPLETED, conn, {
+            actual_cost: actualCost,
+            distance_travelled: payload.distance_travelled !== undefined ? Number(payload.distance_travelled) : null,
+        });
+
+        // ── 4. Save completion location + wait time data ──────────────────────
+        const driverLocation = await findDriverCurrentLocationForService(driverId, conn);
+        await setBookingCompletionData(bId, {
+            drv_comp_long: driverLocation?.long ?? null,
+            drv_comp_lat: driverLocation?.lat ?? null,
+            total_wait_time: totalWaitTime,
+            total_wait_time_cost: totalWaitTimeCost,
+            driver_settled: 0,
+        }, conn);
+
+        // ── 5. Settle driver earnings ─────────────────────────────────────────
+        const commissionRate = Number(booking.driver_commision || 0)
+            || Number(await findSystemSettingByKey("driver_commission_rate", conn) || 80);
+        const driverEarnings = Number(((actualCost * commissionRate) / 100).toFixed(2));
+
+        if (driverEarnings > 0) {
+            let driverWallet = await findDriverWallet(driverId, conn, true);
+
+            if (!driverWallet) {
+                const [[curRow]] = await conn.query(
+                    `SELECT id FROM currencies ORDER BY \`default\` DESC, id ASC LIMIT 1`
+                );
+                const currencyId = Number(curRow?.id || 1);
+                await createDriverWalletAccount({ driverId, currencyId }, conn);
+                driverWallet = await findDriverWallet(driverId, conn, true);
+            }
+
+            if (driverWallet && Number(driverWallet.status) === 1) {
+                const nextBalance = Number((driverWallet.balance + driverEarnings).toFixed(2));
+                await updateWalletBalance(driverWallet.wallet_id, nextBalance, conn);
+                await insertWalletLedger({
+                    wallet_id: driverWallet.wallet_id,
+                    payment_id: null,
+                    amount: driverEarnings,
+                    balance_after: nextBalance,
+                    direction: "credit",
+                    entry_type: "commission",
+                    source_type: "ride_booking",
+                    source_id: bId,
+                    description: `Thu nhập chuyến xe #${bId}`,
+                }, conn);
+
+                await setBookingCompletionData(bId, { driver_settled: 1 }, conn);
+            }
         }
 
-        await updateBookingStatus(bId, BOOKING_STATUS.COMPLETED, conn, extras);
         await incrementDriverCompletedCount(driverId, conn);
 
         await conn.commit();

@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 export const HistoryListSkeleton = () => (
   <View style={styles.wrap}>
     {Array.from({ length: 6 }).map((_, index) => (
-      <View key={index} style={styles.card}>
+      <View key={`skeleton-${index}`} style={styles.card}>
         <View style={[styles.bar, { width: '40%' }]} />
         <View style={[styles.bar, { width: '90%' }]} />
         <View style={[styles.bar, { width: '55%' }]} />

@@ -21,7 +21,7 @@ export default function TransactionsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const debouncedQuery = useDebouncedValue(query);
-
+    const actorMap = {0: "Hành khách", 1: "Tài xế", 2: "Chủ xe", 3: "Quản trị viên", 4: "Hệ thống"};
     const queryParams = useMemo(
         () => ({
             page,
@@ -122,11 +122,11 @@ export default function TransactionsPage() {
                         </select>
                     </label>
                     <label>
-                        <span className="mb-2 block text-sm font-medium text-slate-600">Phương thức thanh toán</span>
+                        <span className="mb-2 block text-sm font-medium text-slate-600">Phương thức giao dịch</span>
                         <select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} className="w-full rounded-2xl border border-slate-300 px-3 py-2.5">
                             <option value="">Tất cả</option>
-                            <option value="credit">Credit</option>
-                            <option value="debit">Debit</option>
+                            <option value="credit">Cộng tiền</option>
+                            <option value="debit">Trừ tiền</option>
                         </select>
                     </label>
                 </div>
@@ -142,7 +142,7 @@ export default function TransactionsPage() {
                             <table className="min-w-full text-sm">
                                 <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                                     <tr>
-                                        <th className="px-4 py-3">ID giao dịch</th><th className="px-4 py-3">Ví</th><th className="px-4 py-3">Số tiền</th><th className="px-4 py-3">Số dư</th><th className="px-4 py-3">Phương thức</th><th className="px-4 py-3">Loại giao dịch</th><th className="px-4 py-3">Tác nhân</th><th className="px-4 py-3">Thời gian</th>
+                                        <th className="px-4 py-3">ID giao dịch</th><th className="px-4 py-3">Ví</th><th className="px-4 py-3">Số tiền</th><th className="px-4 py-3">Số dư</th><th className="px-4 py-3">Phương thức</th><th className="px-4 py-3">Loại giao dịch</th><th className="px-4 py-3">Tác nhân thanh toán</th><th className="px-4 py-3">Tác nhân thụ hưởng</th><th className="px-4 py-3">Thời gian</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -152,9 +152,10 @@ export default function TransactionsPage() {
                                             <td className="px-4 py-3">{row.wallet_id || "--"}</td>
                                             <td className="px-4 py-3">{formatCurrency(row.amount)}</td>
                                             <td className="px-4 py-3">{formatCurrency(row.balance_after)}</td>
-                                            <td className="px-4 py-3">{row.direction || "--"}</td>
+                                            <td className="px-4 py-3">{row.direction === 'credit' ? 'Cộng tiền' : row.direction === 'debit' ? 'Trừ tiền' : "--"}</td>
                                             <td className="px-4 py-3">{row.entry_type || "--"}</td>
-                                            <td className="px-4 py-3">{row.actor_type ?? "--"}:{row.actor_id ?? "--"}</td>
+                                            <td className="px-4 py-3">{actorMap[row.actor_type] || "--"}</td>
+                                            <td className="px-4 py-3">{actorMap[row.actor_id] || "--"}</td>
                                             <td className="px-4 py-3">{row.created_at ? new Date(row.created_at).toLocaleString("vi-VN") : "--"}</td>
                                         </tr>
                                     ))}

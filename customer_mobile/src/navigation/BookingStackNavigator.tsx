@@ -19,7 +19,6 @@ import {
   RentalServiceChooserScreen,
   RentalVehicleConfirmScreen,
   RideBookingConfirmScreen,
-  RideLocationPickerScreen,
   RideLocationPickupScreen,
   RideLocationDropoffScreen,
   RideSearchingDriverScreen,

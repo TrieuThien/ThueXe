@@ -17,7 +17,7 @@ function assertDriver(auth) {
 }
 
 function normalizePagination(query = {}) {
-    const page  = Math.max(Number(query.page  || 1),  1);
+    const page = Math.max(Number(query.page || 1), 1);
     const limit = Math.min(Math.max(Number(query.limit || 20), 1), 100);
     return { page, limit, offset: (page - 1) * limit };
 }
@@ -34,9 +34,15 @@ export async function getDriverNotifications(auth, query = {}) {
             ? undefined
             : Number(query.n_type);
 
+    // is_read filter — handle 0, 1, or undefined
+    const isRead =
+        query.is_read === undefined || query.is_read === null || query.is_read === ""
+            ? undefined
+            : Number(query.is_read);
+
     const [items, total] = await Promise.all([
-        listDriverNotifications(driverId, { nType, limit, offset }),
-        countDriverNotifications(driverId, { nType }),
+        listDriverNotifications(driverId, { nType, isRead, limit, offset }),
+        countDriverNotifications(driverId, { nType, isRead }),
     ]);
 
     return {
@@ -57,7 +63,7 @@ export async function getUnreadCount(auth) {
 }
 
 export async function markOneRead(auth, notificationIdInput) {
-    const driverId       = assertDriver(auth);
+    const driverId = assertDriver(auth);
     const notificationId = Number(notificationIdInput);
 
     if (!Number.isInteger(notificationId) || notificationId < 1) {
@@ -72,13 +78,13 @@ export async function markOneRead(auth, notificationIdInput) {
     await markNotificationRead(notificationId, driverId);
 
     return {
-        id:      notificationId,
+        id: notificationId,
         is_read: 1,
     };
 }
 
 export async function markAllRead(auth) {
     const driverId = assertDriver(auth);
-    const updated  = await markAllNotificationsRead(driverId);
+    const updated = await markAllNotificationsRead(driverId);
     return { updated };
 }

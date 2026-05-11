@@ -59,7 +59,7 @@ export const TripHistoryDetailScreen = ({ route }: Props) => {
         <Text style={styles.title}>Timeline trạng thái</Text>
         <FlatList
           data={detail.timeline}
-          keyExtractor={(item, index) => `${item.status}-${index}`}
+          keyExtractor={(item) => `timeline-${item.at}`}
           scrollEnabled={false}
           renderItem={({ item }) => (
             <View style={styles.timelineRow}>

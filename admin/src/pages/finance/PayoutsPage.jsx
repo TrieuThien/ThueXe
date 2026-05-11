@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Coins, RefreshCw, Search, X, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 import PageHeader from "../../components/common/PageHeader";
 import SkeletonBlock from "../../components/common/SkeletonBlock";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
@@ -18,6 +19,7 @@ export default function PayoutsPage() {
     const [error, setError] = useState("");
     const [processingId, setProcessingId] = useState(null);
     const [payModalRow, setPayModalRow] = useState(null);
+    const [confirmModal, setConfirmModal] = useState({ isOpen: false, row: null, action: null });
     const debouncedQuery = useDebouncedValue(query);
 
     const mapsActorType = {
@@ -100,6 +102,14 @@ export default function PayoutsPage() {
     }, [filteredRows, page]);
 
     async function handleReview(row, decision) {
+        setConfirmModal({ isOpen: true, row, action: decision });
+    }
+
+    async function handleConfirmReview(decision) {
+        if (!confirmModal.row) {
+            return;
+        }
+        const row = confirmModal.row;
         const status = decision === "approve" ? "approved" : "rejected";
         const withdrawalId = row.withdrawal_id || row.id;
         setProcessingId(withdrawalId);
@@ -114,11 +124,23 @@ export default function PayoutsPage() {
                     return item;
                 })
             );
+            const message = decision === "approve" ? "Duyệt yêu cầu thành công" : "Từ chối yêu cầu thành công";
+            toast.success(message);
+            setConfirmModal({ isOpen: false, row: null, action: null });
         } catch (requestError) {
-            setError(requestError?.response?.data?.message || t("adminModules.loadFailed"));
+            const errorMessage = requestError?.response?.data?.message || t("adminModules.loadFailed");
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setProcessingId(null);
         }
+    }
+
+    function closeConfirmModal() {
+        if (processingId) {
+            return;
+        }
+        setConfirmModal({ isOpen: false, row: null, action: null });
     }
 
     function openPayModal(row) {
@@ -150,9 +172,12 @@ export default function PayoutsPage() {
                     return item;
                 })
             );
+            toast.success("Xác nhận thanh toán thành công");
             setPayModalRow(null);
         } catch (requestError) {
-            setError(requestError?.response?.data?.message || t("adminModules.loadFailed"));
+            const errorMessage = requestError?.response?.data?.message || t("adminModules.loadFailed");
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setProcessingId(null);
         }
@@ -309,6 +334,51 @@ export default function PayoutsPage() {
                             <button type="button" onClick={handleConfirmPaid} disabled={processingId === (payModalRow.withdrawal_id || payModalRow.id)} className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40">
                                 <Coins className="h-4 w-4" />Xác nhận đã thanh toán
                             </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
+
+            {confirmModal.isOpen && confirmModal.row ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+                    <div className="w-full max-w-md rounded-3xl bg-white shadow-2xl">
+                        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+                            <h3 className="text-lg font-semibold text-slate-900">
+                                {confirmModal.action === "approve" ? "Xác nhận duyệt" : "Xác nhận từ chối"} yêu cầu rút tiền
+                            </h3>
+                            <button type="button" onClick={closeConfirmModal} disabled={Boolean(processingId)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="space-y-4 px-6 py-5 text-sm text-slate-700">
+                            {confirmModal.action === "approve" ? (
+                                <p className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-800">
+                                    Bạn sắp duyệt yêu cầu rút tiền này. Người dùng sẽ được thông báo về quyết định của bạn.
+                                </p>
+                            ) : (
+                                <p className="rounded-xl bg-red-50 px-3 py-2 text-red-800">
+                                    Bạn sắp từ chối yêu cầu rút tiền này. Người dùng sẽ được thông báo về quyết định của bạn.
+                                </p>
+                            )}
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-2">
+                                <div><span className="text-slate-500">Mã yêu cầu:</span> <span className="font-medium text-slate-900">#{confirmModal.row.withdrawal_id || confirmModal.row.id}</span></div>
+                                <div><span className="text-slate-500">Người dùng:</span> <span className="font-medium text-slate-900">{confirmModal.row.actor_name || "--"}</span></div>
+                                <div><span className="text-slate-500">Số tiền:</span> <span className="font-medium text-slate-900">{new Intl.NumberFormat("vi-VN").format(Number(confirmModal.row.amount || 0))} VND</span></div>
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
+                            <button type="button" onClick={closeConfirmModal} disabled={Boolean(processingId)} className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                Hủy
+                            </button>
+                            {confirmModal.action === "approve" ? (
+                                <button type="button" onClick={() => handleConfirmReview("approve")} disabled={processingId === (confirmModal.row.withdrawal_id || confirmModal.row.id)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <CheckCircle2 className="h-4 w-4" />Xác nhận duyệt
+                                </button>
+                            ) : (
+                                <button type="button" onClick={() => handleConfirmReview("reject")} disabled={processingId === (confirmModal.row.withdrawal_id || confirmModal.row.id)} className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <XCircle className="h-4 w-4" />Xác nhận từ chối
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

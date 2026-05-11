@@ -20,11 +20,11 @@ export const IncomeChart = ({ points }: { points: IncomePoint[] }) => {
     <View style={styles.card}>
       <Text style={styles.title}>Biểu đồ thu nhập</Text>
       <View style={styles.chartWrap}>
-        {safePoints.map((point) => {
+        {safePoints.map((point, index) => {
           const maxHeightPixels = 140;
           const heightPixels = Math.max(6, Math.round((point.amount / maxValue) * maxHeightPixels));
           return (
-            <View key={point.label} style={styles.barGroup}>
+            <View key={`income-${index}`} style={styles.barGroup}>
               <View style={[styles.bar, { height: heightPixels }]} />
               <Text style={styles.barLabel}>{point.label}</Text>
             </View>

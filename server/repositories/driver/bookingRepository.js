@@ -23,7 +23,7 @@ export async function findActiveBookingByDriver(driverId, conn = null) {
             b.est_distance, b.est_duration,
             b.estimated_cost, b.actual_cost,
             b.cur_symbol, b.cur_code,
-            b.payment_type, b.status, b.service_type,
+            b.payment_type, b.haspaid, b.status, b.service_type,
             b.date_created, b.date_arrived, b.date_started,
             r.r_title AS route_name,
             rd.ride_type
@@ -122,9 +122,12 @@ export async function findBookingByIdForDriver(bookingId, driverId, conn = null,
             b.est_distance, b.est_duration, b.distance_travelled,
             b.estimated_cost, b.actual_cost, b.cancel_amount,
             b.cur_symbol, b.cur_code,
+            b.route_id, b.ride_id,
             b.payment_type, b.status, b.service_type,
             b.haspaid, b.paid_amount, b.cancel_comment,
+            b.driver_commision, b.driver_settled, b.transaction_id,
             b.coupon_code,
+            b.total_wait_time, b.total_wait_time_cost,
             b.date_created, b.date_arrived, b.date_started, b.date_completed,
             r.r_title AS route_name,
             rd.ride_type
@@ -322,6 +325,73 @@ export async function incrementDriverCompletedCount(driverId, conn) {
     );
 }
 
+// ─── Driver current location ──────────────────────────────────────────────────
+
+export async function findDriverCurrentLocationForService(driverId, conn = null) {
+    const [rows] = await db(conn).query(
+        `SELECT \`long\`, lat FROM driver_current_locations WHERE driver_id = ? LIMIT 1`,
+        [driverId]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        long: row.long !== null ? Number(row.long) : null,
+        lat: row.lat !== null ? Number(row.lat) : null,
+    };
+}
+
+// ─── Booking field setters (location & settlement) ────────────────────────────
+
+export async function setBookingAcceptanceData(bookingId, { drv_acc_long, drv_acc_lat, driver_commision }, conn) {
+    await db(conn).query(
+        `UPDATE bookings
+         SET drv_acc_long = ?, drv_acc_lat = ?, driver_commision = ?
+         WHERE id = ? LIMIT 1`,
+        [drv_acc_long ?? null, drv_acc_lat ?? null, driver_commision, bookingId]
+    );
+}
+
+export async function setBookingArrivedLocation(bookingId, { drv_arv_long, drv_arv_lat }, conn) {
+    await db(conn).query(
+        `UPDATE bookings SET drv_arv_long = ?, drv_arv_lat = ? WHERE id = ? LIMIT 1`,
+        [drv_arv_long ?? null, drv_arv_lat ?? null, bookingId]
+    );
+}
+
+export async function setBookingStartLocation(bookingId, { drv_start_long, drv_start_lat }, conn) {
+    await db(conn).query(
+        `UPDATE bookings SET drv_start_long = ?, drv_start_lat = ? WHERE id = ? LIMIT 1`,
+        [drv_start_long ?? null, drv_start_lat ?? null, bookingId]
+    );
+}
+
+export async function setBookingCompletionData(bookingId, data, conn) {
+    const sets = [];
+    const params = [];
+
+    if (data.drv_comp_long !== undefined) { sets.push("drv_comp_long = ?"); params.push(data.drv_comp_long ?? null); }
+    if (data.drv_comp_lat !== undefined)  { sets.push("drv_comp_lat = ?");  params.push(data.drv_comp_lat ?? null); }
+    if (data.total_wait_time !== undefined)      { sets.push("total_wait_time = ?");      params.push(data.total_wait_time); }
+    if (data.total_wait_time_cost !== undefined)  { sets.push("total_wait_time_cost = ?"); params.push(data.total_wait_time_cost); }
+    if (data.driver_settled !== undefined)        { sets.push("driver_settled = ?");       params.push(data.driver_settled); }
+
+    if (sets.length === 0) return;
+
+    params.push(bookingId);
+    await db(conn).query(
+        `UPDATE bookings SET ${sets.join(", ")} WHERE id = ? LIMIT 1`,
+        params
+    );
+}
+
+export async function createDriverWalletAccount({ driverId, currencyId }, conn) {
+    const [result] = await db(conn).query(
+        `INSERT INTO wallet_accounts (actor_type, actor_id, currency_id, balance, status) VALUES (1, ?, ?, 0, 1)`,
+        [driverId, currencyId]
+    );
+    return Number(result.insertId);
+}
+
 // ─── Row mappers ──────────────────────────────────────────────────────────────
 
 function mapBookingRow(row) {
@@ -349,6 +419,7 @@ function mapBookingRow(row) {
         cur_symbol: row.cur_symbol,
         cur_code: row.cur_code,
         payment_type: row.payment_type === null ? null : Number(row.payment_type),
+        haspaid: Number(row.haspaid || 0),
         status: Number(row.status || 0),
         service_type: Number(row.service_type || 0),
         route_name: row.route_name,
@@ -362,12 +433,18 @@ function mapBookingRow(row) {
 function mapBookingDetailRow(row) {
     return {
         ...mapBookingRow(row),
+        route_id: row.route_id !== null ? Number(row.route_id) : null,
+        ride_id: row.ride_id !== null ? Number(row.ride_id) : null,
         distance_travelled: row.distance_travelled !== null ? Number(row.distance_travelled) : null,
         cancel_amount: Number(row.cancel_amount || 0),
-        haspaid: Number(row.haspaid || 0),
         paid_amount: Number(row.paid_amount || 0),
         cancel_comment: row.cancel_comment,
+        driver_commision: Number(row.driver_commision || 0),
+        driver_settled: Number(row.driver_settled || 0),
+        transaction_id: row.transaction_id != null ? Number(row.transaction_id) : null,
         coupon_code: row.coupon_code,
+        total_wait_time: Number(row.total_wait_time || 0),
+        total_wait_time_cost: Number(row.total_wait_time_cost || 0),
         date_completed: row.date_completed,
     };
 }

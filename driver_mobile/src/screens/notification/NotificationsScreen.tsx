@@ -119,7 +119,7 @@ export const NotificationsScreen = () => {
         ) : (
           <SectionList
             sections={sections}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => `notification-${item.id}-${item.createdAt}`}
             stickySectionHeadersEnabled
             contentContainerStyle={styles.listContent}
             renderSectionHeader={({ section }) => (
