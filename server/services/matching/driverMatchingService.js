@@ -11,9 +11,16 @@
  * Để dùng Redis: thay bookingLocks bằng ioredis SETNX/TTL.
  */
 
+import crypto from "crypto";
 import sqldb from "../../config/sqldatabase.js";
 import AppError from "../../utils/appError.js";
 import { findNearbyDrivers } from "../../utils/locationUtils.js";
+import {
+    findWalletByActorForUpdate,
+    insertPayment,
+    updateWalletBalance,
+    insertWalletLedger,
+} from "../../repositories/customer/rentalRepository.js";
 import {
     assignDriverToBooking,
     cancelPendingRequests,
@@ -29,6 +36,7 @@ import {
     updateRequestStatus,
 } from "../../repositories/matching/matchingRepository.js";
 import { emitToDriver, emitToUser } from "../../socket/index.js";
+import { publishRealtimeEvent } from "../../utils/realtime.js";
 
 // ─── In-memory lock (thay bằng Redis nếu multi-process) ──────────────────────
 // Key: bookingId, Value: true (đang trong quá trình assign)
@@ -180,7 +188,13 @@ export async function cancelSearchingBooking(bookingId, userId) {
         await conn.commit();
 
         _clearTimer(bookingId);
-        emitToDriver(bookingId, "BOOKING_CANCELLED", { bookingId });
+        // Notify tài xế đang chờ (nếu có) qua SSE + socket.io
+        const pendingReq = await findPendingRequestForBooking(bookingId).catch(() => null);
+        if (pendingReq?.driver_id) {
+            const cancelPayload = { bookingId };
+            publishRealtimeEvent("BOOKING_CANCELLED", cancelPayload, { targetUserIds: [pendingReq.driver_id] });
+            emitToDriver(pendingReq.driver_id, "BOOKING_CANCELLED", cancelPayload);
+        }
     } catch (err) {
         await conn.rollback();
         throw err;
@@ -215,6 +229,70 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
         await markNoDriverFound(bookingId);
         emitToUser(customerId, "DRIVER_NOT_FOUND", { bookingId });
         console.info(`[Matching] bookingId=${bookingId}: no driver found after ${triedIds.length} attempts`);
+
+        // Hoàn tiền nếu đã trừ ví
+        const [bRows] = await sqldb.query(
+            `SELECT user_id, payment_type, payment_status, total_price
+             FROM rental_bookings WHERE rental_id=? LIMIT 1`,
+            [bookingId]
+        );
+        const b = bRows[0];
+        if (b && Number(b.payment_type) === 2 && b.payment_status === "deposit_paid") {
+            const conn2 = await sqldb.getConnection();
+            try {
+                await conn2.beginTransaction();
+                // Idempotency: re-check under lock
+                const [checkRows] = await conn2.query(
+                    `SELECT payment_status FROM rental_bookings WHERE rental_id=? LIMIT 1 FOR UPDATE`,
+                    [bookingId]
+                );
+                if (checkRows[0]?.payment_status !== "deposit_paid") {
+                    await conn2.rollback();
+                } else {
+                    const wallet = await findWalletByActorForUpdate(
+                        { actorType: 0, actorId: Number(b.user_id) }, conn2
+                    );
+                    const refundAmt = Number(b.total_price || 0);
+                    const newBal    = Number((Number(wallet.balance || 0) + refundAmt).toFixed(2));
+                    const pid = await insertPayment({
+                        payment_code:    crypto.randomBytes(8).toString("hex").toUpperCase(),
+                        payer_wallet_id: Number(wallet.wallet_id),
+                        actor_type:      0,
+                        actor_id:        Number(b.user_id),
+                        service_domain:  1,
+                        rental_id:       bookingId,
+                        amount:          refundAmt,
+                        currency_id:     Number(wallet.currency_id || 1),
+                        status:          "paid",
+                        description:     `Hoàn tiền thuê tài xế #${bookingId} (không tìm được tài xế)`,
+                    }, conn2);
+                    await updateWalletBalance(Number(wallet.wallet_id), newBal, conn2);
+                    await insertWalletLedger({
+                        wallet_id:     Number(wallet.wallet_id),
+                        payment_id:    pid,
+                        amount:        refundAmt,
+                        balance_after: newBal,
+                        direction:     "credit",
+                        entry_type:    "refund",
+                        source_type:   "rental_booking",
+                        source_id:     bookingId,
+                        description:   `Hoàn tiền thuê tài xế #${bookingId}`,
+                    }, conn2);
+                    await conn2.query(
+                        `UPDATE rental_bookings SET payment_status='refunded' WHERE rental_id=? LIMIT 1`,
+                        [bookingId]
+                    );
+                    await conn2.commit();
+                    console.info(`[Matching] refund ok bookingId=${bookingId} amount=${refundAmt}`);
+                }
+            } catch (refundErr) {
+                await conn2.rollback();
+                console.error(`[Matching] refund failed bookingId=${bookingId}:`, refundErr.message);
+            } finally {
+                conn2.release();
+            }
+        }
+
         return;
     }
 
@@ -233,8 +311,8 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
         expiresAt:  expiresAtSql,
     });
 
-    // Gửi socket event đến tài xế
-    emitToDriver(driverId, "NEW_DRIVER_RENT_REQUEST", {
+    // Gửi event đến tài xế: SSE (driver mobile dùng SSE) + socket.io (fallback)
+    const rentRequestPayload = {
         requestId,
         bookingId,
         pickup_lat:   lat,
@@ -242,7 +320,9 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
         package_id:   packageId,
         distance_km:  driver.distance_km,
         expires_at:   expiresAtSql,
-    });
+    };
+    publishRealtimeEvent("NEW_DRIVER_RENT_REQUEST", rentRequestPayload, { targetUserIds: [driverId] });
+    emitToDriver(driverId, "NEW_DRIVER_RENT_REQUEST", rentRequestPayload);
 
     // Thông báo khách đang tìm
     emitToUser(customerId, "SEARCHING_DRIVER", {

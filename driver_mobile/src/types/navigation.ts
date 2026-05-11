@@ -31,6 +31,19 @@ export type WorkStackParamList = {
   RentalBookingDetail: {
     bookingId: string;
   };
+  DriverHireActiveService: {
+    rentalId: string;
+    bookingCode?: string;
+    customerName?: string;
+    pickupAddress?: string;
+    pickupLat?: number;
+    pickupLng?: number;
+    durationHours?: number;
+    userId?: number;
+  };
+  DriverHireServiceSummary: {
+    rentalId: string;
+  };
 };
 
 export type HistoryStackParamList = {

@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import MapView, { Marker } from 'react-native-maps';
 import { MainLayout } from '../../layouts/MainLayout';
@@ -17,6 +17,7 @@ import {
 } from '../../hooks/useWorkingQueries';
 import { locationService } from '../../services/location/locationService';
 import { queryKeys } from '../../constants/queryKeys';
+import { useDriverHireStore } from '../../store/driverHireStore';
 import type { LocationError, ServiceTypeId, WorkingOverview } from '../../types/working';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { WorkStackParamList } from '../../types/navigation';
@@ -48,6 +49,22 @@ export const WorkingStatusScreen = () => {
   const queryClient = useQueryClient();
   const workingQuery = useWorkingOverviewQuery();
   const activeTypesQuery = useActiveServiceTypesQuery();
+
+  // Xử lý pending navigation sau khi tài xế accept yêu cầu thuê tài xế
+  const pendingRentalNav = useDriverHireStore((state) => state.pendingRentalNav);
+  const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (pendingRentalNav) {
+        setPendingRentalNav(null);
+        navigation.navigate('DriverHireActiveService', {
+          rentalId: pendingRentalNav.rentalId,
+          pickupLat: pendingRentalNav.pickupLat,
+          pickupLng: pendingRentalNav.pickupLng,
+        });
+      }
+    }, [pendingRentalNav, setPendingRentalNav, navigation])
+  );
 
   const toggleOnlineMutation = useToggleOnlineMutation();
   const updateServiceTypesMutation = useUpdateServiceTypesMutation();

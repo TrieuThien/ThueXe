@@ -14,6 +14,12 @@ import {
     setRentalStatus,
     updateScheduleSlot,
 } from "../../repositories/driver/rentalRepository.js";
+import { emitToUser } from "../../socket/index.js";
+
+// ─── In-memory pause sessions ──────────────────────────────────────────────────
+// Key: rentalId, Value: { isPaused, pausedAt, totalPausedMs }
+// NOTE: data is lost on server restart — production should use Redis or a DB table.
+const pauseSessions = new Map();
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
@@ -442,6 +448,9 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
 
         await conn.commit();
 
+        // Xóa pause session sau khi hoàn thành
+        pauseSessions.delete(id);
+
         return {
             rental_id:          id,
             status:             "completed",
@@ -456,4 +465,153 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
     } finally {
         conn.release();
     }
+}
+
+/**
+ * Tài xế đã đến điểm đón khách.
+ * Không đổi DB status (ENUM không có 'arrived_pickup').
+ * Chỉ emit SSE/socket đến customer để thông báo.
+ */
+export async function arrivedAtPickup(auth, rentalId) {
+    const driverId = assertDriver(auth);
+    const id = Number(rentalId);
+
+    const booking = await findDriverRentalBookingById(id, driverId);
+    if (!booking) throw new AppError("Không tìm thấy booking.", 404, "NOT_FOUND");
+    if (!DRIVER_SERVICE_TYPES.has(booking.service_type)) {
+        throw new AppError("Booking không hợp lệ.", 422, "INVALID_SERVICE_TYPE");
+    }
+    if (booking.status !== "pending") {
+        throw new AppError(
+            `Không thể báo đã đến điểm đón ở trạng thái '${booking.status}'. Cần ở trạng thái 'pending'.`,
+            409,
+            "INVALID_STATUS_TRANSITION"
+        );
+    }
+
+    emitToUser(booking.user_id, "DRIVER_ARRIVED_PICKUP", {
+        bookingId: id,
+        driverId,
+    });
+
+    return { rental_id: id, arrived: true };
+}
+
+/**
+ * Tạm dừng tính giờ dịch vụ (chỉ có hiệu lực khi status = in_progress).
+ * Trạng thái pause lưu in-memory — mất khi server restart.
+ */
+export async function pauseRentalBooking(auth, rentalId) {
+    const driverId = assertDriver(auth);
+    const id = Number(rentalId);
+
+    const booking = await findDriverRentalBookingById(id, driverId);
+    if (!booking) throw new AppError("Không tìm thấy booking.", 404, "NOT_FOUND");
+    if (booking.status !== "in_progress") {
+        throw new AppError(
+            "Chỉ có thể tạm dừng dịch vụ đang trong trạng thái 'in_progress'.",
+            409,
+            "INVALID_STATUS_TRANSITION"
+        );
+    }
+
+    const session = pauseSessions.get(id) ?? { isPaused: false, pausedAt: 0, totalPausedMs: 0 };
+    if (session.isPaused) {
+        throw new AppError("Dịch vụ đang tạm dừng rồi.", 409, "ALREADY_PAUSED");
+    }
+
+    pauseSessions.set(id, {
+        isPaused:     true,
+        pausedAt:     Date.now(),
+        totalPausedMs: session.totalPausedMs,
+    });
+
+    emitToUser(booking.user_id, "DRIVER_SERVICE_PAUSED", { bookingId: id });
+
+    return { rental_id: id, paused: true, paused_at: new Date().toISOString() };
+}
+
+/**
+ * Tiếp tục tính giờ sau khi tạm dừng.
+ */
+export async function resumeRentalBooking(auth, rentalId) {
+    const driverId = assertDriver(auth);
+    const id = Number(rentalId);
+
+    const booking = await findDriverRentalBookingById(id, driverId);
+    if (!booking) throw new AppError("Không tìm thấy booking.", 404, "NOT_FOUND");
+    if (booking.status !== "in_progress") {
+        throw new AppError(
+            "Chỉ có thể tiếp tục dịch vụ đang trong trạng thái 'in_progress'.",
+            409,
+            "INVALID_STATUS_TRANSITION"
+        );
+    }
+
+    const session = pauseSessions.get(id);
+    if (!session?.isPaused) {
+        throw new AppError("Dịch vụ không đang bị tạm dừng.", 409, "NOT_PAUSED");
+    }
+
+    const addedMs = Date.now() - session.pausedAt;
+    pauseSessions.set(id, {
+        isPaused:     false,
+        pausedAt:     0,
+        totalPausedMs: session.totalPausedMs + addedMs,
+    });
+
+    emitToUser(booking.user_id, "DRIVER_SERVICE_RESUMED", { bookingId: id });
+
+    return { rental_id: id, resumed: true, resumed_at: new Date().toISOString() };
+}
+
+/**
+ * Lấy tổng kết booking sau khi hoàn thành (hoặc đang in_progress).
+ * Trả về thời gian thực tế, phí thực tế, thu nhập tài xế.
+ */
+export async function getRentalSummary(auth, rentalId) {
+    const driverId = assertDriver(auth);
+    const id = Number(rentalId);
+
+    const booking = await findDriverRentalBookingById(id, driverId);
+    if (!booking) throw new AppError("Không tìm thấy booking.", 404, "NOT_FOUND");
+
+    const session = pauseSessions.get(id) ?? { isPaused: false, pausedAt: 0, totalPausedMs: 0 };
+    const additionalPausedMs = session.isPaused ? Date.now() - session.pausedAt : 0;
+    const totalPausedMs = session.totalPausedMs + additionalPausedMs;
+    const totalPausedMin = Math.floor(totalPausedMs / 60000);
+
+    const startDt = new Date(booking.start_datetime);
+    const endDt   = booking.actual_end_datetime
+        ? new Date(booking.actual_end_datetime)
+        : new Date();
+
+    const totalElapsedMs   = Math.max(endDt.getTime() - startDt.getTime(), 0);
+    const billableMs       = Math.max(totalElapsedMs - totalPausedMs, 0);
+    const billableMin      = Math.floor(billableMs / 60000);
+    const billableHours    = billableMin / 60;
+
+    const platformFeeRate  = 0.2; // 20% phí platform — nên đưa vào config
+    const actualCost       = round2(booking.total_price);
+    const driverEarnings   = round2(actualCost * (1 - platformFeeRate));
+
+    return {
+        rental_id:           id,
+        rental_code:         booking.rental_code,
+        status:              booking.status,
+        customer_name:       booking.user_name,
+        pickup_address:      booking.pickup_address,
+        start_datetime:      booking.start_datetime,
+        actual_end_datetime: booking.actual_end_datetime,
+        total_elapsed_min:   Math.floor(totalElapsedMs / 60000),
+        total_paused_min:    totalPausedMin,
+        billable_min:        billableMin,
+        billable_hours:      round2(billableHours),
+        base_price:          round2(booking.base_price),
+        extra_time_fee:      round2(booking.extra_time_fee),
+        extra_distance_fee:  round2(booking.extra_distance_fee),
+        actual_cost:         actualCost,
+        driver_earnings:     driverEarnings,
+        payment_status:      booking.payment_status,
+    };
 }

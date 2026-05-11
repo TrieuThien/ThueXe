@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useCallback } from 'react';
 import { Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -12,12 +12,15 @@ import type {
   WalletStackParamList,
   WorkStackParamList
 } from '../types/navigation';
+import { useDriverHireStore } from '../store/driverHireStore';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { WorkingStatusScreen } from '../screens/work/WorkingStatusScreen';
 import { DriverScheduleScreen } from '../screens/work/DriverScheduleScreen';
 import { CurrentTripScreen } from '../screens/trip/CurrentTripScreen';
 import { TripCompletedSummaryScreen } from '../screens/trip/TripCompletedSummaryScreen';
 import { RentalBookingDetailScreen } from '../screens/work/RentalBookingDetailScreen';
+import { DriverHireActiveServiceScreen } from '../screens/work/DriverHireActiveServiceScreen';
+import { DriverHireServiceSummaryScreen } from '../screens/work/DriverHireServiceSummaryScreen';
 import { TripHistoryScreen } from '../screens/history/TripHistoryScreen';
 import { TripHistoryDetailScreen } from '../screens/history/TripHistoryDetailScreen';
 import { WalletIncomeScreen } from '../screens/wallet/WalletIncomeScreen';
@@ -36,7 +39,9 @@ import { useUnreadNotificationsCountQuery } from '../hooks/useDriverQueries';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAuthStore } from '../store/authStore';
 import { useRideRequests } from '../hooks/useRideRequests';
+import { useRentRequests } from '../hooks/useRentRequests';
 import RideRequestModal from '../screens/booking/RideRequestModal';
+import RequestModal from '../screens/rental/RequestModal';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -80,6 +85,16 @@ const WorkStackScreen = () => (
       name="TripCompletedSummary"
       component={TripCompletedSummaryScreen}
       options={{ title: 'Tóm tắt chuyến đi' }}
+    />
+    <WorkStack.Screen
+      name="DriverHireActiveService"
+      component={DriverHireActiveServiceScreen}
+      options={{ title: 'Dịch vụ đang thực hiện', gestureEnabled: false }}
+    />
+    <WorkStack.Screen
+      name="DriverHireServiceSummary"
+      component={DriverHireServiceSummaryScreen}
+      options={{ title: 'Tổng kết dịch vụ', gestureEnabled: false }}
     />
   </WorkStack.Navigator>
 );
@@ -130,10 +145,22 @@ export const MainNavigator = () => {
   const unreadCount = useNotificationStore((state) => state.unreadCount);
   const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
   const { rideRequest, dismissRideRequest } = useRideRequests(accessToken);
+  const { rentRequest, dismissRentRequest } = useRentRequests(accessToken);
+  const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
+
+  // Lưu pending navigation vào store; WorkingStatusScreen sẽ xử lý navigate thực tế
+  const handleRentAccepted = useCallback((bookingId: number) => {
+    setPendingRentalNav({
+      rentalId: String(bookingId),
+      pickupLat: rentRequest?.pickup_lat,
+      pickupLng: rentRequest?.pickup_lng,
+    });
+  }, [rentRequest, setPendingRentalNav]);
 
   return (
     <>
     <RideRequestModal request={rideRequest} onClose={dismissRideRequest} />
+    <RequestModal request={rentRequest} onClose={dismissRentRequest} onAccepted={handleRentAccepted} />
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
       headerTitleAlign: 'center',

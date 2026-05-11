@@ -1,8 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 import { MainLayout } from '../../layouts/MainLayout';
+import { AppButton } from '../../components/common';
 import { EmptyState, ErrorState, LoadingState } from '../../components/states';
 import { useRentalBookingDetailQuery } from '../../hooks/useDriverScheduleQueries';
 import type { WorkStackParamList } from '../../types/navigation';
@@ -12,6 +14,7 @@ type DetailRoute = RouteProp<WorkStackParamList, 'RentalBookingDetail'>;
 
 export const RentalBookingDetailScreen = () => {
   const route = useRoute<DetailRoute>();
+  const navigation = useNavigation<NativeStackNavigationProp<WorkStackParamList>>();
   const bookingId = route.params.bookingId;
   const bookingQuery = useRentalBookingDetailQuery(bookingId);
 
@@ -29,6 +32,18 @@ export const RentalBookingDetailScreen = () => {
 
   const booking = bookingQuery.data;
 
+  const canStartService = booking.status === 'assigned' || booking.status === 'in_progress';
+
+  const goToActiveService = () => {
+    navigation.navigate('DriverHireActiveService', {
+      rentalId: booking.id,
+      bookingCode: booking.bookingCode,
+      customerName: booking.customerName,
+      pickupAddress: booking.pickupAddress,
+      durationHours: booking.totalHours ?? undefined,
+    });
+  };
+
   return (
     <MainLayout title="Chi tiết đơn cho thuê">
       <View style={styles.card}>
@@ -44,6 +59,20 @@ export const RentalBookingDetailScreen = () => {
         <Text style={styles.row}>Điểm trả: {booking.dropoffAddress}</Text>
         {booking.note ? <Text style={styles.note}>Ghi chú: {booking.note}</Text> : null}
       </View>
+
+      {canStartService && (
+        <AppButton
+          title="Thực hiện dịch vụ"
+          onPress={goToActiveService}
+        />
+      )}
+
+      {booking.status === 'completed' && (
+        <AppButton
+          title="Xem tổng kết"
+          onPress={() => navigation.navigate('DriverHireServiceSummary', { rentalId: booking.id })}
+        />
+      )}
     </MainLayout>
   );
 };
