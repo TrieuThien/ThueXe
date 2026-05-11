@@ -49,7 +49,7 @@ export function RideBookingConfirmScreen({ navigation }: Props) {
         Alert.alert("Đặt lịch thành công", "Chuyến xe hẹn giờ đã được tạo.", [
           {
             text: "Xem lịch sử",
-            onPress: () => navigation.navigate("BookingHistory"),
+            onPress: () => navigation.navigate("DriverHireHistory"),
           },
         ]);
         return;

@@ -10,6 +10,7 @@ import { formatCurrency } from '../../utils/format';
 const QUICK_ACTIONS = [
   { key: 'work_status', label: 'Trạng thái làm việc', tab: 'WorkTab', screen: 'WorkingStatus' },
   { key: 'driver_schedule', label: 'Lịch cho thuê', tab: 'WorkTab', screen: 'DriverSchedule' },
+  { key: 'rental_packages', label: 'Đăng ký gói cho thuê', tab: 'DashboardTab', screen: 'PackagesList' },
   { key: 'current_trip', label: 'Chuyến hiện tại', tab: 'WorkTab', screen: 'CurrentTrip' },
   { key: 'trip_history', label: 'Lịch sử chuyến', tab: 'HistoryTab', screen: 'TripHistory' },
   { key: 'wallet', label: 'Ví', tab: 'WalletTab', screen: 'WalletIncome' },
@@ -62,7 +63,6 @@ export const DashboardScreen = () => {
     }
     navigation.navigate(tab, { screen });
   };
-
   return (
     <MainLayout title="Tổng quan tài xế">
       <CardInfo title="Thông tin tài xế">

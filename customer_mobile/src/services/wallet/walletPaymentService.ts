@@ -91,13 +91,14 @@ function toPaymentMethods(payload: unknown): PaymentMethodOption[] {
     .filter((item) => item.id.length > 0);
 
   if (normalized.length > 0) {
-    return normalized.filter((item) => item.type !== "BANK_CARD" && item.type !== "SEPAY");
+    return normalized.filter((item) => item.type !== "BANK_CARD");
   }
 
   return [
-    { id: "pm_wallet", type: "WALLET", title: "VÃ­ ThueXe", isDefault: true, isAvailable: true },
-    { id: "pm_cash", type: "CASH", title: "Tiá»n máº·t", isDefault: false, isAvailable: true },
-    { id: "pm_momo", type: "MOMO", title: "VÃ­ MoMo", isDefault: false, isAvailable: true },
+    { id: "pm_wallet", type: "WALLET", title: "Ví­ ThueXe", isDefault: true, isAvailable: true },
+    { id: "pm_cash", type: "CASH", title: "Tiền mặt", isDefault: false, isAvailable: true },
+    { id: "pm_momo", type: "MOMO", title: "Ví MoMo", isDefault: false, isAvailable: true },
+    { id: "pm_sepay", type: "SEPAY", title: "SePay (QR/Ngân hàng)", isDefault: false, isAvailable: true },
   ];
 }
 

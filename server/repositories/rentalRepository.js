@@ -446,9 +446,11 @@ export async function findRentalBookingById(rentalId, conn) {
                 rb.extra_time_fee, rb.extra_distance_fee, rb.deposit_amount, rb.total_price, rb.payment_status, rb.payment_type, rb.transaction_id,
                 rb.status, rb.cancel_reason, rb.created_at, rb.updated_at,
                 NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
+                u.phone AS user_phone, u.email AS user_email, u.address AS user_address,
                 NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name,
                 d.phone AS driver_phone,
-                v.license_plate, v.brand, v.model, vo.fullname AS owner_name, vo.phone AS owner_phone,
+                v.license_plate, v.brand AS vehicle_brand, v.model AS vehicle_model, v.year AS vehicle_year, v.color AS vehicle_color,
+                vo.fullname AS owner_name, vo.phone AS owner_phone, vo.email AS owner_email, vo.address AS owner_address,
                 rp.package_name
          FROM rental_bookings rb
          LEFT JOIN users u ON u.user_id = rb.user_id
@@ -495,12 +497,20 @@ export async function findRentalBookingById(rentalId, conn) {
         created_at: row.created_at,
         updated_at: row.updated_at,
         user_name: row.user_name,
+        user_phone: row.user_phone,
+        user_email: row.user_email,
+        user_address: row.user_address,
         driver_name: row.driver_name,
         driver_phone: row.driver_phone,
         license_plate: row.license_plate,
-        vehicle_name: [row.brand, row.model].filter(Boolean).join(" ").trim() || null,
+        vehicle_brand: row.vehicle_brand,
+        vehicle_model: row.vehicle_model,
+        vehicle_year: row.vehicle_year,
+        vehicle_color: row.vehicle_color,
         owner_name: row.owner_name,
         owner_phone: row.owner_phone,
+        owner_email: row.owner_email,
+        owner_address: row.owner_address,
         package_name: row.package_name,
     };
 }

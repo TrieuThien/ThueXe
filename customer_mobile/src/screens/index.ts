@@ -7,9 +7,8 @@ export * from "./auth/ResetPasswordScreen";
 export * from "./home/HomeScreen";
 
 export * from "./booking/BookingHomeScreen";
-export * from "./booking/BookingHistoryScreen";
-export * from "./booking/RentalHistoryScreen";
 export * from "./booking/DriverHireHistoryScreen";
+export * from "./booking/RentalHistoryScreen";
 export * from "./booking/BookingDetailScreen";
 export * from "./booking/RentalServiceChooserScreen";
 export * from "./booking/RentalBookingFormScreen";
@@ -23,6 +22,7 @@ export * from "./booking/RentalVehicleConfirmScreen";
 export * from "./booking/RentalBookingConfirmScreen";
 export * from "./booking/RentalBookingDetailScreen";
 export * from "./booking/RentalBookingSuccessScreen";
+export * from "./booking/RentalSearchingDriverScreen";
 export * from "./booking/RideLocationPickupScreen";
 export * from "./booking/RideLocationDropoffScreen";
 export * from "./booking/RideVehicleSelectionScreen";

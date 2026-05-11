@@ -31,7 +31,8 @@ export async function getRentalBookings(params = {}) {
 
 export async function getRentalBookingDetail(rentalId) {
     const res = await apiClient.get(`/api/rentals/bookings/${rentalId}`);
-    return extractPayload(res);
+    const payload = extractPayload(res);
+    return payload.booking || payload;
 }
 
 export async function assignRentalBooking(rentalId, payload) {

@@ -2,7 +2,6 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 
 import {
   BookingDetailScreen,
-  BookingHistoryScreen,
   BookingHomeScreen,
   DriverFoundScreen,
   DriverHireConfirmScreen,
@@ -19,6 +18,7 @@ import {
   RentalLocationDropoffScreen,
   RentalPackageCarsScreen,
   RentalPackageListScreen,
+  RentalSearchingDriverScreen,
   RentalServiceChooserScreen,
   RentalVehicleConfirmScreen,
   RideBookingConfirmScreen,
@@ -60,6 +60,7 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RentalBookingConfirm" component={RentalBookingConfirmScreen} />
       <Stack.Screen name="RentalBookingDetail" component={RentalBookingDetailScreen} />
       <Stack.Screen name="RentalBookingSuccess" component={RentalBookingSuccessScreen} />
+      <Stack.Screen name="RentalSearchingDriver" component={RentalSearchingDriverScreen} />
       <Stack.Screen name="RideLocationPickup" component={RideLocationPickupScreen} />
       <Stack.Screen name="RideLocationDropoff" component={RideLocationDropoffScreen} />
       <Stack.Screen name="RideVehicleSelection" component={RideVehicleSelectionScreen} />
@@ -67,7 +68,6 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RideSearchingDriver" component={RideSearchingDriverScreen} />
       <Stack.Screen name="DriverSearch" component={DriverSearchScreen} />
       <Stack.Screen name="DriverFound" component={DriverFoundScreen} />
-      <Stack.Screen name="BookingHistory" component={BookingHistoryScreen} />
       <Stack.Screen name="RentalHistory" component={RentalHistoryScreen} />
       <Stack.Screen name="DriverHireHistory" component={DriverHireHistoryScreen} />
       <Stack.Screen name="BookingDetail" component={BookingDetailScreen} />

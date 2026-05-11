@@ -949,6 +949,7 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
            AND d.account_deleted = 0
            AND d.available = 1
            AND d.operation_status = 0
+           AND d.available_for_rental = 0
            AND dcl.lat BETWEEN ? AND ?
            AND dcl.long BETWEEN ? AND ?
            AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)

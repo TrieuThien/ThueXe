@@ -4,6 +4,7 @@ import AppError from "../utils/appError.js";
 import { isPointInCoverage, getDistanceKm } from "../utils/locationUtils.js";
 import { emitToDriver } from "../socket/index.js";
 import { sendExpoPush } from "../utils/expoPush.js";
+import { handleRentalTimeout } from "./rentalPaymentService.js";
 import {
     assignRentalDriverVehicle,
     countExistingRentalNotificationsForDrivers,
@@ -34,6 +35,10 @@ const DRIVER_RENTAL_NOTIFY_TYPE = 10;
 
 const RENTAL_STATUSES = ["scheduled", "pending", "in_progress", "completed", "cancelled"];
 const PAYMENT_STATUSES = ["pending", "paid", "refunded"];
+
+// Timeout tracking: Map<rentalId, timeoutHandle>
+// NOTE: Data is lost on server restart — production should use Redis or DB
+const rentalTimeoutTracking = new Map();
 
 function toNullableString(value) {
     if (value === undefined || value === null) return null;
@@ -70,6 +75,51 @@ async function runInTransaction(work) {
         throw error;
     } finally {
         connection.release();
+    }
+}
+
+/**
+ * scheduleRentalTimeout
+ *
+ * Schedules a timeout for a rental driver matching.
+ * If no driver accepts within the timeout period, the rental is cancelled and refunded.
+ *
+ * @param {number} rentalId
+ * @param {number} delayMs - Timeout in milliseconds (default 60 seconds)
+ */
+function scheduleRentalTimeout(rentalId, delayMs = 60_000) {
+    // Cancel existing timeout for this rental (if any)
+    cancelRentalTimeout(rentalId);
+
+    const timeoutHandle = setTimeout(async () => {
+        try {
+            console.log(`[RentalTimeout] Executing timeout for rental ${rentalId} after ${delayMs}ms`);
+            await handleRentalTimeout(rentalId);
+        } catch (error) {
+            console.error(`[RentalTimeout] Error handling timeout for rental ${rentalId}:`, error);
+        } finally {
+            rentalTimeoutTracking.delete(rentalId);
+        }
+    }, delayMs);
+
+    // Store timeout handle for potential cancellation
+    rentalTimeoutTracking.set(rentalId, timeoutHandle);
+}
+
+/**
+ * cancelRentalTimeout
+ *
+ * Cancels a scheduled timeout for a rental.
+ * Called when driver accepts rental or manual cancellation occurs.
+ *
+ * @param {number} rentalId
+ */
+function cancelRentalTimeout(rentalId) {
+    const timeoutHandle = rentalTimeoutTracking.get(rentalId);
+    if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        rentalTimeoutTracking.delete(rentalId);
+        console.log(`[RentalTimeout] Cancelled timeout for rental ${rentalId}`);
     }
 }
 
@@ -333,6 +383,9 @@ export async function createRentalBookingService({ payload, auth }) {
                 endDatetime: endStr,
                 packageInfo: rentalPackage,
             }).catch(() => { });
+
+            // Schedule 60-second timeout for driver matching
+            scheduleRentalTimeout(rentalId, 60_000);
         }
 
         return { rental: created };
@@ -447,6 +500,11 @@ export async function updateRentalStatusService({ rentalId, payload, auth }) {
         const updated = await findRentalBookingById(numericRentalId, conn);
         return { rental: updated };
     });
+
+    // Cancel timeout if cancelled or completed
+    if (["cancelled", "completed"].includes(targetStatus)) {
+        cancelRentalTimeout(numericRentalId);
+    }
 }
 
 export async function assignRentalService({ rentalId, payload }) {
@@ -493,6 +551,11 @@ export async function assignRentalService({ rentalId, payload }) {
 
         return { rental: await findRentalBookingById(numericRentalId, conn) };
     });
+
+    // Cancel timeout since driver has been assigned
+    if (driverId) {
+        cancelRentalTimeout(numericRentalId);
+    }
 
     // Fire-and-forget notifications after DB commit — does not affect API response
     if (driverId) {

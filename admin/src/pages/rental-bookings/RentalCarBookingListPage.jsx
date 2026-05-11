@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { assignRentalBooking, getRentalBookings } from "../../services/rentalBookingService";
+import { getRentalBookings } from "../../services/rentalBookingService";
 import RentalBookingStatusModal from "../../components/rental-bookings/RentalBookingStatusModal";
+import RentalBookingDetailModal from "../../components/rental-bookings/RentalBookingDetailModal";
 
 const STATUS_OPTIONS = [
     { value: "", label: "Tất cả trạng thái" },
@@ -49,11 +50,11 @@ export default function RentalCarBookingListPage() {
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [items, setItems] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [busyId, setBusyId] = useState(null);
     const [pagination, setPagination] = useState({ page: 1, totalPages: 0, total: 0 });
     const [errorMessage, setErrorMessage] = useState("");
     const [successMessage, setSuccessMessage] = useState("");
     const [statusModal, setStatusModal] = useState(null); // booking item or null
+    const [detailModal, setDetailModal] = useState(null); // rental_id or null
 
     const buildParams = (f) => {
         const p = { service_types: "1,3", page: f.page, limit: f.limit };
@@ -92,28 +93,6 @@ export default function RentalCarBookingListPage() {
     function handleReset() {
         setFilters(DEFAULT_FILTERS);
         loadData(DEFAULT_FILTERS);
-    }
-
-    async function handleAssign(item) {
-        setBusyId(item.rental_id);
-        setErrorMessage("");
-        setSuccessMessage("");
-        try {
-            const input = window.prompt(
-                `Nhập mã tài xế (driver_id) để gán cho đơn ${item.rental_code || `#${item.rental_id}`}:`,
-                item.driver_id ? String(item.driver_id) : ""
-            );
-            if (!input) return;
-            const driverId = Number(input);
-            if (!Number.isInteger(driverId) || driverId < 1) throw new Error("Mã tài xế không hợp lệ.");
-            await assignRentalBooking(item.rental_id, { driver_id: driverId });
-            setSuccessMessage(`Đã gán tài xế #${driverId} cho đơn #${item.rental_id}.`);
-            await loadData();
-        } catch (err) {
-            setErrorMessage(err?.response?.data?.message || err.message || "Không thể gán tài xế.");
-        } finally {
-            setBusyId(null);
-        }
     }
 
     const inProgressCount = items.filter((i) => i.status === "in_progress").length;
@@ -231,7 +210,6 @@ export default function RentalCarBookingListPage() {
                                     <th className="px-4 py-3">Loại</th>
                                     <th className="px-4 py-3">Khách hàng</th>
                                     <th className="px-4 py-3">Biển số xe</th>
-                                    <th className="px-4 py-3">Tài xế</th>
                                     <th className="px-4 py-3">Thời gian</th>
                                     <th className="px-4 py-3">Trạng thái</th>
                                     <th className="px-4 py-3 text-right">Giá</th>
@@ -247,8 +225,6 @@ export default function RentalCarBookingListPage() {
                                     </tr>
                                 ) : (
                                     items.map((item) => {
-                                        const isBusy = busyId === item.rental_id;
-                                        const canAssign = item.status === "pending" || item.status === "scheduled";
                                         return (
                                             <tr
                                                 key={item.rental_id}
@@ -272,9 +248,6 @@ export default function RentalCarBookingListPage() {
                                                     {item.license_plate || <span className="text-slate-400">—</span>}
                                                 </td>
                                                 <td className="px-4 py-3 text-slate-600">
-                                                    {item.driver_name || <span className="text-slate-400">Chưa gán</span>}
-                                                </td>
-                                                <td className="px-4 py-3 text-slate-600">
                                                     <p className="text-xs">{formatDatetime(item.start_datetime)}</p>
                                                     {item.end_datetime && (
                                                         <p className="text-xs text-slate-400">→ {formatDatetime(item.end_datetime)}</p>
@@ -290,21 +263,17 @@ export default function RentalCarBookingListPage() {
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex gap-2">
-                                                        {canAssign && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleAssign(item)}
-                                                                disabled={isBusy}
-                                                                className="rounded-lg border border-indigo-300 px-2.5 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
-                                                            >
-                                                                {isBusy ? "..." : "Gán"}
-                                                            </button>
-                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDetailModal(item.rental_id)}
+                                                            className="rounded-lg border border-blue-300 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                                                        >
+                                                            Chi tiết
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setStatusModal(item)}
-                                                            disabled={isBusy}
-                                                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                                            className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                                                         >
                                                             Cập nhật trạng thái
                                                         </button>
@@ -345,6 +314,12 @@ export default function RentalCarBookingListPage() {
                     </div>
                 )}
             </div>
+
+            <RentalBookingDetailModal
+                open={detailModal !== null}
+                rentalId={detailModal}
+                onClose={() => setDetailModal(null)}
+            />
 
             <RentalBookingStatusModal
                 open={statusModal !== null}

@@ -132,9 +132,8 @@ export const WorkingStatusScreen = () => {
 
   const toggleServiceType = async (typeId: ServiceTypeId) => {
     setUiError('');
-    const next = selectedTypes.includes(typeId)
-      ? selectedTypes.filter((item) => item !== typeId)
-      : [...selectedTypes, typeId];
+    // Radio: tapping the active type deselects it; tapping another replaces the selection
+    const next: ServiceTypeId[] = selectedTypes.includes(typeId) ? [] : [typeId];
 
     try {
       await updateServiceTypesMutation.mutateAsync({ serviceTypes: next });
@@ -258,11 +257,10 @@ export const WorkingStatusScreen = () => {
 
       <CardInfo title="Trạng thái hệ thống">
         <StatusBadge status={overview.isOnline ? 'online' : 'offline'} />
-        <Text style={styles.meta}>Loại hình hoạt động: {selectedTypes.length || 0}</Text>
         <Text style={styles.meta}>Khu vực hoạt động: {overview.operationZone}</Text>
         <Text style={styles.meta}>GPS: {overview.gpsStatus}</Text>
-        <Text style={styles.meta}>Quyền vị trí: {overview.permissionStatus}</Text>
-        <Text style={styles.meta}>Kết nối mạng: {overview.networkStatus}</Text>
+        <Text style={styles.meta}>Quyền vị trí: {overview.permissionStatus === 'granted' ? 'Đã cấp' : 'Chưa cấp'}</Text>
+        <Text style={styles.meta}>Kết nối mạng: {overview.networkStatus === 'online' ? 'Trực tuyến' : 'Không có kết nối'}</Text>
       </CardInfo>
 
       <CardInfo title="Cập nhật vị trí hiện tại">

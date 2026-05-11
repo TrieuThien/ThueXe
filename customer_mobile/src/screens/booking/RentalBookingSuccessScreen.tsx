@@ -29,7 +29,7 @@ export function RentalBookingSuccessScreen({ navigation, route }: Props) {
             navigation.navigate("BookingHome");
           }}
         />
-        <PrimaryButton title="Xem lịch sử" onPress={() => navigation.navigate("BookingHistory")} />
+        <PrimaryButton title="Xem lịch sử" onPress={() => navigation.navigate("DriverHireHistory")} />
       </View>
     </SafeAreaView>
   );

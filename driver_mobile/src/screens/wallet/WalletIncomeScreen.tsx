@@ -143,7 +143,7 @@ export const WalletIncomeScreen = () => {
     <MainLayout title="Ví và thu nhập" scrollable={false}>
       <FlatList
         data={isTransactionTab ? transactionItems : []}
-        keyExtractor={(item) => `transaction-${item.createdAt}-${item.amount}`}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => <TransactionItem item={item} />}
         ListHeaderComponent={header}
         contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + 16 }]}

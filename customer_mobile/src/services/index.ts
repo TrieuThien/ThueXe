@@ -11,5 +11,6 @@ export * from "./walletService";
 export * from "./trackingService";
 export * from "./api/client";
 export * from "./api/authApiClient";
+export * from "./api/socketService";
 export * from "./api/modules";
 export * from "./api/errors";

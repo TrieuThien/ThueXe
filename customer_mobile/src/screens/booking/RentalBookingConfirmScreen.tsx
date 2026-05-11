@@ -15,6 +15,7 @@ type Props = NativeStackScreenProps<BookingStackParamList, "RentalBookingConfirm
 export function RentalBookingConfirmScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const criteria = useRentalFlowStore((state) => state.criteria);
+  const selectedServiceType = useRentalFlowStore((state) => state.selectedServiceType);
   const selectedPackage = useRentalFlowStore((state) => state.selectedPackage);
   const couponCode = useRentalFlowStore((state) => state.couponCode);
   const note = useRentalFlowStore((state) => state.note);
@@ -93,17 +94,28 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
                 {
                   text: "Nạp tiền ngay",
                   onPress: () => {
-                    navigation.replace("RentalBookingSuccess", {
-                      bookingId,
-                      status: result.bookingStatus,
-                      message: result.message,
-                    });
+                    // Navigate to searching driver screen first for driver hiring
+                    if (selectedServiceType === "RENTAL_DRIVER") {
+                      navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+                    } else {
+                      navigation.replace("RentalBookingSuccess", {
+                        bookingId,
+                        status: result.bookingStatus,
+                        message: result.message,
+                      });
+                    };
                     (navigation.getParent() as any)?.navigate("Wallet", { screen: "TopUpWallet" });
                   },
                 },
                 {
                   text: "Để sau",
-                  onPress: () => navigation.replace("RentalBookingSuccess", { bookingId, status: result.bookingStatus, message: result.message }),
+                  onPress: () => {
+                    if (selectedServiceType === "RENTAL_DRIVER") {
+                      navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+                    } else {
+                      navigation.replace("RentalBookingSuccess", { bookingId, status: result.bookingStatus, message: result.message });
+                    }
+                  },
                 },
               ],
             );
@@ -113,11 +125,16 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
         }
       }
 
-      navigation.replace("RentalBookingSuccess", {
-        bookingId,
-        status: result.bookingStatus,
-        message: result.message,
-      });
+      // Navigate based on service type
+      if (selectedServiceType === "RENTAL_DRIVER") {
+        navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+      } else {
+        navigation.replace("RentalBookingSuccess", {
+          bookingId,
+          status: result.bookingStatus,
+          message: result.message,
+        });
+      }
     } catch {
       // errors displayed below
     }

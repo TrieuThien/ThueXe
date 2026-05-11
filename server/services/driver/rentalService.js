@@ -15,6 +15,7 @@ import {
     updateScheduleSlot,
 } from "../../repositories/driver/rentalRepository.js";
 import { emitToUser } from "../../socket/index.js";
+import { processPaymentAfterRentalCompletion } from "../rentalPaymentService.js";
 
 // ─── In-memory pause sessions ──────────────────────────────────────────────────
 // Key: rentalId, Value: { isPaused, pausedAt, totalPausedMs }
@@ -450,6 +451,22 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
 
         // Xóa pause session sau khi hoàn thành
         pauseSessions.delete(id);
+
+        // Trigger payment processing (async, fire-and-forget)
+        // Fetch fresh rental data for payment processor
+        const completed = {
+            rental_id: id,
+            user_id: booking.user_id,
+            driver_id: booking.driver_id,
+            payment_type: booking.payment_type,
+            total_price: totalPrice,
+            payment_status: booking.payment_status, // will be 'pending'
+        };
+
+        // Process payment asynchronously, don't block response
+        processPaymentAfterRentalCompletion(completed).catch((err) => {
+            console.error(`[CompleteRental] Payment processing failed for rental ${id}:`, err);
+        });
 
         return {
             rental_id:          id,

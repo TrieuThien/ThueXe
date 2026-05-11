@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ThueXe - Tài xế",
-    "slug": "Nền tảng hiệu quả cho tài xế",
+    "name": "ThueXe Driver",
+    "slug": "ThueXe_driver_mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/thuexe-logo.png",
