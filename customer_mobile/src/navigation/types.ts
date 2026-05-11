@@ -1,5 +1,6 @@
 import { NavigatorScreenParams } from "@react-navigation/native";
 import { AuthIdentifierType, AuthOtpPurpose } from "../types";
+import type { DriverHireBookingDetail } from "../services/api/modules/driverHireApi";
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -33,6 +34,15 @@ export type BookingStackParamList = {
   RentalPackageList: undefined;
   /** Danh sách xe khả dụng của gói thuê, sau khi chọn gói trên màn hình nearby */
   RentalPackageCars: { packageId: number; packageName: string; packageBasePrice?: number; packageDurationHours?: number };
+  /** Xác nhận thuê tài xế — dành riêng cho RENTAL_DRIVER, bỏ qua bước chọn xe */
+  DriverHireConfirm: {
+    packageId: number;
+    packageName: string;
+    basePrice: number;
+    depositAmount: number;
+    durationHours?: number;
+    distanceLimitKm?: number;
+  };
   /** Chi tiết xe thuê – truyền toàn bộ object xe để tránh fetch thêm */
   RentalCarDetail: {
     car: {
@@ -97,6 +107,8 @@ export type BookingStackParamList = {
   RideVehicleSelection: undefined;
   RideBookingConfirm: undefined;
   RideSearchingDriver: { bookingId: string };
+  DriverSearch: { bookingId: number; packageName?: string };
+  DriverFound: { bookingId: number; booking: DriverHireBookingDetail };
   BookingHistory: undefined;
   RentalHistory: undefined;
   DriverHireHistory: undefined;

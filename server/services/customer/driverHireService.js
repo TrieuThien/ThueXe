@@ -15,6 +15,12 @@ import {
     getDriverHireBookingDetail,
     hasActiveDriverHireBooking,
 } from "../../repositories/customer/driverHireRepository.js";
+import {
+    findWalletByActorForUpdate,
+    insertPayment,
+    updateWalletBalance,
+    insertWalletLedger,
+} from "../../repositories/customer/rentalRepository.js";
 import { startDriverMatching } from "../matching/driverMatchingService.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,34 +115,94 @@ export async function createDriverHireBookingService(auth, body) {
         throw new AppError("Tọa độ đón không hợp lệ.", 422, "INVALID_COORDINATES");
     }
 
-    const basePrice    = Number(pkg.base_price    || 0);
+    const basePrice     = Number(pkg.base_price    || 0);
     const depositAmount = Number(pkg.deposit_amount || 0);
-    const totalPrice   = Number((basePrice + depositAmount).toFixed(2));
+    const totalPrice    = Number((basePrice + depositAmount).toFixed(2));
+    const paymentType   = body.payment_type ? Number(body.payment_type) : null;
 
     const rentalCode = generateRentalCode();
 
-    const rentalId = await createDriverHireBooking({
-        rentalCode,
-        userId,
-        packageId,
-        bookingType,
-        startDatetime:  startSql,
-        endDatetime:    endSql,
-        pickupAddress:  body.pickup_address,
-        pickupLat,
-        pickupLng,
-        dropoffAddress: body.dropoff_address || null,
-        basePrice,
-        depositAmount,
-        totalPrice,
-        paymentType:    body.payment_type ? Number(body.payment_type) : null,
-        note:           body.note || null,
-        searchRadiusKm: 2,
-    });
+    const conn = await sqldb.getConnection();
+    let rentalId;
+    try {
+        await conn.beginTransaction();
 
-    // Kích hoạt auto-matching bất đồng bộ (chỉ immediate)
+        rentalId = await createDriverHireBooking({
+            rentalCode,
+            userId,
+            packageId,
+            bookingType,
+            startDatetime:  startSql,
+            endDatetime:    endSql,
+            pickupAddress:  body.pickup_address,
+            pickupLat,
+            pickupLng,
+            dropoffAddress: body.dropoff_address || null,
+            basePrice,
+            depositAmount,
+            totalPrice,
+            paymentType,
+            note:           body.note || null,
+            searchRadiusKm: 2,
+        }, conn);
+
+        if (paymentType === 2) {
+            const wallet = await findWalletByActorForUpdate({ actorType: 0, actorId: userId }, conn);
+            if (!wallet || Number(wallet.status) !== 1) {
+                throw new AppError("Ví không khả dụng.", 409, "WALLET_UNAVAILABLE");
+            }
+            const currentBalance = Number(wallet.balance || 0);
+            if (currentBalance < totalPrice) {
+                throw new AppError(
+                    `Số dư ví không đủ (cần ${totalPrice}, hiện có ${currentBalance}).`,
+                    409,
+                    "INSUFFICIENT_WALLET_BALANCE"
+                );
+            }
+            const newBalance = Number((currentBalance - totalPrice).toFixed(2));
+            const paymentId = await insertPayment({
+                payment_code:    crypto.randomBytes(8).toString("hex").toUpperCase(),
+                payer_wallet_id: Number(wallet.wallet_id),
+                actor_type:      0,
+                actor_id:        userId,
+                service_domain:  1,
+                rental_id:       rentalId,
+                amount:          totalPrice,
+                currency_id:     Number(wallet.currency_id || 1),
+                status:          "paid",
+                description:     `Thuê tài xế #${rentalId}`,
+            }, conn);
+            await updateWalletBalance(Number(wallet.wallet_id), newBalance, conn);
+            await insertWalletLedger({
+                wallet_id:     Number(wallet.wallet_id),
+                payment_id:    paymentId,
+                amount:        totalPrice,
+                balance_after: newBalance,
+                direction:     "debit",
+                entry_type:    "payment",
+                source_type:   "rental_booking",
+                source_id:     rentalId,
+                description:   `Thanh toán thuê tài xế #${rentalId}`,
+            }, conn);
+            await conn.query(
+                `UPDATE rental_bookings SET payment_status='deposit_paid' WHERE rental_id=? LIMIT 1`,
+                [rentalId]
+            );
+        }
+
+        await conn.commit();
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+
+    // Kích hoạt auto-matching bất đồng bộ (chỉ immediate) — after commit
     if (bookingType === "immediate") {
-        startDriverMatching(rentalId, pickupLat, pickupLng, packageId, userId);
+        // service_type 3 (xe kèm tài xế) → available_for_rental=2; còn lại (service_type 2) → 1
+        const rentalType = Number(pkg.service_type) === 3 ? 2 : 1;
+        startDriverMatching(rentalId, pickupLat, pickupLng, packageId, userId, rentalType);
     }
 
     return {

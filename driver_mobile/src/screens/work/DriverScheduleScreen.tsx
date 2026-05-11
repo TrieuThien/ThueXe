@@ -1,12 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { MainLayout } from '../../layouts/MainLayout';
-import { AppButton } from '../../components/common';
 import { EmptyState, ErrorState, LoadingState } from '../../components/states';
 import {
-  useCreateUnavailableSlotMutation,
   useDriverScheduleQuery,
   useUpdateDriverScheduleSlotMutation
 } from '../../hooks/useDriverScheduleQueries';
@@ -89,45 +87,17 @@ export const DriverScheduleScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<WorkStackParamList>>();
   const [viewMode, setViewMode] = useState<ScheduleViewMode>('day');
   const [focusDate, setFocusDate] = useState(new Date());
-  const [startHourInput, setStartHourInput] = useState('12');
-  const [endHourInput, setEndHourInput] = useState('14');
-  const [noteInput, setNoteInput] = useState('Tạm ngưng hoạt động');
-  const [errorText, setErrorText] = useState('');
 
   const dateIso = useMemo(() => {
-    const item = new Date(focusDate);
-    item.setHours(0, 0, 0, 0);
-    return item.toISOString();
+    const d = new Date(focusDate);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   }, [focusDate]);
 
   const scheduleQuery = useDriverScheduleQuery(dateIso, viewMode);
-  const createUnavailableMutation = useCreateUnavailableSlotMutation(dateIso, viewMode);
   const updateSlotMutation = useUpdateDriverScheduleSlotMutation(dateIso, viewMode);
-
-  const onCreateUnavailable = () => {
-    if (!scheduleQuery.data) {
-      return;
-    }
-    const startHour = Number(startHourInput);
-    const endHour = Number(endHourInput);
-
-    if (Number.isNaN(startHour) || Number.isNaN(endHour) || endHour <= startHour) {
-      setErrorText('Khoảng giờ không hợp lệ. Ví dụ 12 -> 14.');
-      return;
-    }
-
-    const start = new Date(focusDate);
-    start.setHours(startHour, 0, 0, 0);
-    const end = new Date(focusDate);
-    end.setHours(endHour, 0, 0, 0);
-
-    setErrorText('');
-    createUnavailableMutation.mutate({
-      startAt: start.toISOString(),
-      endAt: end.toISOString(),
-      note: noteInput.trim() || undefined
-    });
-  };
 
   const onPressTimelineSlot = (slot: DriverScheduleSlot) => {
     if (slot.status === 'booked' && slot.bookingId) {
@@ -229,37 +199,6 @@ export const DriverScheduleScreen = () => {
           );
         }}
       />
-
-      <View style={styles.blockCard}>
-        <Text style={styles.blockTitle}>Khung giờ tạm ngừng hoạt động</Text>
-        <View style={styles.blockInputRow}>
-          <TextInput
-            value={startHourInput}
-            onChangeText={setStartHourInput}
-            keyboardType="number-pad"
-            style={styles.hourInput}
-            placeholder="Bắt đầu"
-            placeholderTextColor="#94A3B8"
-          />
-          <TextInput
-            value={endHourInput}
-            onChangeText={setEndHourInput}
-            keyboardType="number-pad"
-            style={styles.hourInput}
-            placeholder="Kết thúc"
-            placeholderTextColor="#94A3B8"
-          />
-        </View>
-        <TextInput
-          value={noteInput}
-          onChangeText={setNoteInput}
-          style={styles.noteInput}
-          placeholder="Ghi chú"
-          placeholderTextColor="#94A3B8"
-        />
-        {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
-        <AppButton title="Tạo" onPress={onCreateUnavailable} loading={createUnavailableMutation.isPending} />
-      </View>
 
       <View style={styles.bookingWrap}>
         <Text style={styles.blockTitle}>Chuyến đi đã được gán</Text>
@@ -373,44 +312,10 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontSize: 12
   },
-  blockCard: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    padding: 12,
-    gap: 8,
-    backgroundColor: '#FFFFFF'
-  },
   blockTitle: {
     color: '#0F172A',
     fontWeight: '800',
     fontSize: 15
-  },
-  blockInputRow: {
-    flexDirection: 'row',
-    gap: 8
-  },
-  hourInput: {
-    flex: 1,
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    color: '#0F172A'
-  },
-  noteInput: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    color: '#0F172A'
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '600'
   },
   bookingWrap: {
     gap: 8

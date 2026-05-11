@@ -28,6 +28,9 @@ export * from "./booking/RideLocationDropoffScreen";
 export * from "./booking/RideVehicleSelectionScreen";
 export * from "./booking/RideBookingConfirmScreen";
 export * from "./booking/RideSearchingDriverScreen";
+export { DriverSearchScreen } from "./booking/DriverSearchScreen";
+export { DriverFoundScreen } from "./booking/DriverFoundScreen";
+export { DriverHireConfirmScreen } from "./booking/DriverHireConfirmScreen";
 
 export * from "./wallet/PaymentMethodScreen";
 export * from "./wallet/WalletScreen";

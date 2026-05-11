@@ -4,7 +4,10 @@ import {
   BookingDetailScreen,
   BookingHistoryScreen,
   BookingHomeScreen,
+  DriverFoundScreen,
+  DriverHireConfirmScreen,
   DriverHireHistoryScreen,
+  DriverSearchScreen,
   RentalBookingConfirmScreen,
   RentalBookingDetailScreen,
   RentalBookingFormScreen,
@@ -51,6 +54,7 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RentalLocationMapPicker" component={RentalLocationMapPickerScreen} />
       <Stack.Screen name="RentalPackageList" component={RentalPackageListScreen} />
       <Stack.Screen name="RentalPackageCars" component={RentalPackageCarsScreen} />
+      <Stack.Screen name="DriverHireConfirm" component={DriverHireConfirmScreen} />
       <Stack.Screen name="RentalCarDetail" component={RentalCarDetailScreen} />
       <Stack.Screen name="RentalVehicleConfirm" component={RentalVehicleConfirmScreen} />
       <Stack.Screen name="RentalBookingConfirm" component={RentalBookingConfirmScreen} />
@@ -61,6 +65,8 @@ export function BookingStackNavigator() {
       <Stack.Screen name="RideVehicleSelection" component={RideVehicleSelectionScreen} />
       <Stack.Screen name="RideBookingConfirm" component={RideBookingConfirmScreen} />
       <Stack.Screen name="RideSearchingDriver" component={RideSearchingDriverScreen} />
+      <Stack.Screen name="DriverSearch" component={DriverSearchScreen} />
+      <Stack.Screen name="DriverFound" component={DriverFoundScreen} />
       <Stack.Screen name="BookingHistory" component={BookingHistoryScreen} />
       <Stack.Screen name="RentalHistory" component={RentalHistoryScreen} />
       <Stack.Screen name="DriverHireHistory" component={DriverHireHistoryScreen} />

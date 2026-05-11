@@ -1,5 +1,6 @@
-﻿import React, { useCallback } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,6 +15,7 @@ import type {
 } from '../types/navigation';
 import { useDriverHireStore } from '../store/driverHireStore';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
+import { PackagesScreen } from '../screens/rental/PackagesScreen';
 import { WorkingStatusScreen } from '../screens/work/WorkingStatusScreen';
 import { DriverScheduleScreen } from '../screens/work/DriverScheduleScreen';
 import { CurrentTripScreen } from '../screens/trip/CurrentTripScreen';
@@ -41,7 +43,8 @@ import { useAuthStore } from '../store/authStore';
 import { useRideRequests } from '../hooks/useRideRequests';
 import { useRentRequests } from '../hooks/useRentRequests';
 import RideRequestModal from '../screens/booking/RideRequestModal';
-import RequestModal from '../screens/rental/RequestModal';
+import RequestModal, { type RentRequest } from '../screens/rental/RequestModal';
+import { setupAndRegisterPushToken } from '../services/notifications/pushNotificationService';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -68,6 +71,7 @@ const iconByRoute: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap
 const DashboardStackScreen = () => (
   <DashboardStack.Navigator screenOptions={stackScreenOptions}>
     <DashboardStack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+    <DashboardStack.Screen name="PackagesList" component={PackagesScreen} options={{ title: 'Đăng ký gói cho thuê' }} />
   </DashboardStack.Navigator>
 );
 
@@ -148,19 +152,57 @@ export const MainNavigator = () => {
   const { rentRequest, dismissRentRequest } = useRentRequests(accessToken);
   const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
 
+  // Push notification: request received while app is background/killed
+  const [notifRentRequest, setNotifRentRequest] = useState<RentRequest | null>(null);
+  const notifListenerRef = useRef<Notifications.Subscription | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
+    // Register push token once per login session
+    setupAndRegisterPushToken();
+
+    // Handle notification TAP (background → foreground, or killed → foreground)
+    notifListenerRef.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
+        setNotifRentRequest(data as unknown as RentRequest);
+      }
+    });
+
+    // Handle notification tap when app was fully killed
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
+        setNotifRentRequest(data as unknown as RentRequest);
+      }
+    });
+
+    return () => {
+      notifListenerRef.current?.remove();
+    };
+  }, [accessToken]);
+
+  const effectiveRentRequest = rentRequest ?? notifRentRequest;
+  const dismissEffectiveRentRequest = useCallback(() => {
+    dismissRentRequest();
+    setNotifRentRequest(null);
+  }, [dismissRentRequest]);
+
   // Lưu pending navigation vào store; WorkingStatusScreen sẽ xử lý navigate thực tế
   const handleRentAccepted = useCallback((bookingId: number) => {
     setPendingRentalNav({
       rentalId: String(bookingId),
-      pickupLat: rentRequest?.pickup_lat,
-      pickupLng: rentRequest?.pickup_lng,
+      pickupLat: effectiveRentRequest?.pickup_lat,
+      pickupLng: effectiveRentRequest?.pickup_lng,
     });
-  }, [rentRequest, setPendingRentalNav]);
+  }, [effectiveRentRequest, setPendingRentalNav]);
 
   return (
     <>
     <RideRequestModal request={rideRequest} onClose={dismissRideRequest} />
-    <RequestModal request={rentRequest} onClose={dismissRentRequest} onAccepted={handleRentAccepted} />
+    <RequestModal request={effectiveRentRequest} onClose={dismissEffectiveRentRequest} onAccepted={handleRentAccepted} />
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
       headerTitleAlign: 'center',

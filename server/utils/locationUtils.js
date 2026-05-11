@@ -143,7 +143,7 @@ export function isPointInCoverage(lat, lng, pkg) {
  * @param {number[]} excludeIds
  * @returns {Promise<Array>}
  */
-export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null, excludeIds = []) {
+export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null, excludeIds = [], rentalType = 1) {
     const latDelta = radiusKm / 111;
     const lngDelta = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
 
@@ -171,6 +171,8 @@ export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null
     params.push(minLat, maxLat, minLng, maxLng);
     // stale threshold
     params.push(STALE_MINUTES);
+    // available_for_rental filter
+    params.push(rentalType);
     // excludeIds
     if (excludeIds.length > 0) params.push(...excludeIds);
     // HAVING radius
@@ -190,6 +192,7 @@ export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null
              d.photo_file,
              d.driver_rating,
              d.booking_cancel_freq,
+             d.push_notification_token,
              dcl.lat,
              dcl.long AS lng,
              (
@@ -207,7 +210,7 @@ export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null
            AND d.account_deleted     = 0
            AND d.available           = 1
            AND d.operation_status    = 0
-           AND d.available_for_rental = 1
+           AND d.available_for_rental = ?
            AND dcl.lat  BETWEEN ? AND ?
            AND dcl.long BETWEEN ? AND ?
            AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)
@@ -225,16 +228,17 @@ export async function findNearbyDrivers(lat, lng, radiusKm = 2, packageId = null
     );
 
     return rows.map((row) => ({
-        driver_id:           Number(row.driver_id),
-        firstname:           row.firstname,
-        lastname:            row.lastname,
-        phone:               row.phone,
-        photo_file:          row.photo_file,
-        driver_rating:       Number(row.driver_rating),
-        booking_cancel_freq: Number(row.booking_cancel_freq),
-        lat:                 Number(row.lat),
-        lng:                 Number(row.lng),
-        distance_km:         Number(Number(row.distance_km).toFixed(3)),
+        driver_id:                Number(row.driver_id),
+        firstname:                row.firstname,
+        lastname:                 row.lastname,
+        phone:                    row.phone,
+        photo_file:               row.photo_file,
+        driver_rating:            Number(row.driver_rating),
+        booking_cancel_freq:      Number(row.booking_cancel_freq),
+        push_notification_token:  row.push_notification_token ?? null,
+        lat:                      Number(row.lat),
+        lng:                      Number(row.lng),
+        distance_km:              Number(Number(row.distance_km).toFixed(3)),
     }));
 }
 

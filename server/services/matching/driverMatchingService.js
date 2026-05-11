@@ -37,6 +37,7 @@ import {
 } from "../../repositories/matching/matchingRepository.js";
 import { emitToDriver, emitToUser } from "../../socket/index.js";
 import { publishRealtimeEvent } from "../../utils/realtime.js";
+import { sendExpoPush } from "../../utils/expoPush.js";
 
 // ─── In-memory lock (thay bằng Redis nếu multi-process) ──────────────────────
 // Key: bookingId, Value: true (đang trong quá trình assign)
@@ -62,9 +63,9 @@ const MAX_SEARCH_RADIUS_KM = 5;     // mở rộng khi không đủ tài xế 2k
  * @param {number} packageId
  * @param {number} customerId - user_id của khách
  */
-export function startDriverMatching(bookingId, pickupLat, pickupLng, packageId, customerId) {
+export function startDriverMatching(bookingId, pickupLat, pickupLng, packageId, customerId, rentalType = 1) {
     // Fire-and-forget — lỗi được log nhưng không throw
-    _matchNextDriver(bookingId, pickupLat, pickupLng, packageId, customerId, []).catch((err) => {
+    _matchNextDriver(bookingId, pickupLat, pickupLng, packageId, customerId, [], rentalType).catch((err) => {
         console.error(`[Matching] bookingId=${bookingId} fatal error:`, err.message);
     });
 }
@@ -205,7 +206,7 @@ export async function cancelSearchingBooking(bookingId, userId) {
 
 // ─── Internal matching loop ───────────────────────────────────────────────────
 
-async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, triedIds) {
+async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, triedIds, rentalType = 1) {
     // Kiểm tra booking còn hiệu lực
     const [bookingRows] = await sqldb.query(
         `SELECT status, driver_id FROM rental_bookings WHERE rental_id = ? LIMIT 1`,
@@ -218,10 +219,10 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
 
     // Tìm tài xế trong 2km trước, nếu không đủ mở rộng lên 5km
     let radius = SEARCH_RADIUS_KM;
-    let drivers = await findNearbyDrivers(lat, lng, radius, packageId, triedIds);
+    let drivers = await findNearbyDrivers(lat, lng, radius, packageId, triedIds, rentalType);
     if (drivers.length === 0 && radius < MAX_SEARCH_RADIUS_KM) {
         radius = MAX_SEARCH_RADIUS_KM;
-        drivers = await findNearbyDrivers(lat, lng, radius, packageId, triedIds);
+        drivers = await findNearbyDrivers(lat, lng, radius, packageId, triedIds, rentalType);
     }
 
     if (drivers.length === 0) {
@@ -324,6 +325,16 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
     publishRealtimeEvent("NEW_DRIVER_RENT_REQUEST", rentRequestPayload, { targetUserIds: [driverId] });
     emitToDriver(driverId, "NEW_DRIVER_RENT_REQUEST", rentRequestPayload);
 
+    // Push notification (app background/killed)
+    if (driver.push_notification_token) {
+        sendExpoPush(driver.push_notification_token, {
+            title: "Yêu cầu thuê tài xế mới",
+            body: `Khách cần tài xế, cách ${driver.distance_km.toFixed(1)} km`,
+            channelId: "driver-requests",
+            data: { type: "NEW_DRIVER_RENT_REQUEST", ...rentRequestPayload },
+        }).catch(() => {}); // non-blocking, errors already logged inside
+    }
+
     // Thông báo khách đang tìm
     emitToUser(customerId, "SEARCHING_DRIVER", {
         bookingId,
@@ -346,7 +357,7 @@ async function _matchNextDriver(bookingId, lat, lng, packageId, customerId, trie
             console.info(`[Matching] bookingId=${bookingId} driverId=${driverId} TIMEOUT`);
 
             // Gửi tài xế tiếp theo
-            await _matchNextDriver(bookingId, lat, lng, packageId, customerId, [...triedIds, driverId]);
+            await _matchNextDriver(bookingId, lat, lng, packageId, customerId, [...triedIds, driverId], rentalType);
         } catch (err) {
             console.error(`[Matching] timeout handler error bookingId=${bookingId}:`, err.message);
         }
