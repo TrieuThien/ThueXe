@@ -31,7 +31,7 @@ function assertDriver(auth) {
 }
 
 function normalizePagination(query = {}) {
-    const page  = Math.max(Number(query.page  || 1),   1);
+    const page = Math.max(Number(query.page || 1), 1);
     const limit = Math.min(Math.max(Number(query.limit || 20), 1), 100);
     return { page, limit, offset: (page - 1) * limit };
 }
@@ -55,8 +55,8 @@ const DRIVER_SERVICE_TYPES = new Set([2, 3]);
 /**
  * Valid status transitions for driver actions.
  */
-const ACCEPT_FROM   = new Set(["scheduled"]);
-const START_FROM    = new Set(["pending"]);
+const ACCEPT_FROM = new Set(["scheduled"]);
+const START_FROM = new Set(["pending"]);
 const COMPLETE_FROM = new Set(["in_progress"]);
 
 // ─── Schedule availability ────────────────────────────────────────────────────
@@ -69,9 +69,9 @@ export async function getAvailability(auth, query = {}) {
     const { page, limit, offset } = normalizePagination(query);
 
     const filters = {
-        status:   query.status   || undefined,
+        status: query.status || undefined,
         fromDate: query.fromDate || undefined,
-        toDate:   query.toDate   || undefined,
+        toDate: query.toDate || undefined,
     };
 
     const [items, total] = await Promise.all([
@@ -84,8 +84,8 @@ export async function getAvailability(auth, query = {}) {
         pagination: {
             page,
             limit,
-            total_items:  total,
-            total_pages:  Math.ceil(total / limit),
+            total_items: total,
+            total_pages: Math.ceil(total / limit),
         },
     };
 }
@@ -101,7 +101,7 @@ export async function createAvailability(auth, payload) {
     const driverId = assertDriver(auth);
 
     const start = new Date(payload.start_datetime);
-    const end   = new Date(payload.end_datetime);
+    const end = new Date(payload.end_datetime);
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
         throw new AppError("start_datetime and end_datetime must be valid datetimes.", 422, "INVALID_DATETIME");
@@ -114,7 +114,7 @@ export async function createAvailability(auth, payload) {
     }
 
     const startSql = toMySqlDatetime(start);
-    const endSql   = toMySqlDatetime(end);
+    const endSql = toMySqlDatetime(end);
 
     const overlaps = await countOverlappingSlots(driverId, startSql, endSql);
     if (overlaps > 0) {
@@ -125,13 +125,13 @@ export async function createAvailability(auth, payload) {
         );
     }
 
-    const status     = payload.status === "unavailable" ? "unavailable" : "available";
+    const status = payload.status === "unavailable" ? "unavailable" : "available";
     const scheduleId = await insertScheduleSlot({
         driverId,
         startDatetime: startSql,
-        endDatetime:   endSql,
-        locationLong:  payload.location_long  ?? null,
-        locationLat:   payload.location_lat   ?? null,
+        endDatetime: endSql,
+        locationLong: payload.location_long ?? null,
+        locationLat: payload.location_lat ?? null,
         status,
     });
 
@@ -176,12 +176,12 @@ export async function patchAvailability(auth, scheduleId, payload) {
         }
 
         const startSql = toMySqlDatetime(newStart);
-        const endSql   = toMySqlDatetime(newEnd);
+        const endSql = toMySqlDatetime(newEnd);
 
         // Only re-check overlap if datetime changed
         const datetimeChanged =
             startSql !== toMySqlDatetime(new Date(slot.start_datetime)) ||
-            endSql   !== toMySqlDatetime(new Date(slot.end_datetime));
+            endSql !== toMySqlDatetime(new Date(slot.end_datetime));
 
         if (datetimeChanged) {
             const overlaps = await countOverlappingSlots(driverId, startSql, endSql, id, conn);
@@ -197,9 +197,9 @@ export async function patchAvailability(auth, scheduleId, payload) {
         // Build update payload — only defined fields
         const updates = {};
         if (payload.start_datetime !== undefined) updates.startDatetime = startSql;
-        if (payload.end_datetime   !== undefined) updates.endDatetime   = endSql;
-        if (payload.location_long  !== undefined) updates.locationLong  = payload.location_long  ?? null;
-        if (payload.location_lat   !== undefined) updates.locationLat   = payload.location_lat   ?? null;
+        if (payload.end_datetime !== undefined) updates.endDatetime = endSql;
+        if (payload.location_long !== undefined) updates.locationLong = payload.location_long ?? null;
+        if (payload.location_lat !== undefined) updates.locationLat = payload.location_lat ?? null;
         if (payload.status !== undefined && payload.status !== "booked") {
             updates.status = payload.status;
         }
@@ -257,9 +257,9 @@ export async function getRentalBookings(auth, query = {}) {
     const { page, limit, offset } = normalizePagination(query);
 
     const filters = {
-        status:      query.status       || undefined,
-        fromDate:    query.fromDate      || undefined,
-        toDate:      query.toDate        || undefined,
+        status: query.status || undefined,
+        fromDate: query.fromDate || undefined,
+        toDate: query.toDate || undefined,
         serviceType: query.service_type !== undefined ? Number(query.service_type) : undefined,
         limit,
         offset,
@@ -409,16 +409,16 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
             );
         }
 
-        const now       = new Date();
-        const endDt     = new Date(booking.end_datetime);
+        const now = new Date();
+        const endDt = new Date(booking.end_datetime);
         const actualEnd = toMySqlDatetime(now);
 
         // ── Overtime calculation ──────────────────────────────────────────────
-        let extraTimeFee     = round2(booking.extra_time_fee);      // keep existing if no package
+        let extraTimeFee = round2(booking.extra_time_fee);      // keep existing if no package
         let extraDistanceFee = round2(booking.extra_distance_fee);  // keep existing
 
         if (booking.duration_hours && booking.extra_hour_fee > 0 && now > endDt) {
-            const overtimeMs    = now.getTime() - endDt.getTime();
+            const overtimeMs = now.getTime() - endDt.getTime();
             const overtimeHours = Math.ceil(overtimeMs / (60 * 60 * 1000));
             extraTimeFee = round2(overtimeHours * Number(booking.extra_hour_fee));
         }
@@ -437,12 +437,12 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
 
         await completeRentalBooking(
             {
-                rentalId:             id,
-                actualEndDatetime:    actualEnd,
+                rentalId: id,
+                actualEndDatetime: actualEnd,
                 extraTimeFee,
                 extraDistanceFee,
                 totalPrice,
-                distanceTravelledKm:  distKm,
+                distanceTravelledKm: distKm,
             },
             conn
         );
@@ -469,12 +469,12 @@ export async function completeRentalBookingService(auth, rentalId, payload = {})
         });
 
         return {
-            rental_id:          id,
-            status:             "completed",
+            rental_id: id,
+            status: "completed",
             actual_end_datetime: actualEnd,
-            extra_time_fee:     extraTimeFee,
+            extra_time_fee: extraTimeFee,
             extra_distance_fee: extraDistanceFee,
-            total_price:        totalPrice,
+            total_price: totalPrice,
         };
     } catch (err) {
         await conn.rollback();
@@ -538,8 +538,8 @@ export async function pauseRentalBooking(auth, rentalId) {
     }
 
     pauseSessions.set(id, {
-        isPaused:     true,
-        pausedAt:     Date.now(),
+        isPaused: true,
+        pausedAt: Date.now(),
         totalPausedMs: session.totalPausedMs,
     });
 
@@ -572,8 +572,8 @@ export async function resumeRentalBooking(auth, rentalId) {
 
     const addedMs = Date.now() - session.pausedAt;
     pauseSessions.set(id, {
-        isPaused:     false,
-        pausedAt:     0,
+        isPaused: false,
+        pausedAt: 0,
         totalPausedMs: session.totalPausedMs + addedMs,
     });
 
@@ -599,36 +599,36 @@ export async function getRentalSummary(auth, rentalId) {
     const totalPausedMin = Math.floor(totalPausedMs / 60000);
 
     const startDt = new Date(booking.start_datetime);
-    const endDt   = booking.actual_end_datetime
+    const endDt = booking.actual_end_datetime
         ? new Date(booking.actual_end_datetime)
         : new Date();
 
-    const totalElapsedMs   = Math.max(endDt.getTime() - startDt.getTime(), 0);
-    const billableMs       = Math.max(totalElapsedMs - totalPausedMs, 0);
-    const billableMin      = Math.floor(billableMs / 60000);
-    const billableHours    = billableMin / 60;
+    const totalElapsedMs = Math.max(endDt.getTime() - startDt.getTime(), 0);
+    const billableMs = Math.max(totalElapsedMs - totalPausedMs, 0);
+    const billableMin = Math.floor(billableMs / 60000);
+    const billableHours = billableMin / 60;
 
-    const platformFeeRate  = 0.2; // 20% phí platform — nên đưa vào config
-    const actualCost       = round2(booking.total_price);
-    const driverEarnings   = round2(actualCost * (1 - platformFeeRate));
+    const platformFeeRate = 0.2; // 20% phí platform — nên đưa vào config
+    const actualCost = round2(booking.total_price);
+    const driverEarnings = round2(actualCost * (1 - platformFeeRate));
 
     return {
-        rental_id:           id,
-        rental_code:         booking.rental_code,
-        status:              booking.status,
-        customer_name:       booking.user_name,
-        pickup_address:      booking.pickup_address,
-        start_datetime:      booking.start_datetime,
+        rental_id: id,
+        rental_code: booking.rental_code,
+        status: booking.status,
+        customer_name: booking.user_name,
+        pickup_address: booking.pickup_address,
+        start_datetime: booking.start_datetime,
         actual_end_datetime: booking.actual_end_datetime,
-        total_elapsed_min:   Math.floor(totalElapsedMs / 60000),
-        total_paused_min:    totalPausedMin,
-        billable_min:        billableMin,
-        billable_hours:      round2(billableHours),
-        base_price:          round2(booking.base_price),
-        extra_time_fee:      round2(booking.extra_time_fee),
-        extra_distance_fee:  round2(booking.extra_distance_fee),
-        actual_cost:         actualCost,
-        driver_earnings:     driverEarnings,
-        payment_status:      booking.payment_status,
+        total_elapsed_min: Math.floor(totalElapsedMs / 60000),
+        total_paused_min: totalPausedMin,
+        billable_min: billableMin,
+        billable_hours: round2(billableHours),
+        base_price: round2(booking.base_price),
+        extra_time_fee: round2(booking.extra_time_fee),
+        extra_distance_fee: round2(booking.extra_distance_fee),
+        actual_cost: actualCost,
+        driver_earnings: driverEarnings,
+        payment_status: booking.payment_status,
     };
 }

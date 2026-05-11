@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để hoạt động và cập nhật vị trí của bạn cho những người đặt xe.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Ứng dụng cần quyền vị trí để hoạt động và cập nhật vị trí của bạn cho những người đặt xe."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +24,11 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Nntnghiuquchotix"
+      "package": "com.anonymous.Nntnghiuquchotix",
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",

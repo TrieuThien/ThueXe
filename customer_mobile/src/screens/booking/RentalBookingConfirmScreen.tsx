@@ -34,11 +34,11 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
   const pricingQuery = useRentalPricingQuery(
     criteria && selectedPackage
       ? {
-          packageId: selectedPackage.packageId,
-          criteria,
-          couponCode,
-          note,
-        }
+        packageId: selectedPackage.packageId,
+        criteria,
+        couponCode,
+        note,
+      }
       : undefined,
   );
 

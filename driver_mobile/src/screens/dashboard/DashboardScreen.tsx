@@ -82,9 +82,9 @@ export const DashboardScreen = () => {
       </CardInfo>
 
       <View style={styles.inlineCards}>
-        <CardInfo title="Thu nhập hôm nay">
+        {/* <CardInfo title="Thu nhập hôm nay">
           <Text style={styles.money}>{formatCurrency(dashboard.todayIncome)}</Text>
-        </CardInfo>
+        </CardInfo> */}
         <CardInfo title="Số dư ví">
           <Text style={styles.money}>{formatCurrency(wallet.availableBalance)}</Text>
         </CardInfo>

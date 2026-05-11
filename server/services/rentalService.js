@@ -429,7 +429,7 @@ export async function getRentalBookingDetailService({ rentalId, auth }) {
         result.owner_phone = null;
         result.driver_phone = null;
     }
-    
+
     return { booking: result };
 }
 
