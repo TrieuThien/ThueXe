@@ -29,6 +29,10 @@ function mapBookingRow(row) {
         driver_id: Number(row.driver_id || 0),
         driver_name: row.driver_name,
         driver_phone: row.driver_phone,
+        driver_rating: row.driver_rating === null ? null : Number(row.driver_rating || 5),
+        driver_photo_file: row.driver_photo_file || null,
+        driver_car_model: row.driver_car_model || null,
+        driver_car_plate_num: row.driver_car_plate_num || null,
         pickup_datetime: row.pickup_datetime,
         pickup_address: row.pickup_address,
         pickup_long: row.pickup_long,
@@ -238,7 +242,8 @@ export async function insertBooking(payload, conn) {
 export async function findBookingByIdForUpdate(bookingId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(
-        `SELECT id, user_id, driver_id, scheduled, scheduled_driver, status, payment_type
+        `SELECT id, user_id, driver_id, scheduled, scheduled_driver, status, payment_type,
+                haspaid, paid_amount, transaction_id
          FROM bookings
          WHERE id = ?
          LIMIT 1
@@ -258,6 +263,9 @@ export async function findBookingByIdForUpdate(bookingId, conn) {
         scheduled_driver: Number(rows[0].scheduled_driver || 0),
         status: Number(rows[0].status || 0),
         payment_type: rows[0].payment_type === null ? null : Number(rows[0].payment_type),
+        haspaid: Number(rows[0].haspaid || 0),
+        paid_amount: rows[0].paid_amount != null ? Number(rows[0].paid_amount) : null,
+        transaction_id: rows[0].transaction_id != null ? Number(rows[0].transaction_id) : null,
     };
 }
 
@@ -466,6 +474,10 @@ export async function listBookings(filters, auth) {
             b.driver_id,
             NULLIF(TRIM(CONCAT(COALESCE(d.firstname, ''), ' ', COALESCE(d.lastname, ''))), '') AS driver_name,
             b.driver_phone,
+            d.driver_rating,
+            d.photo_file AS driver_photo_file,
+            d.car_model AS driver_car_model,
+            d.car_plate_num AS driver_car_plate_num,
             b.pickup_datetime,
             b.pickup_address,
             b.dropoff_address,
@@ -585,7 +597,11 @@ export async function findBookingDetailById(bookingId) {
             d.available AS driver_available,
             d.operation_status AS driver_operation_status,
             d.ride_id AS driver_ride_id,
-            d.route_id AS driver_route_id
+            d.route_id AS driver_route_id,
+            d.driver_rating,
+            d.photo_file AS driver_photo_file,
+            d.car_model AS driver_car_model,
+            d.car_plate_num AS driver_car_plate_num
          FROM bookings b
          LEFT JOIN users u ON u.user_id = b.user_id
          LEFT JOIN drivers d ON d.driver_id = b.driver_id
@@ -615,17 +631,21 @@ export async function findBookingDetailById(bookingId) {
         driver:
             Number(row.driver_id || 0) > 0
                 ? {
-                      id: Number(row.driver_id),
-                      full_name: row.driver_name,
-                      firstname: row.driver_firstname,
-                      lastname: row.driver_lastname,
-                      phone: row.driver_phone,
-                      account_active: Number(row.driver_account_active || 0),
-                      available: Number(row.driver_available || 0),
-                      operation_status: Number(row.driver_operation_status || 0),
-                      ride_id: row.driver_ride_id === null ? null : Number(row.driver_ride_id),
-                      route_id: row.driver_route_id === null ? null : Number(row.driver_route_id),
-                  }
+                    id: Number(row.driver_id),
+                    full_name: row.driver_name,
+                    firstname: row.driver_firstname,
+                    lastname: row.driver_lastname,
+                    phone: row.driver_phone,
+                    rating: row.driver_rating === null ? null : Number(row.driver_rating || 5),
+                    avatar_url: row.driver_photo_file || null,
+                    vehicle_name: row.driver_car_model || null,
+                    license_plate: row.driver_car_plate_num || null,
+                    account_active: Number(row.driver_account_active || 0),
+                    available: Number(row.driver_available || 0),
+                    operation_status: Number(row.driver_operation_status || 0),
+                    ride_id: row.driver_ride_id === null ? null : Number(row.driver_ride_id),
+                    route_id: row.driver_route_id === null ? null : Number(row.driver_route_id),
+                }
                 : null,
     };
 }
@@ -660,7 +680,7 @@ export async function findBookingAllocations(bookingId) {
 
 export async function findLatestDriverLocation(driverId) {
     const [rows] = await sqldb.query(
-        `SELECT driver_id, long, lat, b_angle, loc_static_status, loc_static_duration, updated_at
+        `SELECT driver_id, \`long\`, lat, b_angle, loc_static_status, loc_static_duration, updated_at
          FROM driver_current_locations
          WHERE driver_id = ?
          LIMIT 1`,
@@ -911,14 +931,14 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
             d.lastname,
             d.phone,
             d.driver_rating,
-            dcl.current_lat,
-            dcl.current_lng,
+            dcl.lat,
+            dcl.long,
             (
                 6371 * ACOS(
                     GREATEST(-1, LEAST(1,
-                        COS(RADIANS(?)) * COS(RADIANS(dcl.current_lat))
-                        * COS(RADIANS(dcl.current_lng) - RADIANS(?))
-                        + SIN(RADIANS(?)) * SIN(RADIANS(dcl.current_lat))
+                        COS(RADIANS(?)) * COS(RADIANS(dcl.lat))
+                        * COS(RADIANS(dcl.long) - RADIANS(?))
+                        + SIN(RADIANS(?)) * SIN(RADIANS(dcl.lat))
                     ))
                 )
             ) AS distance_km
@@ -929,9 +949,10 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
            AND d.account_deleted = 0
            AND d.available = 1
            AND d.operation_status = 0
-           AND dcl.current_lat BETWEEN ? AND ?
-           AND dcl.current_lng BETWEEN ? AND ?
-           AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+           AND d.available_for_rental = 0
+           AND dcl.lat BETWEEN ? AND ?
+           AND dcl.long BETWEEN ? AND ?
+           AND dcl.updated_at >= DATE_SUB(NOW(), INTERVAL 2 HOUR)
            AND NOT EXISTS (
                SELECT 1 FROM bookings ab
                WHERE ab.driver_id = d.driver_id
@@ -951,8 +972,8 @@ export async function findNearbyDriversForRide(lat, lng, radiusKm = 2, excludeId
         lastname: row.lastname,
         phone: row.phone,
         driver_rating: Number(row.driver_rating || 0),
-        current_lat: Number(row.current_lat),
-        current_lng: Number(row.current_lng),
+        current_lat: Number(row.lat),
+        current_lng: Number(row.long),
         distance_km: Number(Number(row.distance_km).toFixed(2)),
     }));
 }
@@ -1040,14 +1061,23 @@ export async function rejectDispatchAllocation(allocationId, conn) {
 export async function getBookingDispatchState(bookingId, conn) {
     const db = dbConnection(conn);
     const [rows] = await db.query(
-        `SELECT id, status, driver_id FROM bookings WHERE id = ? LIMIT 1`,
+        `SELECT id, status, driver_id,
+                user_id, pickup_address, dropoff_address, estimated_cost,
+                pickup_lat, pickup_long
+         FROM bookings WHERE id = ? LIMIT 1`,
         [bookingId]
     );
     if (!rows[0]) return null;
     return {
-        id: Number(rows[0].id),
-        status: Number(rows[0].status),
-        driver_id: rows[0].driver_id === null ? null : Number(rows[0].driver_id),
+        id:             Number(rows[0].id),
+        status:         Number(rows[0].status),
+        driver_id:      rows[0].driver_id === null ? null : Number(rows[0].driver_id),
+        user_id:        rows[0].user_id    != null  ? Number(rows[0].user_id) : null,
+        pickup_address:  rows[0].pickup_address  ?? null,
+        dropoff_address: rows[0].dropoff_address ?? null,
+        estimated_cost:  rows[0].estimated_cost  != null ? Number(rows[0].estimated_cost) : null,
+        pickup_lat:      rows[0].pickup_lat  != null ? Number(rows[0].pickup_lat)  : null,
+        pickup_long:     rows[0].pickup_long != null ? Number(rows[0].pickup_long) : null,
     };
 }
 
@@ -1058,4 +1088,32 @@ export async function getTriedDriverIdsForBooking(bookingId) {
         [bookingId]
     );
     return rows.map((r) => Number(r.driver_id));
+}
+
+export async function findSystemSettingByKey(key, conn = null) {
+    const db = conn || sqldb;
+    const [rows] = await db.query(
+        `SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1`,
+        [key]
+    );
+    return rows[0]?.setting_value ?? null;
+}
+
+export async function findTariffWaitData({ routeId, rideId, serviceType = 0 }, conn = null) {
+    const db = conn || sqldb;
+    const [rows] = await db.query(
+        `SELECT wait_time, nwait_time, wait_cost_per_minute, nwait_cost_per_minute
+         FROM rides_tariffs
+         WHERE routes_id = ? AND ride_id = ? AND service_type = ?
+         LIMIT 1`,
+        [routeId, rideId, serviceType]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+        wait_time: Number(row.wait_time || 0),
+        nwait_time: Number(row.nwait_time || 0),
+        wait_cost_per_minute: Number(row.wait_cost_per_minute || 0),
+        nwait_cost_per_minute: Number(row.nwait_cost_per_minute || 0),
+    };
 }

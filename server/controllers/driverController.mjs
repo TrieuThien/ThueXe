@@ -5,6 +5,7 @@ import {
     getDriverLocation,
     getDriverMeta,
     getDriverSummary,
+    getOnlineDriversWithLocations,
     softDeleteDriverAccount,
     updateDriverAccountState,
     updateDriverPersonalInformation,
@@ -101,6 +102,15 @@ export async function getDriverLocationHandler(req, res, next) {
     try {
         const result = await getDriverLocation(req.params.driverId);
         return successResponse(res, result, "Driver location fetched successfully");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function getOnlineDriversWithLocationsHandler(req, res, next) {
+    try {
+        const result = await getOnlineDriversWithLocations();
+        return successResponse(res, result, "Online drivers with locations fetched");
     } catch (error) {
         return next(error);
     }

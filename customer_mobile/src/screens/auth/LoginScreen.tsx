@@ -56,7 +56,7 @@ export function LoginScreen({ navigation }: Props) {
             autoCapitalize="none"
             keyboardType="email-address"
             errorMessage={fieldState.error?.message}
-            placeholder="example@email.com hoac 0912345678"
+            placeholder="example@email.com hoặc 0912345678"
           />
         )}
       />

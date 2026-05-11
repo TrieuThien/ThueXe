@@ -1,16 +1,8 @@
-/**
- * PackagesScreen.tsx
- *
- * Tài xế xem và chọn gói thuê tài xế mà họ muốn bán.
- * Route: /driver/packages
- */
-
 import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
@@ -18,11 +10,12 @@ import {
   Switch,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { MainLayout } from '../../layouts/MainLayout';
 import { packagesApi, SystemPackage } from '../../services/api/packagesApi';
 
 const QUERY_KEY = ['driver', 'packages'];
 
-export default function PackagesScreen() {
+export const PackagesScreen = () => {
   const queryClient = useQueryClient();
   const [loadingIds, setLoadingIds] = useState<Set<number>>(new Set());
 
@@ -41,6 +34,8 @@ export default function PackagesScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
   });
 
+  const hasActivePackage = packages.some((p) => p.enrollment_status === 'active');
+
   const handleToggle = useCallback(
     async (pkg: SystemPackage) => {
       const id = pkg.package_id;
@@ -48,10 +43,8 @@ export default function PackagesScreen() {
 
       try {
         if (pkg.enrollment_status === 'active' && pkg.enrollment_id) {
-          // Ngừng bán
           await removeMutation.mutateAsync(pkg.enrollment_id);
         } else {
-          // Bắt đầu bán
           await enrollMutation.mutateAsync(id);
         }
       } catch (err: any) {
@@ -70,10 +63,11 @@ export default function PackagesScreen() {
   const renderPackage = ({ item: pkg }: { item: SystemPackage }) => {
     const isActive = pkg.enrollment_status === 'active';
     const isToggling = loadingIds.has(pkg.package_id);
+    const isDisabled = hasActivePackage && !isActive;
     const serviceLabel = pkg.service_type === 2 ? 'Thuê tài xế' : 'Xe + Tài xế';
 
     return (
-      <View style={[styles.card, isActive && styles.cardActive]}>
+      <View style={[styles.card, isActive && styles.cardActive, isDisabled && styles.cardDisabled]}>
         <View style={styles.cardHeader}>
           <View style={{ flex: 1 }}>
             <Text style={styles.packageName}>{pkg.package_name}</Text>
@@ -85,6 +79,7 @@ export default function PackagesScreen() {
             <Switch
               value={isActive}
               onValueChange={() => handleToggle(pkg)}
+              disabled={isDisabled}
               trackColor={{ false: '#D1D5DB', true: '#FCD34D' }}
               thumbColor={isActive ? '#F59E0B' : '#9CA3AF'}
             />
@@ -109,7 +104,7 @@ export default function PackagesScreen() {
 
         {isActive && (
           <View style={styles.activeBadge}>
-            <Text style={styles.activeBadgeText}>✓ Đang bán</Text>
+            <Text style={styles.activeBadgeText}>✓ Gói đang đăng ký</Text>
           </View>
         )}
       </View>
@@ -118,15 +113,24 @@ export default function PackagesScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#F59E0B" />
-        <Text style={styles.loadingText}>Đang tải gói thuê...</Text>
-      </View>
+      <MainLayout title="Đăng ký gói cho thuê">
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#F59E0B" />
+          <Text style={styles.loadingText}>Đang tải gói thuê...</Text>
+        </View>
+      </MainLayout>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <MainLayout title="Đăng ký gói cho thuê" scrollable={false}>
+      {hasActivePackage && (
+        <View style={styles.infoBanner}>
+          <Text style={styles.infoBannerText}>
+            Bạn đang đăng ký 1 gói. Hủy đăng ký gói hiện tại để chọn gói khác.
+          </Text>
+        </View>
+      )}
       <FlatList
         data={packages}
         keyExtractor={(item) => String(item.package_id)}
@@ -140,13 +144,10 @@ export default function PackagesScreen() {
             <Text style={styles.emptyText}>Chưa có gói thuê nào.</Text>
           </View>
         }
-        ListHeaderComponent={
-          <Text style={styles.header}>Gói thuê tài xế</Text>
-        }
       />
-    </View>
+    </MainLayout>
   );
-}
+};
 
 function InfoChip({ label, value }: { label: string; value: string }) {
   return (
@@ -162,12 +163,19 @@ function formatCurrency(amount: number) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
-  list: { padding: 16, paddingBottom: 32 },
-  header: { fontSize: 20, fontWeight: '700', color: '#111827', marginBottom: 12 },
+  list: { paddingBottom: 32 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   loadingText: { marginTop: 12, color: '#6B7280' },
   emptyText: { color: '#6B7280', fontSize: 16 },
+  infoBanner: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  infoBannerText: { color: '#92400E', fontSize: 13, fontWeight: '600' },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -180,6 +188,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardActive: { borderWidth: 2, borderColor: '#F59E0B' },
+  cardDisabled: { opacity: 0.5 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   packageName: { fontSize: 16, fontWeight: '700', color: '#111827' },
   serviceLabel: { fontSize: 12, color: '#6B7280', marginTop: 2 },

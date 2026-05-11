@@ -2,6 +2,9 @@ import crypto from "crypto";
 import sqldb from "../config/sqldatabase.js";
 import AppError from "../utils/appError.js";
 import { isPointInCoverage, getDistanceKm } from "../utils/locationUtils.js";
+import { emitToDriver } from "../socket/index.js";
+import { sendExpoPush } from "../utils/expoPush.js";
+import { handleRentalTimeout } from "./rentalPaymentService.js";
 import {
     assignRentalDriverVehicle,
     countExistingRentalNotificationsForDrivers,
@@ -32,6 +35,10 @@ const DRIVER_RENTAL_NOTIFY_TYPE = 10;
 
 const RENTAL_STATUSES = ["scheduled", "pending", "in_progress", "completed", "cancelled"];
 const PAYMENT_STATUSES = ["pending", "paid", "refunded"];
+
+// Timeout tracking: Map<rentalId, timeoutHandle>
+// NOTE: Data is lost on server restart — production should use Redis or DB
+const rentalTimeoutTracking = new Map();
 
 function toNullableString(value) {
     if (value === undefined || value === null) return null;
@@ -68,6 +75,51 @@ async function runInTransaction(work) {
         throw error;
     } finally {
         connection.release();
+    }
+}
+
+/**
+ * scheduleRentalTimeout
+ *
+ * Schedules a timeout for a rental driver matching.
+ * If no driver accepts within the timeout period, the rental is cancelled and refunded.
+ *
+ * @param {number} rentalId
+ * @param {number} delayMs - Timeout in milliseconds (default 60 seconds)
+ */
+function scheduleRentalTimeout(rentalId, delayMs = 60_000) {
+    // Cancel existing timeout for this rental (if any)
+    cancelRentalTimeout(rentalId);
+
+    const timeoutHandle = setTimeout(async () => {
+        try {
+            console.log(`[RentalTimeout] Executing timeout for rental ${rentalId} after ${delayMs}ms`);
+            await handleRentalTimeout(rentalId);
+        } catch (error) {
+            console.error(`[RentalTimeout] Error handling timeout for rental ${rentalId}:`, error);
+        } finally {
+            rentalTimeoutTracking.delete(rentalId);
+        }
+    }, delayMs);
+
+    // Store timeout handle for potential cancellation
+    rentalTimeoutTracking.set(rentalId, timeoutHandle);
+}
+
+/**
+ * cancelRentalTimeout
+ *
+ * Cancels a scheduled timeout for a rental.
+ * Called when driver accepts rental or manual cancellation occurs.
+ *
+ * @param {number} rentalId
+ */
+function cancelRentalTimeout(rentalId) {
+    const timeoutHandle = rentalTimeoutTracking.get(rentalId);
+    if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+        rentalTimeoutTracking.delete(rentalId);
+        console.log(`[RentalTimeout] Cancelled timeout for rental ${rentalId}`);
     }
 }
 
@@ -331,6 +383,9 @@ export async function createRentalBookingService({ payload, auth }) {
                 endDatetime: endStr,
                 packageInfo: rentalPackage,
             }).catch(() => { });
+
+            // Schedule 60-second timeout for driver matching
+            scheduleRentalTimeout(rentalId, 60_000);
         }
 
         return { rental: created };
@@ -340,11 +395,15 @@ export async function createRentalBookingService({ payload, auth }) {
 export async function listRentalBookingsService({ query, auth }) {
     const filters = {
         status: toNullableString(query.status),
-        serviceType: query.service_type === undefined || query.service_type === "" ? undefined : Number(query.service_type),
         search: toNullableString(query.search),
         page: query.page,
         limit: query.limit,
     };
+    if (query.service_types) {
+        filters.serviceTypes = String(query.service_types).split(",").map(Number).filter(Number.isFinite);
+    } else if (query.service_type !== undefined && query.service_type !== "") {
+        filters.serviceType = Number(query.service_type);
+    }
     if (auth.role === "passenger") {
         filters.userId = Number(auth.userId);
     } else if (auth.role === "driver") {
@@ -362,14 +421,15 @@ export async function getRentalBookingDetailService({ rentalId, auth }) {
     if (!booking) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
     ensureActorCanAccessRental(auth, booking);
 
-    // Điều kiện: Chỉ trả về thông tin chủ xe/tài xế khi status = "in_progress"
+    // Điều kiện: Ẩn thông tin chủ xe/tài xế với passenger/driver khi chưa in_progress
     let result = { ...booking };
-    if (booking.status !== "in_progress") {
+    const isPrivileged = auth?.role === "admin" || auth?.role === "dispatcher";
+    if (!isPrivileged && booking.status !== "in_progress") {
         result.owner_name = null;
         result.owner_phone = null;
         result.driver_phone = null;
     }
-    
+
     return { booking: result };
 }
 
@@ -440,6 +500,11 @@ export async function updateRentalStatusService({ rentalId, payload, auth }) {
         const updated = await findRentalBookingById(numericRentalId, conn);
         return { rental: updated };
     });
+
+    // Cancel timeout if cancelled or completed
+    if (["cancelled", "completed"].includes(targetStatus)) {
+        cancelRentalTimeout(numericRentalId);
+    }
 }
 
 export async function assignRentalService({ rentalId, payload }) {
@@ -450,7 +515,7 @@ export async function assignRentalService({ rentalId, payload }) {
     const driverId = payload.driver_id === undefined || payload.driver_id === null || payload.driver_id === "" ? null : Number(payload.driver_id);
     const vehicleId = payload.vehicle_id === undefined || payload.vehicle_id === null || payload.vehicle_id === "" ? null : Number(payload.vehicle_id);
 
-    return runInTransaction(async (conn) => {
+    const result = await runInTransaction(async (conn) => {
         const rental = await findRentalByIdForUpdate(numericRentalId, conn);
         if (!rental) throw new AppError("Rental booking not found.", 404, "RENTAL_NOT_FOUND");
         if (rental.status === "completed" || rental.status === "cancelled") {
@@ -486,6 +551,52 @@ export async function assignRentalService({ rentalId, payload }) {
 
         return { rental: await findRentalBookingById(numericRentalId, conn) };
     });
+
+    // Cancel timeout since driver has been assigned
+    if (driverId) {
+        cancelRentalTimeout(numericRentalId);
+    }
+
+    // Fire-and-forget notifications after DB commit — does not affect API response
+    if (driverId) {
+        _notifyDriverAssigned(driverId, result.rental).catch((err) => {
+            console.error(`[AssignRental] notification failed driverId=${driverId}:`, err.message);
+        });
+    }
+
+    return result;
+}
+
+async function _notifyDriverAssigned(driverId, rental) {
+    const eventPayload = {
+        type: "RENTAL_ASSIGNED_BY_ADMIN",
+        rentalId: rental.rental_id,
+        rentalCode: rental.rental_code,
+        startDatetime: String(rental.start_datetime),
+        endDatetime: String(rental.end_datetime),
+        pickupAddress: rental.pickup_address ?? "",
+        totalPrice: Number(rental.total_price || 0),
+    };
+
+    // Socket: foreground delivery
+    emitToDriver(driverId, "RENTAL_ASSIGNED_BY_ADMIN", eventPayload);
+
+    // Push: background / killed app delivery
+    const [rows] = await sqldb.query(
+        `SELECT push_notification_token FROM drivers WHERE driver_id = ? LIMIT 1`,
+        [driverId]
+    );
+    const pushToken = rows[0]?.push_notification_token;
+    if (pushToken) {
+        const dt = new Date(rental.start_datetime);
+        const timeStr = dt.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+        await sendExpoPush(pushToken, {
+            title: "Bạn được gán vào đơn thuê",
+            body: `Đơn ${rental.rental_code} – Bắt đầu ${timeStr}`,
+            channelId: "driver-requests",
+            data: eventPayload,
+        });
+    }
 }
 
 // ─── Owner: xem gói thuê chuẩn dành cho xe (service_type=1, active=1) ─────────

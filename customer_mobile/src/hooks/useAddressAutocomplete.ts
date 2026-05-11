@@ -5,6 +5,7 @@ import { formatAddressFromGeocode } from "../utils/address";
 import { calculateRankingScore, applyDistancePenalty, calculateDistance, calculateMatchQuality } from "../utils/addressRanking";
 import { formatVietnameseAddress } from "../utils/vietnameseAddressParser";
 import { AddressCache, RequestDeduplicator } from "../utils/addressCache";
+import { hasGooglePlacesKey, searchGooglePlacesAutocomplete } from "../utils/googlePlaces";
 
 /**
  * Phase 4: Calculate dynamic zoom level based on location accuracy
@@ -84,7 +85,12 @@ async function retryWithBackoff<T>(
 interface GeoBias {
   latitude: number;
   longitude: number;
-  accuracy?: number; // Phase 4: For dynamic zoom calculation
+  accuracy?: number;
+  currentLocation?: {
+    label: string;
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export interface AddressSuggestion {
@@ -92,7 +98,9 @@ export interface AddressSuggestion {
   label: string;
   latitude?: number;
   longitude?: number;
-  score?: number; // Ranking score (0-1) for sorting
+  score?: number;
+  isCurrentLocation?: boolean;
+  placeId?: string;
 }
 
 // Phase 2: Singleton cache and request deduplicator
@@ -181,8 +189,20 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
 
   useEffect(() => {
     const keyword = query.trim();
+
+    // Build the current-location suggestion (always first when available)
+    const currentLocationSuggestion: AddressSuggestion | null = bias?.currentLocation
+      ? {
+          id: "current_location",
+          label: bias.currentLocation.label,
+          latitude: bias.currentLocation.latitude,
+          longitude: bias.currentLocation.longitude,
+          isCurrentLocation: true,
+        }
+      : null;
+
     if (keyword.length < 2) {
-      setSuggestions([]);
+      setSuggestions(currentLocationSuggestion ? [currentLocationSuggestion] : []);
       setLoading(false);
       return;
     }
@@ -218,85 +238,90 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
         const results = await requestDeduplicator.execute(cacheKey, async () => {
           const nextSuggestions: AddressSuggestion[] = [];
 
-          // 1) Prefer Nominatim first for richer addressdetails.
-          const nominatimParams = new URLSearchParams({
-            q: keyword,
-            format: "jsonv2",
-            limit: "6",
-            addressdetails: "1",
-            "accept-language": "vi",
-          });
-
-          // Phase 4: Add geographic bias using viewbox
-          if (bias) {
-            const viewbox = getViewboxParams(bias.latitude, bias.longitude);
-            nominatimParams.set("viewbox", viewbox.viewbox);
-            nominatimParams.set("bounded", viewbox.bounded);
-          }
-
-          try {
-            const nominatimResponse = await fetchWithTimeout(
-              `https://nominatim.openstreetmap.org/search?${nominatimParams.toString()}`,
-              {
-                headers: { Accept: "application/json" },
-              },
-              5000, // Phase 6: 5-second timeout
-            );
-
-            if (nominatimResponse.ok) {
-              const payload = (await nominatimResponse.json()) as Array<{
-                display_name?: string;
-                lat?: string;
-                lon?: string;
-                address?: Record<string, unknown>;
-              }>;
-
-              for (const item of payload ?? []) {
-                const fromStructured = buildLabelFromStructuredAddress(item.address ?? {});
-                const fromDisplay = buildLabelFromDisplayName(item.display_name);
-                const label = fromStructured || fromDisplay;
-                if (!label) {
-                  continue;
-                }
-
-                const latitude = item.lat ? Number(item.lat) : undefined;
-                const longitude = item.lon ? Number(item.lon) : undefined;
-
+          if (hasGooglePlacesKey()) {
+            // Google Places Autocomplete — accurate Vietnamese addresses
+            try {
+              const googleResults = await searchGooglePlacesAutocomplete(keyword, bias, 4);
+              for (const place of googleResults) {
                 nextSuggestions.push({
-                  id: toSuggestionId("nominatim", label, latitude, longitude),
-                  label,
-                  latitude: Number.isFinite(latitude) ? latitude : undefined,
-                  longitude: Number.isFinite(longitude) ? longitude : undefined,
+                  id: `google_${place.placeId}`,
+                  label: place.label,
+                  placeId: place.placeId,
                 });
               }
+            } catch {
+              // Google failed, fall through to Nominatim
             }
-          } catch {
-            // Nominatim failed, continue to fallback
           }
 
-          // 2) Add Photon as side-source if still short on results.
-          if (nextSuggestions.length < 6) {
-            const photonParams = new URLSearchParams({
+          // Nominatim fallback when Google is unavailable or returned 0 results
+          if (nextSuggestions.length === 0) {
+            const nominatimParams = new URLSearchParams({
               q: keyword,
-              limit: "6",
-              lang: "vi",
+              format: "jsonv2",
+              limit: "4",
+              addressdetails: "1",
+              "accept-language": "vi",
             });
+
+            if (bias) {
+              const viewbox = getViewboxParams(bias.latitude, bias.longitude);
+              nominatimParams.set("viewbox", viewbox.viewbox);
+              nominatimParams.set("bounded", viewbox.bounded);
+            }
+
+            try {
+              const nominatimResponse = await fetchWithTimeout(
+                `https://nominatim.openstreetmap.org/search?${nominatimParams.toString()}`,
+                { headers: { Accept: "application/json" } },
+                5000,
+              );
+
+              if (nominatimResponse.ok) {
+                const payload = (await nominatimResponse.json()) as Array<{
+                  display_name?: string;
+                  lat?: string;
+                  lon?: string;
+                  address?: Record<string, unknown>;
+                }>;
+
+                for (const item of payload ?? []) {
+                  const fromStructured = buildLabelFromStructuredAddress(item.address ?? {});
+                  const fromDisplay = buildLabelFromDisplayName(item.display_name);
+                  const label = fromStructured || fromDisplay;
+                  if (!label) continue;
+
+                  const latitude = item.lat ? Number(item.lat) : undefined;
+                  const longitude = item.lon ? Number(item.lon) : undefined;
+
+                  nextSuggestions.push({
+                    id: toSuggestionId("nominatim", label, latitude, longitude),
+                    label,
+                    latitude: Number.isFinite(latitude) ? latitude : undefined,
+                    longitude: Number.isFinite(longitude) ? longitude : undefined,
+                  });
+                }
+              }
+            } catch {
+              // Nominatim failed
+            }
+          }
+
+          // Photon fallback when still short on results
+          if (nextSuggestions.length === 0) {
+            const photonParams = new URLSearchParams({ q: keyword, limit: "4", lang: "vi" });
 
             if (bias) {
               photonParams.set("lat", String(bias.latitude));
               photonParams.set("lon", String(bias.longitude));
-              // Phase 4: Dynamic zoom based on location accuracy
-              const zoom = getZoomFromAccuracy(bias.accuracy);
-              photonParams.set("zoom", String(zoom));
+              photonParams.set("zoom", String(getZoomFromAccuracy(bias.accuracy)));
             }
 
             try {
               const photonResponse = await fetchWithTimeout(
                 `https://photon.komoot.io/api?${photonParams.toString()}`,
-                {
-                  headers: { Accept: "application/json" },
-                },
-                5000, // Phase 6: 5-second timeout
+                { headers: { Accept: "application/json" } },
+                5000,
               );
 
               if (photonResponse.ok) {
@@ -309,9 +334,7 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
 
                 for (const feature of payload.features ?? []) {
                   const label = buildLabelFromStructuredAddress(feature.properties ?? {});
-                  if (!label) {
-                    continue;
-                  }
+                  if (!label) continue;
 
                   const coordinates = feature.geometry?.coordinates ?? [];
                   const longitude = typeof coordinates[0] === "number" ? coordinates[0] : undefined;
@@ -326,18 +349,16 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
                 }
               }
             } catch {
-              // Photon failed, continue to fallback
+              // Photon failed
             }
           }
 
-          // 3) Final fallback: device geocoder.
+          // Device geocoder as final fallback
           if (nextSuggestions.length === 0) {
             try {
               const geoResults = await Location.geocodeAsync(keyword);
-              for (const item of geoResults.slice(0, 5)) {
-                if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
-                  continue;
-                }
+              for (const item of geoResults.slice(0, 4)) {
+                if (typeof item.latitude !== "number" || typeof item.longitude !== "number") continue;
 
                 try {
                   const reverse = await Location.reverseGeocodeAsync({
@@ -347,9 +368,7 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
                   const label =
                     formatAddressFromGeocode(reverse[0]) ??
                     buildLabelFromStructuredAddress((reverse[0] ?? {}) as Record<string, unknown>);
-                  if (!label) {
-                    continue;
-                  }
+                  if (!label) continue;
 
                   nextSuggestions.push({
                     id: toSuggestionId("device", label, item.latitude, item.longitude),
@@ -366,34 +385,30 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
             }
           }
 
-          // Deduplicate
+          // For non-Google results: deduplicate + rank by proximity
           const deduped = nextSuggestions.filter(
-            (item, index) => nextSuggestions.findIndex((x) => x.label.toLowerCase() === item.label.toLowerCase()) === index,
+            (item, index) =>
+              nextSuggestions.findIndex((x) => x.label.toLowerCase() === item.label.toLowerCase()) === index,
           );
 
-          // Phase 1: Calculate ranking scores and sort by relevance
           const scored = deduped.map((suggestion) => {
             let score = 0;
-
             if (bias && suggestion.latitude && suggestion.longitude) {
-              const distance = calculateDistance(
-                bias.latitude,
-                bias.longitude,
-                suggestion.latitude,
-                suggestion.longitude,
-              );
+              const distance = calculateDistance(bias.latitude, bias.longitude, suggestion.latitude, suggestion.longitude);
               score = calculateRankingScore(distance, keyword, suggestion.label);
-              // Phase 4: Apply distance penalty for far results
               score *= applyDistancePenalty(distance);
             } else {
               score = calculateMatchQuality(keyword, suggestion.label);
             }
-
             return { ...suggestion, score };
           });
 
-          const sorted = scored.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-          return sorted.slice(0, 6);
+          const searchResults = scored.sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 4);
+
+          // Prepend current location suggestion
+          return currentLocationSuggestion
+            ? [currentLocationSuggestion, ...searchResults]
+            : searchResults;
         });
 
         if (requestSeqRef.current !== seq) {
@@ -425,7 +440,7 @@ export function useAddressAutocomplete(query: string, bias?: GeoBias) {
       clearTimeout(timer);
       clearTimeout(loadingTimeoutId);
     };
-  }, [query, bias?.latitude, bias?.longitude]);
+  }, [query, bias?.latitude, bias?.longitude, bias?.currentLocation?.label]);
 
   return { suggestions, loading };
 }

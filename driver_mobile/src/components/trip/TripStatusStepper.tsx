@@ -22,7 +22,7 @@ export const TripStatusStepper = ({ status }: { status: TripFlowStatus }) => {
       {STEPS.map((step, index) => {
         const active = index <= current;
         return (
-          <View key={step} style={styles.row}>
+          <View key={`step-${index}`} style={styles.row}>
             <View style={[styles.dot, active && styles.dotActive]} />
             <Text style={[styles.label, active && styles.labelActive]}>{step}</Text>
           </View>

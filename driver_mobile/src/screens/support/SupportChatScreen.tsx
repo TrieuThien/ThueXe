@@ -125,7 +125,7 @@ export const SupportChatScreen = () => {
         <FlatList
           ref={flatListRef}
           data={safeMessages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => `message-${item.id}-${item.createdAt}`}
           renderItem={renderMessage}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}

@@ -1,5 +1,6 @@
-﻿import React from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,12 +13,16 @@ import type {
   WalletStackParamList,
   WorkStackParamList
 } from '../types/navigation';
+import { useDriverHireStore } from '../store/driverHireStore';
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
+import { PackagesScreen } from '../screens/rental/PackagesScreen';
 import { WorkingStatusScreen } from '../screens/work/WorkingStatusScreen';
 import { DriverScheduleScreen } from '../screens/work/DriverScheduleScreen';
 import { CurrentTripScreen } from '../screens/trip/CurrentTripScreen';
 import { TripCompletedSummaryScreen } from '../screens/trip/TripCompletedSummaryScreen';
 import { RentalBookingDetailScreen } from '../screens/work/RentalBookingDetailScreen';
+import { DriverHireActiveServiceScreen } from '../screens/work/DriverHireActiveServiceScreen';
+import { DriverHireServiceSummaryScreen } from '../screens/work/DriverHireServiceSummaryScreen';
 import { TripHistoryScreen } from '../screens/history/TripHistoryScreen';
 import { TripHistoryDetailScreen } from '../screens/history/TripHistoryDetailScreen';
 import { WalletIncomeScreen } from '../screens/wallet/WalletIncomeScreen';
@@ -36,7 +41,12 @@ import { useUnreadNotificationsCountQuery } from '../hooks/useDriverQueries';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAuthStore } from '../store/authStore';
 import { useRideRequests } from '../hooks/useRideRequests';
+import { useRentRequests } from '../hooks/useRentRequests';
 import RideRequestModal from '../screens/booking/RideRequestModal';
+import RequestModal, { type RentRequest } from '../screens/rental/RequestModal';
+import RentalAssignedModal from '../screens/rental/RentalAssignedModal';
+import { setupAndRegisterPushToken } from '../services/notifications/pushNotificationService';
+import { useRentalAssignedNotification, type RentalAssignedNotif } from '../hooks/useRentalAssignedNotification';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -63,6 +73,7 @@ const iconByRoute: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap
 const DashboardStackScreen = () => (
   <DashboardStack.Navigator screenOptions={stackScreenOptions}>
     <DashboardStack.Screen name="DashboardHome" component={DashboardScreen} options={{ title: 'Dashboard' }} />
+    <DashboardStack.Screen name="PackagesList" component={PackagesScreen} options={{ title: 'Đăng ký gói cho thuê' }} />
   </DashboardStack.Navigator>
 );
 
@@ -80,6 +91,16 @@ const WorkStackScreen = () => (
       name="TripCompletedSummary"
       component={TripCompletedSummaryScreen}
       options={{ title: 'Tóm tắt chuyến đi' }}
+    />
+    <WorkStack.Screen
+      name="DriverHireActiveService"
+      component={DriverHireActiveServiceScreen}
+      options={{ title: 'Dịch vụ đang thực hiện', gestureEnabled: false }}
+    />
+    <WorkStack.Screen
+      name="DriverHireServiceSummary"
+      component={DriverHireServiceSummaryScreen}
+      options={{ title: 'Tổng kết dịch vụ', gestureEnabled: false }}
     />
   </WorkStack.Navigator>
 );
@@ -130,10 +151,72 @@ export const MainNavigator = () => {
   const unreadCount = useNotificationStore((state) => state.unreadCount);
   const accessToken = useAuthStore((state) => state.tokens?.accessToken ?? null);
   const { rideRequest, dismissRideRequest } = useRideRequests(accessToken);
+  const { rentRequest, dismissRentRequest } = useRentRequests(accessToken);
+  const { assignedNotif, dismissAssignedNotif, setAssignedNotif } = useRentalAssignedNotification(accessToken);
+  const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
+  const setPendingRentalDetailId = useDriverHireStore((state) => state.setPendingRentalDetailId);
+
+  // Push notification: request received while app is background/killed
+  const [notifRentRequest, setNotifRentRequest] = useState<RentRequest | null>(null);
+  const notifListenerRef = useRef<Notifications.Subscription | null>(null);
+
+  useEffect(() => {
+    if (!accessToken) return;
+
+    // Register push token once per login session
+    setupAndRegisterPushToken();
+
+    // Handle notification TAP (background → foreground, or killed → foreground)
+    notifListenerRef.current = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
+        setNotifRentRequest(data as unknown as RentRequest);
+      } else if (data?.type === 'RENTAL_ASSIGNED_BY_ADMIN') {
+        setAssignedNotif(data as unknown as RentalAssignedNotif);
+      }
+    });
+
+    // Handle notification tap when app was fully killed
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content.data as Record<string, unknown>;
+      if (data?.type === 'NEW_DRIVER_RENT_REQUEST') {
+        setNotifRentRequest(data as unknown as RentRequest);
+      } else if (data?.type === 'RENTAL_ASSIGNED_BY_ADMIN') {
+        setAssignedNotif(data as unknown as RentalAssignedNotif);
+      }
+    });
+
+    return () => {
+      notifListenerRef.current?.remove();
+    };
+  }, [accessToken]);
+
+  const effectiveRentRequest = rentRequest ?? notifRentRequest;
+  const dismissEffectiveRentRequest = useCallback(() => {
+    dismissRentRequest();
+    setNotifRentRequest(null);
+  }, [dismissRentRequest]);
+
+  // Lưu pending navigation vào store; WorkingStatusScreen sẽ xử lý navigate thực tế
+  const handleRentAccepted = useCallback((bookingId: number) => {
+    setPendingRentalNav({
+      rentalId: String(bookingId),
+      pickupLat: effectiveRentRequest?.pickup_lat,
+      pickupLng: effectiveRentRequest?.pickup_lng,
+    });
+  }, [effectiveRentRequest, setPendingRentalNav]);
+
+  // Admin-assigned booking: store rentalId → DriverScheduleScreen sẽ navigate
+  const handleViewAssignedDetail = useCallback((rentalId: number) => {
+    setPendingRentalDetailId(String(rentalId));
+  }, [setPendingRentalDetailId]);
 
   return (
     <>
     <RideRequestModal request={rideRequest} onClose={dismissRideRequest} />
+    <RequestModal request={effectiveRentRequest} onClose={dismissEffectiveRentRequest} onAccepted={handleRentAccepted} />
+    <RentalAssignedModal notif={assignedNotif} onClose={dismissAssignedNotif} onViewDetail={handleViewAssignedDetail} />
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
       headerTitleAlign: 'center',

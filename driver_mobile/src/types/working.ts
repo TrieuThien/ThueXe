@@ -1,4 +1,4 @@
-﻿export type ServiceTypeId = 'goi_xe' | 'thue_tai_xe' | 'xe_kem_tai_xe' | 'lien_tinh';
+﻿export type ServiceTypeId = 'goi_xe' | 'thue_tai_xe' | 'xe_kem_tai_xe' ;
 
 export type NetworkStatus = 'online' | 'offline';
 export type GpsStatus = 'ready' | 'disabled' | 'error';
@@ -47,3 +47,4 @@ export type LocationError = {
   code: LocationErrorCode;
   message: string;
 };
+

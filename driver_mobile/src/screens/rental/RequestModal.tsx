@@ -38,9 +38,11 @@ export interface RentRequest {
 interface Props {
   request: RentRequest | null;
   onClose: () => void;
+  /** Được gọi sau khi tài xế nhấn Nhận chuyến thành công, với bookingId */
+  onAccepted?: (bookingId: number) => void;
 }
 
-export default function RequestModal({ request, onClose }: Props) {
+export default function RequestModal({ request, onClose, onAccepted }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(TIMEOUT_SECONDS);
   const [loading, setLoading] = useState(false);
   const progressAnim = useRef(new Animated.Value(1)).current;
@@ -83,14 +85,19 @@ export default function RequestModal({ request, onClose }: Props) {
       clearInterval(intervalRef.current!);
       try {
         await packagesApi.respondToRequest(request.requestId, action);
-      } catch (err) {
+        if (action === 'accept' && onAccepted) {
+          onClose();
+          onAccepted(request.bookingId);
+          return;
+        }
+      } catch {
         // Nếu timeout đã xảy ra bên server, chỉ close modal
       } finally {
         setLoading(false);
         onClose();
       }
     },
-    [request, loading, onClose]
+    [request, loading, onClose, onAccepted]
   );
 
   const progressWidth = progressAnim.interpolate({

@@ -103,10 +103,18 @@ export function RentalHistoryScreen({ navigation }: Props) {
         Linking.openURL(`tel:${phoneNumber}`);
     };
 
-    // Filter only RENTAL_CAR bookings
-    const rentalCarBookings = (rentalQuery.data ?? []).filter(
-        (booking) => booking.rideType === "RENTAL_CAR"
-    );
+    // Filter only RENTAL_CAR bookings and deduplicate by ID
+    const rentalCarBookings = (rentalQuery.data ?? [])
+        .filter((booking) => booking.rideType === "RENTAL_CAR")
+        .reduce(
+            (acc, booking) => {
+                if (!acc.some((b) => b.id === booking.id)) {
+                    acc.push(booking);
+                }
+                return acc;
+            },
+            []
+        );
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]}>
@@ -120,9 +128,9 @@ export function RentalHistoryScreen({ navigation }: Props) {
                     <EmptyState title="Chưa có lịch sử thuê xe" />
                 ) : null}
 
-                {rentalCarBookings.map((booking) => (
+                {rentalCarBookings.map((booking, index) => (
                     <RentalCarCard
-                        key={booking.id}
+                        key={`${booking.id}-${index}`}
                         booking={booking}
                         onPress={() => navigation.navigate("RentalBookingDetail", { bookingId: booking.id })}
                         onCallDriver={handleCallDriver}

@@ -130,7 +130,7 @@ export default function RentalBookingTable({ items, loading, onAssign, onStatusC
                                                     disabled={isBusy}
                                                     className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                                 >
-                                                    {isBusy ? "..." : "Cập nhật TT"}
+                                                    {isBusy ? "..." : "Cập nhật trạng thái"}
                                                 </button>
                                             </div>
                                         </td>

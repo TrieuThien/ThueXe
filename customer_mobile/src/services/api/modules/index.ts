@@ -1,4 +1,5 @@
 export * from "./authApi";
+export * from "./driverHireApi";
 export * from "./chatApi";
 export * from "./couponApi";
 export * from "./homeApi";

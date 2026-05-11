@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import MapView, { Marker } from 'react-native-maps';
 import { MainLayout } from '../../layouts/MainLayout';
@@ -17,7 +17,8 @@ import {
 } from '../../hooks/useWorkingQueries';
 import { locationService } from '../../services/location/locationService';
 import { queryKeys } from '../../constants/queryKeys';
-import type { LocationError, ServiceTypeId } from '../../types/working';
+import { useDriverHireStore } from '../../store/driverHireStore';
+import type { LocationError, ServiceTypeId, WorkingOverview } from '../../types/working';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { WorkStackParamList } from '../../types/navigation';
 
@@ -25,7 +26,6 @@ const SERVICE_TYPE_OPTIONS: { id: ServiceTypeId; label: string }[] = [
   { id: 'goi_xe', label: 'Gọi xe' },
   { id: 'thue_tai_xe', label: 'Thuê tài xế' },
   { id: 'xe_kem_tai_xe', label: 'Xe kèm tài xế' },
-  { id: 'lien_tinh', label: 'Liên tỉnh' }
 ];
 
 const getFriendlyError = (error: unknown) => {
@@ -50,6 +50,22 @@ export const WorkingStatusScreen = () => {
   const workingQuery = useWorkingOverviewQuery();
   const activeTypesQuery = useActiveServiceTypesQuery();
 
+  // Xử lý pending navigation sau khi tài xế accept yêu cầu thuê tài xế
+  const pendingRentalNav = useDriverHireStore((state) => state.pendingRentalNav);
+  const setPendingRentalNav = useDriverHireStore((state) => state.setPendingRentalNav);
+  useFocusEffect(
+    React.useCallback(() => {
+      if (pendingRentalNav) {
+        setPendingRentalNav(null);
+        navigation.navigate('DriverHireActiveService', {
+          rentalId: pendingRentalNav.rentalId,
+          pickupLat: pendingRentalNav.pickupLat,
+          pickupLng: pendingRentalNav.pickupLng,
+        });
+      }
+    }, [pendingRentalNav, setPendingRentalNav, navigation])
+  );
+
   const toggleOnlineMutation = useToggleOnlineMutation();
   const updateServiceTypesMutation = useUpdateServiceTypesMutation();
   const manualLocationMutation = useManualLocationUpdateMutation();
@@ -61,10 +77,18 @@ export const WorkingStatusScreen = () => {
   const isError = workingQuery.isError || activeTypesQuery.isError;
 
   useEffect(() => {
+    if (workingQuery.data?.isOnline && workingQuery.data?.autoUpdating) {
+      locationService.startPeriodicLocationUpdate(
+        (lat, lng) => queryClient.setQueryData(queryKeys.workingOverview, (old: WorkingOverview | undefined) =>
+          old ? { ...old, lastLocation: { lat, lng, updatedAt: new Date().toISOString() } } : old
+        ),
+        (error: LocationError) => setUiError(getFriendlyError(error)),
+      );
+    }
     return () => {
       locationService.stopPeriodicLocationUpdate();
     };
-  }, []);
+  }, [workingQuery.data?.isOnline, workingQuery.data?.autoUpdating]);
 
   const selectedTypes = useMemo(
     () => (Array.isArray(activeTypesQuery.data) ? activeTypesQuery.data : []),
@@ -108,9 +132,8 @@ export const WorkingStatusScreen = () => {
 
   const toggleServiceType = async (typeId: ServiceTypeId) => {
     setUiError('');
-    const next = selectedTypes.includes(typeId)
-      ? selectedTypes.filter((item) => item !== typeId)
-      : [...selectedTypes, typeId];
+    // Radio: tapping the active type deselects it; tapping another replaces the selection
+    const next: ServiceTypeId[] = selectedTypes.includes(typeId) ? [] : [typeId];
 
     try {
       await updateServiceTypesMutation.mutateAsync({ serviceTypes: next });
@@ -136,7 +159,17 @@ export const WorkingStatusScreen = () => {
 
     try {
       await toggleOnlineMutation.mutateAsync(nextValue);
-      await workingQuery.refetch();
+
+      if (nextValue) {
+        locationService.startPeriodicLocationUpdate(
+          (lat, lng) => queryClient.setQueryData(queryKeys.workingOverview, (old: WorkingOverview | undefined) =>
+            old ? { ...old, lastLocation: { lat, lng, updatedAt: new Date().toISOString() } } : old
+          ),
+          (error: LocationError) => setUiError(getFriendlyError(error)),
+        );
+      } else {
+        locationService.stopPeriodicLocationUpdate();
+      }
     } catch (error) {
       setUiError(getFriendlyError(error));
     }
@@ -160,12 +193,10 @@ export const WorkingStatusScreen = () => {
 
       if (enabled) {
         locationService.startPeriodicLocationUpdate(
-          (data) => {
-            queryClient.setQueryData(queryKeys.workingOverview, data);
-          },
-          (error: LocationError) => {
-            setUiError(getFriendlyError(error));
-          }
+          (lat, lng) => queryClient.setQueryData(queryKeys.workingOverview, (old: WorkingOverview | undefined) =>
+            old ? { ...old, lastLocation: { lat, lng, updatedAt: new Date().toISOString() } } : old
+          ),
+          (error: LocationError) => setUiError(getFriendlyError(error)),
         );
       } else {
         locationService.stopPeriodicLocationUpdate();
@@ -200,14 +231,14 @@ export const WorkingStatusScreen = () => {
         </View>
       </View>
 
-      <CardInfo title="Online / Offline" subtitle="Bắt đầu online để nhận cuộc gọi mới">
+      <CardInfo title="Online / Offline" subtitle="Bắt đầu online để nhận chuyến mới">
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>{overview.isOnline ? 'DANG ONLINE' : 'DANG OFFLINE'}</Text>
+          <Text style={styles.switchLabel}>{overview.isOnline ? 'ĐANG ONLINE' : 'ĐANG OFFLINE'}</Text>
           <Switch value={overview.isOnline} onValueChange={handleOnlineChange} trackColor={{ true: '#10B981', false: '#94A3B8' }} />
         </View>
       </CardInfo>
 
-      <CardInfo title="Loại hình hoạt động hiện tại">
+      <CardInfo title="Loại hình hoạt động" subtitle="Chọn loại hình hoạt động mà bạn muốn nhận chuyến">
         <View style={styles.chipsWrap}>
           {SERVICE_TYPE_OPTIONS.map((item) => {
             const selected = selectedTypes.includes(item.id);
@@ -226,11 +257,10 @@ export const WorkingStatusScreen = () => {
 
       <CardInfo title="Trạng thái hệ thống">
         <StatusBadge status={overview.isOnline ? 'online' : 'offline'} />
-        <Text style={styles.meta}>Loại hình hoạt động: {selectedTypes.length || 0}</Text>
         <Text style={styles.meta}>Khu vực hoạt động: {overview.operationZone}</Text>
         <Text style={styles.meta}>GPS: {overview.gpsStatus}</Text>
-        <Text style={styles.meta}>Quyền vị trí: {overview.permissionStatus}</Text>
-        <Text style={styles.meta}>Kết nối mạng: {overview.networkStatus}</Text>
+        <Text style={styles.meta}>Quyền vị trí: {overview.permissionStatus === 'granted' ? 'Đã cấp' : 'Chưa cấp'}</Text>
+        <Text style={styles.meta}>Kết nối mạng: {overview.networkStatus === 'online' ? 'Trực tuyến' : 'Không có kết nối'}</Text>
       </CardInfo>
 
       <CardInfo title="Cập nhật vị trí hiện tại">
@@ -313,3 +343,4 @@ const styles = StyleSheet.create({
     color: '#334155'
   }
 });
+

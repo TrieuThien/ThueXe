@@ -243,7 +243,7 @@ export default function StaffList() {
                             <div className="rounded-2xl bg-indigo-100 p-3 text-indigo-700"><UsersRound className="h-6 w-6" /></div>
                             <div>
                                 <p className="text-sm text-slate-500">{item.label}</p>
-                                {summaryLoading ? <div className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Dang tinh...</div> : <p className="mt-1 text-3xl font-bold text-slate-900">{item.value}</p>}
+                                {summaryLoading ? <div className="mt-1 flex items-center gap-2 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />Đang tính...</div> : <p className="mt-1 text-3xl font-bold text-slate-900">{item.value}</p>}
                             </div>
                         </div>
                     </article>

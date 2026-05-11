@@ -4,19 +4,19 @@ export function getRideFlowErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
     switch (error.code) {
       case "MAP_API_ERROR":
-        return "Khong ket noi duoc dich vu ban do. Vui long thu lai.";
+        return "Không thể tải bản đồ. Vui lòng kiểm tra kết nối mạng và thử lại.";
       case "ETA_UNAVAILABLE":
-        return "Khong tinh duoc ETA cho lo trinh nay.";
+        return "Không thể tính được ETA cho lộ trình này.";
       case "PRICING_ERROR":
-        return "Khong tinh duoc gia cuoc. Vui long doi loai xe hoac thu lai.";
+        return "Không thể tính được giá cước. Vui lòng đợi loại xe hoặc thử lại.";
       case "BOOKING_CREATE_ERROR":
-        return "Tao booking that bai. Vui long thu lai.";
+        return "Tạo booking thất bại. Vui lòng thử lại.";
       case "NETWORK_ERROR":
-        return "Mat ket noi mang. Kiem tra internet va thu lai.";
+        return "Mất kết nối mạng. Vui lòng kiểm tra kết nối và thử lại.";
       default:
         return error.message;
     }
   }
 
-  return "Co loi xay ra, vui long thu lai.";
+  return "Có lỗi xảy ra. Vui lòng thử lại.";
 }

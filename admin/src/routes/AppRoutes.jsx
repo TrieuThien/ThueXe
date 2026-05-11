@@ -58,6 +58,8 @@ import CustomerReportPage from "../pages/reports/CustomerReportPage";
 import PaymentReportPage from "../pages/reports/PaymentReportPage";
 import RentalPackagesPage from "../pages/rentals/RentalPackagesPage";
 import RentalBookingListPage from "../pages/rental-bookings/RentalBookingListPage";
+import RentalCarBookingListPage from "../pages/rental-bookings/RentalCarBookingListPage";
+import RentalDriverBookingListPage from "../pages/rental-bookings/RentalDriverBookingListPage";
 
 function getElementByRoleAndPath(role, path) {
     const sharedMap = {
@@ -111,6 +113,8 @@ function getElementByRoleAndPath(role, path) {
             "reports/payments": <PaymentReportPage />,
             "rental-packages": <RentalPackagesPage />,
             "rental-bookings": <RentalBookingListPage />,
+            "rental-car-bookings": <RentalCarBookingListPage />,
+            "rental-driver-bookings": <RentalDriverBookingListPage />,
         };
 
         if (adminMap[path]) {
@@ -123,6 +127,8 @@ function getElementByRoleAndPath(role, path) {
             "customer/create": <NewCustomer />,
             "customers": <CustomerList />,
             "rental-bookings": <RentalBookingListPage />,
+        "rental-car-bookings": <RentalCarBookingListPage />,
+        "rental-driver-bookings": <RentalDriverBookingListPage />,
         };
 
         if (dispatcherMap[path]) {

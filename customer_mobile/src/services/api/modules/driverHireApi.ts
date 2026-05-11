@@ -3,7 +3,7 @@
  * API client cho luồng thuê tài xế tức thì / lịch hẹn.
  */
 
-import apiClient from '../apiClient';
+import { apiClient } from '../apiClient';
 
 export interface CreateDriverHirePayload {
   package_id: number;
@@ -59,6 +59,7 @@ export interface DriverHireBookingDetail {
   pickup_lng: number | null;
   base_price: number;
   total_price: number;
+  updated_at: string;
 }
 
 const BASE = '/api/customer/driver-hire';

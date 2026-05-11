@@ -10,7 +10,8 @@ import type {
 } from '../../types/schedule';
 
 type BackendAvailability = {
-  id?: number;
+  schedule_id?: number;
+  rental_id?: number | null;
   start_datetime?: string;
   end_datetime?: string;
   status?: string;
@@ -19,10 +20,10 @@ type BackendAvailability = {
 };
 
 type BackendRentalBooking = {
-  id?: number;
-  booking_code?: string;
-  customer_name?: string;
-  customer_phone?: string;
+  rental_id?: number;
+  rental_code?: string;
+  user_name?: string;
+  user_phone?: string;
   start_datetime?: string;
   end_datetime?: string;
   status?: string;
@@ -59,12 +60,15 @@ export const driverScheduleService = {
       toDate = d.toISOString().slice(0, 10);
     }
 
+    // Bookings: always from today onwards so future-assigned trips always appear
+    const todayDate = new Date().toISOString().slice(0, 10);
+
     const [availRes, bookingRes, profileRes] = await Promise.all([
       apiClient.get('/api/driver/rental/availability', {
         params: { fromDate, toDate, limit: 50 }
       }),
       apiClient.get('/api/driver/rental/bookings', {
-        params: { fromDate, toDate, limit: 50 }
+        params: { fromDate: todayDate, limit: 50 }
       }),
       apiClient.get('/api/driver/working-status')
     ]);
@@ -83,17 +87,18 @@ export const driverScheduleService = {
     const bookings = bookingData.bookings ?? bookingData.items ?? [];
 
     const slots: DriverScheduleSlot[] = availabilities.map((a) => ({
-      id: String(a.id ?? ''),
+      id: String(a.schedule_id ?? ''),
       startAt: a.start_datetime ?? '',
       endAt: a.end_datetime ?? '',
       status: mapSlotStatus(a.status),
-      source: 'driver_schedule' as const
+      source: 'driver_schedule' as const,
+      bookingId: a.rental_id ? String(a.rental_id) : undefined,
     }));
 
     const assignedBookings: RentalBookingSummary[] = bookings.map((b) => ({
-      id: String(b.id ?? ''),
-      bookingCode: b.booking_code ?? String(b.id ?? ''),
-      customerName: b.customer_name ?? 'Khách hàng',
+      id: String(b.rental_id ?? ''),
+      bookingCode: b.rental_code ?? String(b.rental_id ?? ''),
+      customerName: b.user_name ?? 'Khách hàng',
       startAt: b.start_datetime ?? '',
       endAt: b.end_datetime ?? '',
       status: mapRentalStatus(b.status),
@@ -142,10 +147,10 @@ export const driverScheduleService = {
     const b = (data as { booking?: BackendRentalBooking }).booking ?? (data as BackendRentalBooking);
 
     return {
-      id: String(b.id ?? bookingId),
-      bookingCode: b.booking_code ?? bookingId,
-      customerName: b.customer_name ?? 'Khách hàng',
-      customerPhone: b.customer_phone ?? '',
+      id: String(b.rental_id ?? bookingId),
+      bookingCode: b.rental_code ?? bookingId,
+      customerName: b.user_name ?? 'Khách hàng',
+      customerPhone: b.user_phone ?? '',
       startAt: b.start_datetime ?? '',
       endAt: b.end_datetime ?? '',
       status: mapRentalStatus(b.status),

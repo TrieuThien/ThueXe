@@ -76,6 +76,8 @@ export function getAuthErrorMessage(error: unknown): string {
         return "Tài khoản đang bị vô hiệu hóa.";
       case "NETWORK_ERROR":
         return "Không kết nối được đến máy chủ. Vui lòng kiểm tra mạng.";
+      case "RATE_LIMITED":
+        return "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng thử lại sau 15 phút.";
       default:
         if (error.status === 401) {
           return "Phiên đăng nhập không hợp lệ. Vui lòng thử lại.";

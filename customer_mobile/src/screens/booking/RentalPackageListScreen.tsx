@@ -65,6 +65,7 @@ interface NearbyPackage {
   package_id: number;
   package_name: string;
   price: number;
+  deposit_amount: number;
   description: string | null;
   service_type: number;
   coverage_type: string | null;
@@ -253,14 +254,25 @@ export function RentalPackageListScreen({ navigation }: Props) {
             key={pkg.package_id}
             item={pkg}
             btnLabel={btnLabel}
-            onPress={() =>
-              navigation.navigate("RentalPackageCars", {
-                packageId: pkg.package_id,
-                packageName: pkg.package_name,
-                packageBasePrice: pkg.price,
-                packageDurationHours: pkg.duration_hours ?? undefined,
-              })
-            }
+            onPress={() => {
+              if (selectedServiceType === "RENTAL_DRIVER") {
+                navigation.navigate("DriverHireConfirm", {
+                  packageId: pkg.package_id,
+                  packageName: pkg.package_name,
+                  basePrice: pkg.price,
+                  depositAmount: pkg.deposit_amount ?? 0,
+                  durationHours: pkg.duration_hours ?? undefined,
+                  distanceLimitKm: pkg.distance_limit_km,
+                });
+              } else {
+                navigation.navigate("RentalPackageCars", {
+                  packageId: pkg.package_id,
+                  packageName: pkg.package_name,
+                  packageBasePrice: pkg.price,
+                  packageDurationHours: pkg.duration_hours ?? undefined,
+                });
+              }
+            }}
           />
         ))}
       </ScrollView>

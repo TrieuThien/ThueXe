@@ -102,7 +102,11 @@ export default function VehicleListTable({
                         {readableVerify[row.verificationStatus] || row.verificationStatus}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-slate-600">{row.location?.label || 'Không có dữ liệu'}</td>
+                    <td className="px-3 py-2 text-slate-600">
+                      {row.location
+                        ? `${row.location.lat.toFixed(5)}, ${row.location.lng.toFixed(5)}`
+                        : 'Không có dữ liệu'}
+                    </td>
                     <td className="px-3 py-2">
                       {isVerified ? (
                         <button

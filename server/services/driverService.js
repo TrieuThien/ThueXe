@@ -17,6 +17,7 @@ import {
     findExistingAccountByEmail,
     findExistingAccountByPhone,
     findLatestDriverLocation,
+    findOnlineDriversWithLocations,
     insertDriver,
     rideExists,
     routeExists,
@@ -762,4 +763,12 @@ export async function getDriverLocation(driverIdInput) {
 
     const location = await findLatestDriverLocation(driverId);
     return { location };
+}
+
+export async function getOnlineDriversWithLocations() {
+    const drivers = await findOnlineDriversWithLocations();
+    return {
+        total_online: drivers.length,
+        drivers,
+    };
 }

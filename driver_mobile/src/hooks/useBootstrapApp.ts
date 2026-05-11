@@ -5,6 +5,7 @@ import { useUiStore } from '../store/uiStore';
 import { driverService } from '../services/api/driverService';
 import { realtimeClient } from '../services/realtime/socketClient';
 import { useNotificationStore } from '../store/notificationStore';
+import { permissionService } from '../services/permissions/permissionService';
 
 export const useBootstrapApp = () => {
   const setBootstrapping = useUiStore((state) => state.setBootstrapping);
@@ -31,6 +32,9 @@ export const useBootstrapApp = () => {
           setSession(profile, tokens);
           const unread = await driverService.getNotificationsUnreadCount();
           setUnreadCount(unread.unreadCount);
+
+          // Request location permission after user is authenticated
+          await permissionService.ensureLocationPermission();
         }
       } catch {
         await tokenStorage.clearTokens();

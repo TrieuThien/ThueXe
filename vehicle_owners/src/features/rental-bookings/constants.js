@@ -3,7 +3,7 @@
   confirmed: 'Đã xác nhận',
   in_progress: 'Đang thuê',
   completed: 'Hoàn tất',
-  canceled: 'Đã Hủy',
+  canceled: 'Hủy',
 };
 
 export const RENTAL_PAYMENT_STATUS_LABELS = {

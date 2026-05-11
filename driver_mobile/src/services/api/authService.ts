@@ -146,5 +146,9 @@ export const authService = {
     } finally {
       await tokenStorage.clearTokens();
     }
+  },
+
+  async registerPushToken(token: string): Promise<void> {
+    await apiClient.patch('/api/driver/auth/me/push-token', { push_notification_token: token });
   }
 };

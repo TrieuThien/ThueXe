@@ -29,9 +29,9 @@ type FormData = z.infer<typeof schema>;
 type Props = NativeStackScreenProps<WalletStackParamList, 'WalletTopUp'>;
 
 const paymentMethods: { id: TopupPaymentMethod; label: string; color: string; activeColor: string; activeTextColor: string }[] = [
-  { id: 'momo',    label: 'MoMo',             color: '#FFE4EF', activeColor: '#FFE4EF', activeTextColor: '#B5004A' },
-  { id: 'sepay',   label: 'SePay',            color: '#DBEAFE', activeColor: '#DBEAFE', activeTextColor: '#1D4ED8' },
-  { id: 'zalopay', label: 'ZaloPay',          color: '#EEF2FF', activeColor: '#EEF2FF', activeTextColor: '#4338CA' },
+  { id: 'momo', label: 'MoMo', color: '#FFE4EF', activeColor: '#FFE4EF', activeTextColor: '#B5004A' },
+  { id: 'sepay', label: 'SePay', color: '#DBEAFE', activeColor: '#DBEAFE', activeTextColor: '#1D4ED8' },
+  { id: 'zalopay', label: 'ZaloPay', color: '#EEF2FF', activeColor: '#EEF2FF', activeTextColor: '#4338CA' },
   { id: 'banking', label: 'Internet Banking', color: '#FEF9C3', activeColor: '#FEF9C3', activeTextColor: '#A16207' },
 ];
 
@@ -89,8 +89,8 @@ export const WalletTopUpScreen = ({ navigation }: Props) => {
         />
 
         <View style={styles.quickWrap}>
-          {QUICK_AMOUNTS.map((quick) => (
-            <Pressable key={quick} onPress={() => setValue('amount', String(quick))} style={styles.quickChip}>
+          {QUICK_AMOUNTS.map((quick, index) => (
+            <Pressable key={`amount-${index}`} onPress={() => setValue('amount', String(quick))} style={styles.quickChip}>
               <Text style={styles.quickText}>{quick.toLocaleString('vi-VN')}</Text>
             </Pressable>
           ))}

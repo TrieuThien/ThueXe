@@ -2,20 +2,24 @@
  * DriverFoundScreen.tsx
  *
  * Hiển thị thông tin tài xế sau khi được match thành công.
+ * Poll vị trí GPS tài xế mỗi 10s để cập nhật bản đồ.
  * Route: DriverFound
  */
 
+import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
   Image,
-  TouchableOpacity,
   Linking,
+  Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { DriverHireBookingDetail } from '../../services/api/modules/driverHireApi';
+
+import { driverHireApi, DriverHireBookingDetail } from '../../services/api/modules/driverHireApi';
 
 interface Props {
   route: {
@@ -27,9 +31,66 @@ interface Props {
   navigation: any;
 }
 
-export default function DriverFoundScreen({ route, navigation }: Props) {
-  const { booking } = route.params;
+function secondsAgo(isoStr?: string): string {
+  if (!isoStr) return '';
+  const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+  if (diff < 60) return `${diff}s trước`;
+  return `${Math.floor(diff / 60)}p trước`;
+}
+
+function DriverMap({ lat, lng, updatedAt }: { lat: number; lng: number; updatedAt?: string }) {
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.mapWrap, styles.webFallback]}>
+        <Text style={styles.webCoords}>📍 {lat.toFixed(5)}, {lng.toFixed(5)}</Text>
+        {updatedAt ? <Text style={styles.mapUpdated}>Cập nhật {secondsAgo(updatedAt)}</Text> : null}
+      </View>
+    );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const maps = require('react-native-maps') as { default: any; Marker: any };
+  const MapView = maps.default;
+  const Marker = maps.Marker;
+
+  return (
+    <View style={styles.mapWrap}>
+      <MapView
+        style={styles.map}
+        region={{
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        }}
+      >
+        <Marker
+          coordinate={{ latitude: lat, longitude: lng }}
+          title="Tài xế"
+        />
+      </MapView>
+      {updatedAt ? (
+        <View style={styles.mapBadge}>
+          <Text style={styles.mapUpdated}>Cập nhật {secondsAgo(updatedAt)}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+export function DriverFoundScreen({ route, navigation }: Props) {
+  const { bookingId, booking } = route.params;
   const driver = booking.driver;
+
+  const { data: liveBooking } = useQuery({
+    queryKey: ['driverHire', 'status', bookingId],
+    queryFn: () => driverHireApi.getStatus(bookingId),
+    refetchInterval: 10_000,
+  });
+
+  const driverLat = liveBooking?.driver?.current_lat ?? driver?.current_lat;
+  const driverLng = liveBooking?.driver?.current_lng ?? driver?.current_lng;
+  const hasLocation = driverLat != null && driverLng != null;
 
   const callDriver = () => {
     if (driver?.phone) {
@@ -57,6 +118,19 @@ export default function DriverFoundScreen({ route, navigation }: Props) {
         <Text style={styles.successTitle}>Tài xế đã nhận chuyến!</Text>
         <Text style={styles.successSub}>Tài xế đang trên đường đến</Text>
       </View>
+
+      {/* Live map */}
+      {hasLocation ? (
+        <DriverMap
+          lat={driverLat!}
+          lng={driverLng!}
+          updatedAt={liveBooking?.updated_at}
+        />
+      ) : (
+        <View style={[styles.mapWrap, styles.noLocationBox]}>
+          <Text style={styles.noLocationText}>Chưa có vị trí tài xế</Text>
+        </View>
+      )}
 
       {/* Driver card */}
       {driver && (
@@ -130,10 +204,9 @@ function DetailRow({
 
 const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: '#F9FAFB' },
-  content:    { padding: 20, paddingBottom: 48 },
+  content:    { padding: 20, paddingBottom: 48, gap: 16 },
   successHeader: {
     alignItems: 'center',
-    marginBottom: 24,
     paddingVertical: 28,
     backgroundColor: '#ECFDF5',
     borderRadius: 16,
@@ -141,11 +214,43 @@ const styles = StyleSheet.create({
   successIcon:  { fontSize: 48, color: '#10B981', marginBottom: 8 },
   successTitle: { fontSize: 22, fontWeight: '800', color: '#065F46' },
   successSub:   { fontSize: 14, color: '#047857', marginTop: 4 },
+
+  mapWrap: {
+    height: 240,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  map: { flex: 1 },
+  mapBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  mapUpdated: { fontSize: 11, color: '#FFFFFF' },
+  webFallback: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  webCoords:     { fontSize: 13, color: '#334155', fontWeight: '600' },
+  noLocationBox: {
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noLocationText: { fontSize: 14, color: '#9CA3AF' },
+
   driverCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -177,7 +282,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
-    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,

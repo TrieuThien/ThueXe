@@ -4,11 +4,11 @@ import type { WalletTransaction } from '../../types/wallet';
 import { formatCurrency, formatDateTime } from '../../utils/format';
 
 const typeMeta: Record<WalletTransaction['type'], { label: string; color: string }> = {
-  nap_tien: { label: 'Nap tien', color: '#2563EB' },
-  thanh_toan: { label: 'Thanh toan', color: '#16A34A' },
-  khau_tru: { label: 'Khau tru', color: '#DC2626' },
-  rut_tien: { label: 'Rut tien', color: '#EA580C' },
-  hoan_tien: { label: 'Hoan tien', color: '#7C3AED' }
+  nap_tien: { label: 'Nạp tiền', color: '#2563EB' },
+  thanh_toan: { label: 'Thanh toán', color: '#16A34A' },
+  khau_tru: { label: 'Khấu trừ', color: '#DC2626' },
+  rut_tien: { label: 'Rút tiền', color: '#EA580C' },
+  hoan_tien: { label: 'Hoàn tiền', color: '#7C3AED' }
 };
 
 export const TransactionItem = ({ item }: { item: WalletTransaction }) => {
@@ -23,7 +23,7 @@ export const TransactionItem = ({ item }: { item: WalletTransaction }) => {
       <Text style={styles.date}>{formatDateTime(item.createdAt)}</Text>
       <View style={styles.rowBottom}>
         <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
-        <Text style={styles.balance}>So du: {formatCurrency(item.balanceAfter)}</Text>
+        <Text style={styles.balance}>Số dư: {formatCurrency(item.balanceAfter)}</Text>
       </View>
       {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
     </View>

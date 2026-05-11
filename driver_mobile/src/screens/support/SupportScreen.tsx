@@ -62,8 +62,8 @@ export const SupportScreen = () => {
     <MainLayout title="Hỗ trợ tài xe" scrollable={true}>
       <SectionCard title="Danh sách chủ đề hỗ trợ" subtitle="Chọn đúng nhóm vấn đề để được xử lý nhanh hơn">
         <View style={styles.topicWrap}>
-          {safeTopics.map((topic) => (
-            <View key={topic.id} style={styles.topicChip}>
+          {safeTopics.map((topic, index) => (
+            <View key={`topic-${topic.id}-${index}`} style={styles.topicChip}>
               <Text style={styles.topicTitle}>{topic.title}</Text>
               <Text style={styles.topicDescription}>{topic.description}</Text>
             </View>
@@ -79,7 +79,7 @@ export const SupportScreen = () => {
         ) : (
           <FlatList
             data={safeTickets}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => `ticket-${item.id}`}
             scrollEnabled={false}
             contentContainerStyle={styles.ticketList}
             renderItem={({ item }) => (

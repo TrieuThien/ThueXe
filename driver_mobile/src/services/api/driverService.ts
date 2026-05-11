@@ -47,7 +47,7 @@ export const driverService = {
   // Dashboard: dùng income/summary vì không có endpoint dashboard riêng
   async getDashboard(): Promise<DashboardSummary> {
     const response = await apiClient.get('/api/driver/income/summary');
-    const data = response.data.data as { income?: { today?: number; thisMonth?: number; allTime?: number } };
+    const data = response.data.data as { income?: { today?: number } };
     return {
       todayIncome: data.income?.today ?? 0
     };

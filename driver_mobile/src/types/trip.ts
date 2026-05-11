@@ -9,6 +9,8 @@
 
 export type PaymentStatus = 'pending' | 'paid_cash' | 'paid_wallet';
 
+export type PaymentMethod = 'CASH' | 'WALLET';
+
 export type ActiveTrip = {
   tripId: string;
   customerName: string;
@@ -21,8 +23,13 @@ export type ActiveTrip = {
   actualFare?: number;
   status: TripFlowStatus;
   paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod;
   expiresAt?: string;
   cancelReason?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
 };
 
 export type TripSummary = {
@@ -35,6 +42,7 @@ export type TripSummary = {
   estimatedFare: number;
   actualFare: number;
   paymentStatus: PaymentStatus;
+  paymentMethod?: PaymentMethod;
   completedAt: string;
 };
 

@@ -1,5 +1,5 @@
 import { apiClient } from '../api/client';
-import type { ActiveTrip, TripLocationPayload, TripMutationPayload, TripSummary } from '../../types/trip';
+import type { ActiveTrip, PaymentMethod, TripLocationPayload, TripMutationPayload, TripSummary } from '../../types/trip';
 
 // Backend booking → ActiveTrip mapper
 type BackendBooking = {
@@ -7,22 +7,33 @@ type BackendBooking = {
   booking_code?: string;
   status?: number;
   pickup_address?: string;
+  pickup_lat?: number | null;
+  pickup_long?: number | null;
   dropoff_address?: string;
+  dropoff_lat?: number | null;
+  dropoff_long?: number | null;
   estimated_cost?: number;
   actual_cost?: number;
+  est_distance?: number;
+  est_duration?: number;
   distance_km?: number;
   duration_min?: number;
   cancel_comment?: string;
-  driver_id?: number;
+  driver_id?: number | null;
   customer?: { firstname?: string; lastname?: string; phone?: string } | null;
   customer_name?: string;
   customer_phone?: string;
+  user_firstname?: string;
+  user_lastname?: string;
+  user_phone?: string;
   payment_status?: string;
+  payment_type?: number | null;
+  haspaid?: number | null;
   expires_at?: string | null;
 };
 
 const BOOKING_STATUS_MAP: Record<number, ActiveTrip['status']> = {
-  0: 'incoming',
+  0: 'accepted',
   1: 'in_progress',
   2: 'cancelled',
   3: 'completed',
@@ -31,26 +42,42 @@ const BOOKING_STATUS_MAP: Record<number, ActiveTrip['status']> = {
   6: 'arrived_pickup'
 };
 
+function mapPaymentType(paymentType: number | null | undefined): PaymentMethod | undefined {
+  if (paymentType === null || paymentType === undefined) return undefined;
+  const numeric = Number(paymentType);
+  if (numeric === 1) return 'CASH';
+  if (numeric === 2) return 'WALLET';
+  return undefined;
+}
+
 function mapBookingToActiveTrip(b: BackendBooking): ActiveTrip {
   const customerName =
-    b.customer_name ??
-    [b.customer?.firstname, b.customer?.lastname].filter(Boolean).join(' ') ??
+    b.customer_name ||
+    [b.customer?.firstname, b.customer?.lastname].filter(Boolean).join(' ') ||
+    [b.user_firstname, b.user_lastname].filter(Boolean).join(' ') ||
     'Khách hàng';
 
   return {
     tripId: String(b.id ?? ''),
     customerName,
-    customerPhone: b.customer_phone ?? b.customer?.phone ?? '',
+    customerPhone: b.customer_phone ?? b.customer?.phone ?? b.user_phone ?? '',
     pickupAddress: b.pickup_address ?? '',
     dropoffAddress: b.dropoff_address ?? '',
-    estimatedDistanceKm: b.distance_km ?? 0,
-    estimatedDurationMin: b.duration_min ?? 0,
+    estimatedDistanceKm: b.distance_km ?? b.est_distance ?? 0,
+    estimatedDurationMin: b.duration_min ?? b.est_duration ?? 0,
     estimatedFare: b.estimated_cost ?? 0,
     actualFare: b.actual_cost ?? undefined,
-    status: BOOKING_STATUS_MAP[b.status ?? 0] ?? 'incoming',
-    paymentStatus: 'pending',
+    status: BOOKING_STATUS_MAP[b.status ?? 0] ?? 'accepted',
+    paymentStatus: b.haspaid === 1
+      ? (b.payment_type === 1 ? 'paid_cash' : 'paid_wallet')
+      : 'pending',
+    paymentMethod: mapPaymentType(b.payment_type),
     expiresAt: b.expires_at ?? undefined,
-    cancelReason: b.cancel_comment ?? undefined
+    cancelReason: b.cancel_comment ?? undefined,
+    pickupLat: b.pickup_lat ?? undefined,
+    pickupLng: b.pickup_long ?? undefined,
+    dropoffLat: b.dropoff_lat ?? undefined,
+    dropoffLng: b.dropoff_long ?? undefined,
   };
 }
 
@@ -70,6 +97,7 @@ function mapBookingToTripSummary(b: BackendBooking): TripSummary {
     estimatedFare: b.estimated_cost ?? 0,
     actualFare: b.actual_cost ?? b.estimated_cost ?? 0,
     paymentStatus: 'pending',
+    paymentMethod: mapPaymentType(b.payment_type),
     completedAt: new Date().toISOString()
   };
 }

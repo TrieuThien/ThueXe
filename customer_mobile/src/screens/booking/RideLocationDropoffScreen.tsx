@@ -1,5 +1,6 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState } from "react";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -19,6 +20,7 @@ import {
     useCurrentLocation,
     useRideRouteEstimateMutation,
 } from "../../hooks";
+import { resolveGooglePlaceDetails } from "../../utils/googlePlaces";
 import { BookingStackParamList } from "../../navigation";
 import { useRideFlowStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -66,7 +68,21 @@ export function RideLocationDropoffScreen({
         }
         : undefined;
 
-    const destAutocomplete = useAddressAutocomplete(destinationInput, locationBias);
+    // Destination gets the "current location" suggestion; stops do not
+    const destBias = location.data
+        ? {
+            ...locationBias!,
+            currentLocation: location.data.address
+                ? {
+                    label: location.data.address,
+                    latitude: location.data.latitude,
+                    longitude: location.data.longitude,
+                }
+                : undefined,
+        }
+        : undefined;
+
+    const destAutocomplete = useAddressAutocomplete(destinationInput, destBias);
     const stop1Autocomplete = useAddressAutocomplete(stop1Input, locationBias);
     const stop2Autocomplete = useAddressAutocomplete(stop2Input, locationBias);
 
@@ -124,14 +140,15 @@ export function RideLocationDropoffScreen({
     };
 
     const resolveSuggestionLabel = async (item: AddressSuggestion): Promise<string> => {
+        if (item.placeId) {
+            const details = await resolveGooglePlaceDetails(item.placeId).catch(() => null);
+            return details?.formattedAddress || item.label;
+        }
         if (typeof item.latitude !== "number" || typeof item.longitude !== "number") {
             return item.label;
         }
         try {
-            const resolved = await reverseGeocodeToDisplayAddress(
-                item.latitude,
-                item.longitude
-            );
+            const resolved = await reverseGeocodeToDisplayAddress(item.latitude, item.longitude);
             return resolved ?? item.label;
         } catch {
             return item.label;
@@ -207,15 +224,27 @@ export function RideLocationDropoffScreen({
     };
 
     const handleSelectDestination = async (item: AddressSuggestion) => {
-        const nextLabel = await resolveSuggestionLabel(item);
-        setDestinationInput(nextLabel);
-        setSelectedDestination(nextLabel);
-
-        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-            setDestinationCoord({
-                latitude: item.latitude,
-                longitude: item.longitude,
-            });
+        if (item.isCurrentLocation) {
+            setDestinationInput(item.label);
+            setSelectedDestination(item.label);
+            if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                setDestinationCoord({ latitude: item.latitude, longitude: item.longitude });
+            }
+        } else if (item.placeId) {
+            const details = await resolveGooglePlaceDetails(item.placeId);
+            const address = details?.formattedAddress || item.label;
+            setDestinationInput(address);
+            setSelectedDestination(address);
+            if (details) {
+                setDestinationCoord({ latitude: details.latitude, longitude: details.longitude });
+            }
+        } else {
+            const nextLabel = await resolveSuggestionLabel(item);
+            setDestinationInput(nextLabel);
+            setSelectedDestination(nextLabel);
+            if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                setDestinationCoord({ latitude: item.latitude, longitude: item.longitude });
+            }
         }
         setShowDestinationSuggestions(false);
     };
@@ -325,7 +354,7 @@ export function RideLocationDropoffScreen({
                         {!destAutocomplete.loading &&
                             showDestinationSuggestions &&
                             destinationInput.trim().length >= 2 &&
-                            destAutocomplete.suggestions.length === 0 && (
+                            destAutocomplete.suggestions.filter((s) => !s.isCurrentLocation).length === 0 && (
                                 <Text style={[styles.hint, { color: theme.colors.textMuted }]}>
                                     Không tìm thấy gợi ý phù hợp
                                 </Text>
@@ -350,8 +379,14 @@ export function RideLocationDropoffScreen({
                                             { borderBottomColor: theme.colors.border },
                                         ]}
                                     >
+                                        <MaterialCommunityIcons
+                                            name={item.isCurrentLocation ? "crosshairs-gps" : "map-marker-outline"}
+                                            size={14}
+                                            color={item.isCurrentLocation ? theme.colors.primary : theme.colors.textMuted}
+                                            style={{ marginRight: 6 }}
+                                        />
                                         <Text
-                                            style={[styles.suggestionText, { color: theme.colors.text }]}
+                                            style={[styles.suggestionText, { color: theme.colors.text, flex: 1 }]}
                                             numberOfLines={1}
                                         >
                                             {item.label}
@@ -425,13 +460,16 @@ export function RideLocationDropoffScreen({
                                             <Pressable
                                                 key={item.id}
                                                 onPress={async () => {
-                                                    const nextLabel = await resolveSuggestionLabel(item);
-                                                    setStop1Input(nextLabel);
-                                                    if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                                                        setStop1Coord({
-                                                            latitude: item.latitude,
-                                                            longitude: item.longitude,
-                                                        });
+                                                    if (item.placeId) {
+                                                        const details = await resolveGooglePlaceDetails(item.placeId);
+                                                        setStop1Input(details?.formattedAddress || item.label);
+                                                        if (details) setStop1Coord({ latitude: details.latitude, longitude: details.longitude });
+                                                    } else {
+                                                        const nextLabel = await resolveSuggestionLabel(item);
+                                                        setStop1Input(nextLabel);
+                                                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                                                            setStop1Coord({ latitude: item.latitude, longitude: item.longitude });
+                                                        }
                                                     }
                                                     setShowStop1Suggestions(false);
                                                 }}
@@ -502,13 +540,16 @@ export function RideLocationDropoffScreen({
                                             <Pressable
                                                 key={item.id}
                                                 onPress={async () => {
-                                                    const nextLabel = await resolveSuggestionLabel(item);
-                                                    setStop2Input(nextLabel);
-                                                    if (typeof item.latitude === "number" && typeof item.longitude === "number") {
-                                                        setStop2Coord({
-                                                            latitude: item.latitude,
-                                                            longitude: item.longitude,
-                                                        });
+                                                    if (item.placeId) {
+                                                        const details = await resolveGooglePlaceDetails(item.placeId);
+                                                        setStop2Input(details?.formattedAddress || item.label);
+                                                        if (details) setStop2Coord({ latitude: details.latitude, longitude: details.longitude });
+                                                    } else {
+                                                        const nextLabel = await resolveSuggestionLabel(item);
+                                                        setStop2Input(nextLabel);
+                                                        if (typeof item.latitude === "number" && typeof item.longitude === "number") {
+                                                            setStop2Coord({ latitude: item.latitude, longitude: item.longitude });
+                                                        }
                                                     }
                                                     setShowStop2Suggestions(false);
                                                 }}
@@ -647,6 +688,8 @@ const styles = StyleSheet.create({
         overflow: "hidden",
     },
     suggestionItem: {
+        flexDirection: "row",
+        alignItems: "center",
         paddingHorizontal: 12,
         paddingVertical: 10,
         borderBottomWidth: 1,

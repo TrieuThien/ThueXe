@@ -63,6 +63,17 @@ export async function selectDriverPackage(auth, body) {
         priceOverride = override;
     }
 
+    // Kiểm tra driver đã có gói active khác chưa (max 1 gói)
+    const activePackages = await listDriverActivePackages(driverId);
+    const activeInOther = activePackages.filter((p) => Number(p.package_id) !== packageId);
+    if (activeInOther.length >= 1) {
+        throw new AppError(
+            "Bạn chỉ được đăng ký tối đa 1 gói thuê tài xế. Hủy gói hiện tại trước khi chọn gói mới.",
+            409,
+            "MAX_PACKAGE_LIMIT"
+        );
+    }
+
     await upsertDriverPackageEnrollment(driverId, packageId, priceOverride);
 
     const enrolled = await findEnrollmentByPackage(driverId, packageId);

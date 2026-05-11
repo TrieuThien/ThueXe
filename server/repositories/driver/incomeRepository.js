@@ -51,21 +51,21 @@ export async function getIncomeSummaryStats(driverId, conn = null) {
     const [rows] = await db(conn).query(
         `SELECT
             COUNT(*)                                                        AS total_trips,
-            SUM(CASE WHEN DATE(b.date_completed) = CURDATE()             THEN 1 ELSE 0 END) AS today_trips,
-            SUM(CASE WHEN YEAR(b.date_completed)  = YEAR(NOW())
-                      AND MONTH(b.date_completed) = MONTH(NOW())          THEN 1 ELSE 0 END) AS month_trips,
+            SUM(CASE WHEN DATE(b.date_created) = CURDATE()             THEN 1 ELSE 0 END) AS today_trips,
+            SUM(CASE WHEN YEAR(b.date_created)  = YEAR(NOW())
+                      AND MONTH(b.date_created) = MONTH(NOW())          THEN 1 ELSE 0 END) AS month_trips,
 
             SUM(${EARNINGS_EXPR})                                          AS total_earnings,
-            SUM(CASE WHEN DATE(b.date_completed) = CURDATE()
+            SUM(CASE WHEN DATE(b.date_created) = CURDATE()
                      THEN ${EARNINGS_EXPR} ELSE 0 END)                    AS today_earnings,
-            SUM(CASE WHEN YEAR(b.date_completed)  = YEAR(NOW())
-                      AND MONTH(b.date_completed) = MONTH(NOW())
+            SUM(CASE WHEN YEAR(b.date_created)  = YEAR(NOW())
+                      AND MONTH(b.date_created) = MONTH(NOW())
                      THEN ${EARNINGS_EXPR} ELSE 0 END)                    AS month_earnings,
 
             SUM(CASE WHEN b.driver_settled = 0
                      THEN ${EARNINGS_EXPR} ELSE 0 END)                    AS unsettled_earnings
          FROM bookings b
-         WHERE b.driver_id = ? AND b.status = 3`,
+         WHERE b.driver_id = ?`,
         [driverId]
     );
 
@@ -75,9 +75,10 @@ export async function getIncomeSummaryStats(driverId, conn = null) {
         today_trips: Number(r.today_trips || 0),
         month_trips: Number(r.month_trips || 0),
         total_earnings: Number(r.total_earnings || 0),
-        today_earnings: Number(r.today_earnings || 0),
-        month_earnings: Number(r.month_earnings || 0),
-        unsettled_earnings: Number(r.unsettled_earnings || 0),
+        today: Number(r.today_earnings || 0),
+        thisMonth: Number(r.month_earnings || 0),
+        allTime: Number(r.total_earnings || 0),
+        unsettled: Number(r.unsettled_earnings || 0),
     };
 }
 

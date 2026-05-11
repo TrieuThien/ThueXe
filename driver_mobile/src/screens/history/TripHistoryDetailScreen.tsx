@@ -26,9 +26,8 @@ export const TripHistoryDetailScreen = ({ route }: Props) => {
   }
 
   const detail = detailQuery.data;
-
   return (
-    <MainLayout title={`Chi tiet ${detail.tripCode}`} scrollable={false}>
+    <MainLayout title={`Chi tiết chuyến đi #${detail.tripCode}`} scrollable={false}>
       <View style={styles.card}>
         <Text style={styles.title}>Thông tin chung</Text>
         <Text style={styles.item}>Mã chuyến: {detail.tripCode}</Text>
@@ -59,7 +58,7 @@ export const TripHistoryDetailScreen = ({ route }: Props) => {
         <Text style={styles.title}>Timeline trạng thái</Text>
         <FlatList
           data={detail.timeline}
-          keyExtractor={(item, index) => `${item.status}-${index}`}
+          keyExtractor={(item) => `timeline-${item.at}`}
           scrollEnabled={false}
           renderItem={({ item }) => (
             <View style={styles.timelineRow}>

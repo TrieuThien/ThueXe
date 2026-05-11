@@ -28,8 +28,8 @@ export const patchOnlineStatusValidator = [
 
 export const patchServiceTypeValidator = [
     body("available_for_rental")
-        .isInt({ min: 0, max: 1 })
-        .withMessage("available_for_rental must be 0 or 1")
+        .isInt({ min: 0, max: 2 })
+        .withMessage("available_for_rental must be 0, 1 or 2")
         .toInt(),
 ];
 

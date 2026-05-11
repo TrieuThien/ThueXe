@@ -37,6 +37,17 @@ import {
     rememberInflightPromise,
 } from "../utils/idempotencyCache.js";
 import { emitBookingStatusUpdated } from "./customer/realtimeService.js";
+import { startRideDispatch } from "./rideDispatchService.js";
+import { publishRealtimeEvent } from "../utils/realtime.js";
+import {
+    findWalletByActor,
+    findWalletByIdForUpdate,
+    updateWalletBalance,
+    insertWalletLedger,
+    updatePaymentStatusById,
+    insertPayment,
+    markBookingPaidByWallet,
+} from "../repositories/walletRepository.js";
 
 const BOOKING_STATUS = {
     PENDING: 0,
@@ -442,7 +453,7 @@ export function createBookingService(overrides = {}) {
             {
                 personId: driver.driver_id,
                 userType: 1,
-                content: `You have a new booking assignment #${bookingId}`,
+                content: `Bạn có yêu cầu chuyến xe mới #${bookingId}`,
                 nType: 2,
             },
             conn
@@ -515,11 +526,80 @@ export function createBookingService(overrides = {}) {
                         conn
                     );
 
+                    // ── Wallet payment: lock, verify balance, charge atomically ─────────
+                    // This must happen inside the same transaction so that a failed
+                    // balance check rolls back the booking insert as well.
+                    if (normalizedPayload.payment_type === 2) {
+                        const chargeAmount = normalizedPayload.estimated_cost;
+                        if (!(chargeAmount > 0)) {
+                            throw new AppError(
+                                "estimated_cost must be positive for wallet payment.",
+                                422,
+                                "INVALID_ESTIMATED_COST"
+                            );
+                        }
+
+                        const customerWallet = await findWalletByActor(
+                            { actorType: 0, actorId: normalizedPayload.user_id },
+                            conn
+                        );
+                        if (!customerWallet || Number(customerWallet.status) !== 1) {
+                            throw new AppError(
+                                "Insufficient wallet balance. Please top up your wallet before booking.",
+                                402,
+                                "INSUFFICIENT_WALLET_BALANCE"
+                            );
+                        }
+
+                        // Pessimistic lock — prevents concurrent deductions from the same wallet.
+                        const lockedWallet = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+                        if (Number(lockedWallet.balance) < chargeAmount) {
+                            throw new AppError(
+                                "Insufficient wallet balance. Please top up your wallet before booking.",
+                                402,
+                                "INSUFFICIENT_WALLET_BALANCE"
+                            );
+                        }
+
+                        const walletPaymentId = await insertPayment({
+                            payment_code:             `RIDE-${Date.now()}-${crypto.createHash("md5").update(String(bookingId)).digest("hex").slice(0, 8).toUpperCase()}`,
+                            payer_wallet_id:          lockedWallet.wallet_id,
+                            actor_type:               0,
+                            actor_id:                 normalizedPayload.user_id,
+                            service_domain:           0,
+                            booking_id:               bookingId,
+                            amount:                   chargeAmount,
+                            currency_id:              lockedWallet.currency_id,
+                            status:                   "paid",
+                            gateway_name:             null,
+                            gateway_transaction_ref:  null,
+                            description:              `Wallet payment for booking #${bookingId}`,
+                        }, conn);
+
+                        const nextBalance = Math.round((Number(lockedWallet.balance) - chargeAmount) * 100) / 100;
+                        await updateWalletBalance(lockedWallet.wallet_id, nextBalance, conn);
+                        await insertWalletLedger({
+                            wallet_id:     lockedWallet.wallet_id,
+                            payment_id:    walletPaymentId,
+                            amount:        chargeAmount,
+                            balance_after: nextBalance,
+                            direction:     "debit",
+                            entry_type:    "ride_payment",    // ✅ valid enum value
+                            source_type:   "ride_booking",    // ✅ valid enum value
+                            source_id:     bookingId,
+                            description:   `Wallet payment for booking #${bookingId}`,
+                        }, conn);
+
+                        await markBookingPaidByWallet({ bookingId, paymentId: walletPaymentId, amount: chargeAmount }, conn);
+                    }
+
                     await insertNotification(
                         {
                             personId: normalizedPayload.user_id,
                             userType: 0,
                             content: `Booking #${bookingId} created successfully`,
+                            title: `Yêu cầu chuyến xe mới`,
+                            body: `Bạn có yêu cầu chuyến xe mới #${bookingId}`,
                             nType: 2,
                         },
                         conn
@@ -527,13 +607,17 @@ export function createBookingService(overrides = {}) {
 
                     let autoDispatchResult = null;
                     if (normalizedPayload.auto_dispatch === 1) {
-                        autoDispatchResult = await tryAutoDispatch({
-                            conn,
-                            bookingId,
-                            routeId: normalizedPayload.route_id,
-                            rideId: normalizedPayload.ride_id,
-                            scheduled: normalizedPayload.scheduled,
-                        });
+                        if (normalizedPayload.scheduled === 1) {
+                            autoDispatchResult = await tryAutoDispatch({
+                                conn,
+                                bookingId,
+                                routeId: normalizedPayload.route_id,
+                                rideId: normalizedPayload.ride_id,
+                                scheduled: normalizedPayload.scheduled,
+                            });
+                        } else {
+                            autoDispatchResult = { assigned: false, reason: "gps_dispatch_queued" };
+                        }
                     }
 
                     const detail = await findBookingDetailById(bookingId);
@@ -568,6 +652,15 @@ export function createBookingService(overrides = {}) {
             try {
                 const result = await operation;
                 rememberIdempotentResponse(auth.userId, effectiveIdempotencyKey, result);
+
+                if (normalizedPayload.auto_dispatch === 1 && normalizedPayload.scheduled !== 1) {
+                    const pickupLat = Number(normalizedPayload.pickup_lat);
+                    const pickupLng = Number(normalizedPayload.pickup_long);
+                    if (Number.isFinite(pickupLat) && Number.isFinite(pickupLng)) {
+                        startRideDispatch(result.booking.id, pickupLat, pickupLng);
+                    }
+                }
+
                 return result;
             } finally {
                 clearInflightPromise(auth.userId, effectiveIdempotencyKey);
@@ -662,13 +755,13 @@ export function createBookingService(overrides = {}) {
                     conn
                 );
 
-                await createDriverAllocation(
+                const allocationId = await createDriverAllocation(
                     { bookingId: numericBookingId, driverId: driver.driver_id, status: DRIVER_ALLOCATE_STATUS.PENDING_RESPONSE },
                     conn
                 );
 
                 await insertNotification(
-                    { personId: driver.driver_id, userType: 1, content: `You have a new booking assignment #${numericBookingId}`, nType: 2 },
+                    { personId: driver.driver_id, userType: 1, content: `Bạn có yêu cầu chuyến xe mới #${numericBookingId}`, nType: 2 },
                     conn
                 );
 
@@ -682,8 +775,28 @@ export function createBookingService(overrides = {}) {
                     metadata: { old_driver_id: booking.driver_id, new_driver_id: driver.driver_id },
                 });
 
-                return detail;
+                return { ...detail, manualAllocationId: allocationId };
             });
+
+            // Emit SSE immediately to the assigned driver so they see the request modal
+            publishRealtimeEvent(
+                "NEW_RIDE_REQUEST",
+                {
+                    allocation_id:   result.manualAllocationId,
+                    booking_id:      numericBookingId,
+                    expires_at:      new Date(Date.now() + 60_000).toISOString(),
+                    timeout_sec:     60,
+                    pickup_address:  result.booking?.pickup_address  ?? null,
+                    dropoff_address: result.booking?.dropoff_address ?? null,
+                    estimated_cost:  result.booking?.estimated_cost  ?? null,
+                    pickup: {
+                        lat:         result.booking?.pickup_lat  ?? null,
+                        lng:         result.booking?.pickup_long ?? null,
+                        distance_km: null,
+                    },
+                },
+                { targetUserIds: [numericDriverId] }
+            );
 
             return { booking: serializeBooking(result.booking) };
         },
@@ -713,6 +826,38 @@ export function createBookingService(overrides = {}) {
 
                 if (TERMINAL_STATUSES.has(numericStatus)) {
                     await finalizeNonAcceptedAllocations(numericBookingId, conn);
+                }
+
+                if (numericStatus === BOOKING_STATUS.CANCELLED_BY_RIDER) {
+                    const haspaid      = Number(booking.haspaid || 0);
+                    const paymentType  = Number(booking.payment_type);
+                    const refundAmount = Number(booking.paid_amount || 0);
+                    const paymentId    = booking.transaction_id ?? null;
+
+                    if (haspaid === 1 && paymentType === 2 && refundAmount > 0) {
+                        const customerWallet = await findWalletByActor(
+                            { actorType: 0, actorId: Number(booking.user_id) }, conn
+                        );
+                        if (customerWallet) {
+                            const locked     = await findWalletByIdForUpdate(customerWallet.wallet_id, conn);
+                            const newBalance = Math.round((Number(locked.balance) + refundAmount) * 100) / 100;
+                            await updateWalletBalance(customerWallet.wallet_id, newBalance, conn);
+                            await insertWalletLedger({
+                                wallet_id:     customerWallet.wallet_id,
+                                payment_id:    paymentId,
+                                amount:        refundAmount,
+                                balance_after: newBalance,
+                                direction:     'credit',
+                                entry_type:    'refund',
+                                source_type:   'ride_booking',
+                                source_id:     numericBookingId,
+                                description:   `Refund for customer-cancelled ride #${numericBookingId}`,
+                            }, conn);
+                            if (paymentId) {
+                                await updatePaymentStatusById(paymentId, 'refunded', conn);
+                            }
+                        }
+                    }
                 }
 
                 const detailAfterUpdate = await findBookingDetailById(numericBookingId);

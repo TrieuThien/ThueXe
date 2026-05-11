@@ -1,12 +1,16 @@
 import {
     acceptRentalBooking,
+    arrivedAtPickup,
     completeRentalBookingService,
     createAvailability,
     deleteAvailability,
     getAvailability,
     getRentalBookingDetail,
     getRentalBookings,
+    getRentalSummary,
     patchAvailability,
+    pauseRentalBooking,
+    resumeRentalBooking,
     startRentalBooking,
 } from "../../services/driver/rentalService.js";
 import { successResponse } from "../../utils/apiResponse.js";
@@ -91,6 +95,42 @@ export async function completeRentalBookingHandler(req, res, next) {
     try {
         const result = await completeRentalBookingService(req.auth, req.params.rentalId, req.body);
         return successResponse(res, result, "Rental booking completed");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function arrivedAtPickupHandler(req, res, next) {
+    try {
+        const result = await arrivedAtPickup(req.auth, req.params.rentalId);
+        return successResponse(res, result, "Đã thông báo tài xế đến điểm đón");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function pauseRentalBookingHandler(req, res, next) {
+    try {
+        const result = await pauseRentalBooking(req.auth, req.params.rentalId);
+        return successResponse(res, result, "Dịch vụ đã tạm dừng");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function resumeRentalBookingHandler(req, res, next) {
+    try {
+        const result = await resumeRentalBooking(req.auth, req.params.rentalId);
+        return successResponse(res, result, "Dịch vụ đã tiếp tục");
+    } catch (error) {
+        return next(error);
+    }
+}
+
+export async function getRentalSummaryHandler(req, res, next) {
+    try {
+        const result = await getRentalSummary(req.auth, req.params.rentalId);
+        return successResponse(res, result, "Tổng kết dịch vụ");
     } catch (error) {
         return next(error);
     }

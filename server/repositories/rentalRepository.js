@@ -446,9 +446,11 @@ export async function findRentalBookingById(rentalId, conn) {
                 rb.extra_time_fee, rb.extra_distance_fee, rb.deposit_amount, rb.total_price, rb.payment_status, rb.payment_type, rb.transaction_id,
                 rb.status, rb.cancel_reason, rb.created_at, rb.updated_at,
                 NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
+                u.phone AS user_phone, u.email AS user_email, u.address AS user_address,
                 NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name,
                 d.phone AS driver_phone,
-                v.license_plate, v.brand, v.model, vo.fullname AS owner_name, vo.phone AS owner_phone,
+                v.license_plate, v.brand AS vehicle_brand, v.model AS vehicle_model, v.year AS vehicle_year, v.color AS vehicle_color,
+                vo.fullname AS owner_name, vo.phone AS owner_phone, vo.email AS owner_email, vo.address AS owner_address,
                 rp.package_name
          FROM rental_bookings rb
          LEFT JOIN users u ON u.user_id = rb.user_id
@@ -495,12 +497,20 @@ export async function findRentalBookingById(rentalId, conn) {
         created_at: row.created_at,
         updated_at: row.updated_at,
         user_name: row.user_name,
+        user_phone: row.user_phone,
+        user_email: row.user_email,
+        user_address: row.user_address,
         driver_name: row.driver_name,
         driver_phone: row.driver_phone,
         license_plate: row.license_plate,
-        vehicle_name: [row.brand, row.model].filter(Boolean).join(" ").trim() || null,
+        vehicle_brand: row.vehicle_brand,
+        vehicle_model: row.vehicle_model,
+        vehicle_year: row.vehicle_year,
+        vehicle_color: row.vehicle_color,
         owner_name: row.owner_name,
         owner_phone: row.owner_phone,
+        owner_email: row.owner_email,
+        owner_address: row.owner_address,
         package_name: row.package_name,
     };
 }
@@ -520,14 +530,20 @@ export async function listRentalBookings(filters = {}) {
         whereClauses.push("rb.status = ?");
         params.push(filters.status);
     }
-    if (filters.serviceType !== undefined) {
+    if (filters.serviceTypes && filters.serviceTypes.length > 0) {
+        const placeholders = filters.serviceTypes.map(() => "?").join(", ");
+        whereClauses.push(`rb.service_type IN (${placeholders})`);
+        params.push(...filters.serviceTypes);
+    } else if (filters.serviceType !== undefined) {
         whereClauses.push("rb.service_type = ?");
         params.push(filters.serviceType);
     }
     if (filters.search) {
         const keyword = `%${filters.search}%`;
-        whereClauses.push("(rb.rental_code LIKE ? OR rb.pickup_address LIKE ? OR rb.dropoff_address LIKE ?)");
-        params.push(keyword, keyword, keyword);
+        whereClauses.push(
+            "(rb.rental_code LIKE ? OR rb.pickup_address LIKE ? OR rb.dropoff_address LIKE ? OR CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,'')) LIKE ?)"
+        );
+        params.push(keyword, keyword, keyword, keyword);
     }
     const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(" AND ")}` : "";
     const limit = Math.min(Math.max(Number(filters.limit) || 20, 1), 100);
@@ -538,10 +554,13 @@ export async function listRentalBookings(filters = {}) {
         `SELECT rb.rental_id, rb.rental_code, rb.user_id, rb.driver_id, rb.vehicle_id, rb.service_type,
                 rb.start_datetime, rb.end_datetime, rb.total_price, rb.payment_status, rb.status, rb.created_at,
                 NULLIF(TRIM(CONCAT(COALESCE(u.firstname,''), ' ', COALESCE(u.lastname,''))), '') AS user_name,
-                NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name
+                u.phone AS user_phone,
+                NULLIF(TRIM(CONCAT(COALESCE(d.firstname,''), ' ', COALESCE(d.lastname,''))), '') AS driver_name,
+                v.license_plate
          FROM rental_bookings rb
          LEFT JOIN users u ON u.user_id = rb.user_id
          LEFT JOIN drivers d ON d.driver_id = rb.driver_id
+         LEFT JOIN vehicles v ON v.vehicle_id = rb.vehicle_id
          ${whereSql}
          ORDER BY rb.rental_id DESC
          LIMIT ? OFFSET ?`,
@@ -551,6 +570,7 @@ export async function listRentalBookings(filters = {}) {
     const [countRows] = await sqldb.query(
         `SELECT COUNT(*) AS total_items
          FROM rental_bookings rb
+         LEFT JOIN users u ON u.user_id = rb.user_id
          ${whereSql}`,
         params
     );
@@ -561,9 +581,11 @@ export async function listRentalBookings(filters = {}) {
             rental_code: row.rental_code,
             user_id: Number(row.user_id),
             user_name: row.user_name,
+            user_phone: row.user_phone || null,
             driver_id: row.driver_id === null ? null : Number(row.driver_id),
             driver_name: row.driver_name,
             vehicle_id: row.vehicle_id === null ? null : Number(row.vehicle_id),
+            license_plate: row.license_plate || null,
             service_type: Number(row.service_type || 1),
             start_datetime: row.start_datetime,
             end_datetime: row.end_datetime,

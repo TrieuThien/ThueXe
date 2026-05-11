@@ -10,13 +10,17 @@
 import { Router } from "express";
 import {
     acceptRentalBookingHandler,
+    arrivedAtPickupHandler,
     completeRentalBookingHandler,
     createAvailabilityHandler,
     deleteAvailabilityHandler,
     getAvailabilityHandler,
     getRentalBookingDetailHandler,
     getRentalBookingsHandler,
+    getRentalSummaryHandler,
     patchAvailabilityHandler,
+    pauseRentalBookingHandler,
+    resumeRentalBookingHandler,
     startRentalBookingHandler,
 } from "../../controllers/driver/rentalController.js";
 import requireAuth from "../../middlewares/authMiddleware.js";
@@ -24,13 +28,17 @@ import requireRole from "../../middlewares/roleMiddleware.js";
 import validateRequest from "../../middlewares/validateRequest.js";
 import {
     acceptRentalBookingValidator,
+    arrivedRentalBookingValidator,
     completeRentalBookingValidator,
     createAvailabilityValidator,
     deleteAvailabilityValidator,
     getAvailabilityValidator,
     getRentalBookingDetailValidator,
     getRentalBookingsValidator,
+    getRentalSummaryValidator,
     patchAvailabilityValidator,
+    pauseRentalBookingValidator,
+    resumeRentalBookingValidator,
     startRentalBookingValidator,
 } from "../../validators/driver/rentalValidators.js";
 
@@ -51,7 +59,11 @@ router.get("/bookings/:rentalId", getRentalBookingDetailValidator, validateReque
 
 // ─── Rental lifecycle actions ─────────────────────────────────────────────────
 router.post("/bookings/:rentalId/accept",   acceptRentalBookingValidator,   validateRequest, acceptRentalBookingHandler);
+router.post("/bookings/:rentalId/arrived",  arrivedRentalBookingValidator,  validateRequest, arrivedAtPickupHandler);
 router.post("/bookings/:rentalId/start",    startRentalBookingValidator,    validateRequest, startRentalBookingHandler);
+router.post("/bookings/:rentalId/pause",    pauseRentalBookingValidator,    validateRequest, pauseRentalBookingHandler);
+router.post("/bookings/:rentalId/resume",   resumeRentalBookingValidator,   validateRequest, resumeRentalBookingHandler);
 router.post("/bookings/:rentalId/complete", completeRentalBookingValidator, validateRequest, completeRentalBookingHandler);
+router.get("/bookings/:rentalId/summary",   getRentalSummaryValidator,      validateRequest, getRentalSummaryHandler);
 
 export default router;

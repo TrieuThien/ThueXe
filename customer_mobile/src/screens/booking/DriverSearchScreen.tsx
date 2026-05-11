@@ -30,7 +30,7 @@ interface Props {
 
 const POLL_INTERVAL_MS = 3000;
 
-export default function DriverSearchScreen({ route, navigation }: Props) {
+export function DriverSearchScreen({ route, navigation }: Props) {
   const { bookingId, packageName } = route.params;
   const queryClient = useQueryClient();
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -50,9 +50,10 @@ export default function DriverSearchScreen({ route, navigation }: Props) {
   const { data: booking } = useQuery({
     queryKey: ['driverHire', 'status', bookingId],
     queryFn: () => driverHireApi.getStatus(bookingId),
-    refetchInterval: (data) => {
+    refetchInterval: (query: any) => {
       // Dừng polling khi đã gán tài xế hoặc hủy
-      if (data && ['pending', 'in_progress', 'completed', 'cancelled'].includes(data.status)) {
+      const booking = query.state?.data;
+      if (booking && ['pending', 'in_progress', 'completed', 'cancelled'].includes(booking.status)) {
         return false;
       }
       return POLL_INTERVAL_MS;

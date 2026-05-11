@@ -8,6 +8,7 @@ import {
     estimateFareHandler,
     estimateRouteHandler,
     getAvailableBookingHistoryHandler,
+    getBookingCancelPolicyHandler,
     getBookingDetailHandler,
     getBookingTrackingHandler,
     getCurrentBookingHandler,
@@ -30,6 +31,7 @@ router.post("/fare-estimate", requireAuth, fareEstimateValidator, validateReques
 router.post("/bookings", requireAuth, createBookingValidator, validateRequest, createBookingHandler);
 router.get("/bookings/current", requireAuth, getCurrentBookingHandler);
 router.get("/bookings/history", requireAuth, bookingHistoryValidator, validateRequest, getAvailableBookingHistoryHandler);
+router.get("/bookings/:bookingId/cancel-policy", requireAuth, bookingIdParamValidator, validateRequest, getBookingCancelPolicyHandler);
 router.get("/bookings/:bookingId", requireAuth, bookingIdParamValidator, validateRequest, getBookingDetailHandler);
 router.post(
     "/bookings/:bookingId/cancel",

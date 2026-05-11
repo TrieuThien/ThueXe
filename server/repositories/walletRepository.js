@@ -52,10 +52,16 @@ export async function createWalletAccount({ actorType, actorId, currencyId }, co
 }
 
 export async function findOrCreateWallet({ actorType, actorId, currencyId }, conn) {
-    const wallet = await findWalletByActor({ actorType, actorId }, conn);
-    if (wallet) return wallet;
-    const walletId = await createWalletAccount({ actorType, actorId, currencyId }, conn);
-    return findWalletByActor({ actorType, actorId }, conn) || { wallet_id: walletId, actor_type: actorType, actor_id: actorId, currency_id: currencyId, balance: 0, status: 1 };
+    const db = dbConnection(conn);
+    // INSERT IGNORE prevents duplicate-key errors under concurrent requests.
+    // If the row already exists the INSERT is silently skipped; the SELECT below
+    // always returns the authoritative row regardless of which path created it.
+    await db.query(
+        `INSERT IGNORE INTO wallet_accounts (actor_type, actor_id, currency_id, balance, status)
+         VALUES (?, ?, ?, 0, 1)`,
+        [actorType, actorId, currencyId]
+    );
+    return findWalletByActor({ actorType, actorId }, conn);
 }
 
 export async function findWalletByIdForUpdate(walletId, conn) {
@@ -146,6 +152,17 @@ export async function insertPayment(payload, conn) {
         ]
     );
     return Number(result.insertId);
+}
+
+export async function updatePaymentStatusById(paymentId, status, conn) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE payments
+         SET status = ?, updated_at = NOW()
+         WHERE payment_id = ?
+         LIMIT 1`,
+        [status, paymentId]
+    );
 }
 
 export async function insertWithdrawalRequest({ walletId, amount, note }, conn) {

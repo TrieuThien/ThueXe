@@ -70,7 +70,7 @@ export function ActiveTripScreen({ navigation }: Props) {
                 <PrimaryButton title="Chat với tài xế" onPress={() => navigation.navigate("TripChat", { bookingId: activeTrip.bookingId })} />
               </>
             ) : (
-              <View style={[styles.searchingBox, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}> 
+              <View style={[styles.searchingBox, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
                 <Text style={[styles.searchingTitle, { color: theme.colors.text }]}>Đang tìm tài xế phù hợp...</Text>
                 <Text style={[styles.searchingDesc, { color: theme.colors.textMuted }]}>Hệ thống sẽ cập nhật ngay khi có tài xế nhận chuyến.</Text>
               </View>
@@ -87,7 +87,7 @@ export function ActiveTripScreen({ navigation }: Props) {
             />
           </>
         ) : (
-          <PrimaryButton title="Đặt chuyến mới" onPress={() => navigation.navigate("RideLocationPicker")} />
+          <PrimaryButton title="Đặt chuyến mới" onPress={() => navigation.navigate("RideLocationPickup")} />
         )}
       </ScrollView>
 

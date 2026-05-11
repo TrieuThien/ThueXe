@@ -120,6 +120,10 @@ export const getRentalBookingDetailValidator = [rentalIdParam];
 
 export const acceptRentalBookingValidator  = [rentalIdParam];
 export const startRentalBookingValidator   = [rentalIdParam];
+export const arrivedRentalBookingValidator = [rentalIdParam];
+export const pauseRentalBookingValidator   = [rentalIdParam];
+export const resumeRentalBookingValidator  = [rentalIdParam];
+export const getRentalSummaryValidator     = [rentalIdParam];
 
 export const completeRentalBookingValidator = [
     rentalIdParam,

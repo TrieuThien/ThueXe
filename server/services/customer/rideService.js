@@ -44,6 +44,12 @@ const BOOKING_STATUS = {
 };
 
 const TERMINAL_STATUSES = new Set([2, 3, 4, 5]);
+const CANCEL_REASONS = [
+    "Thay đổi kế hoạch",
+    "Đặt nhầm điểm đón/điểm đến",
+    "Không cần đi nữa",
+    "Lý do khác",
+];
 
 function toDateTimeString(date) {
     return date.toISOString().slice(0, 19).replace("T", " ");
@@ -189,6 +195,31 @@ async function estimateByGoogleMaps(points) {
     };
 }
 
+async function estimateByOSRM(points) {
+    const coordStr = points.map((p) => `${p.lng},${p.lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${coordStr}?overview=full&geometries=polyline`;
+
+    const response = await fetch(url, {
+        headers: { "User-Agent": "ThueXe-Server/1.0" },
+        signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) return null;
+
+    const payload = await response.json();
+    if (payload.code !== "Ok" || !payload.routes?.[0]) return null;
+
+    const route = payload.routes[0];
+    const distanceKm = Number((route.distance / 1000).toFixed(2));
+    const durationMin = Number((route.duration / 60).toFixed(1));
+
+    return {
+        distance_km: Math.max(distanceKm, 0.2),
+        duration_min: Math.max(durationMin, 1),
+        polyline: route.geometry,
+        provider: "osrm",
+    };
+}
+
 function estimateByFallback(points) {
     let totalDistance = 0;
     for (let i = 0; i < points.length - 1; i += 1) {
@@ -298,12 +329,65 @@ async function ensureCustomerReady(userId, conn = null) {
     }
     return customer;
 }
+
+function resolveCancellationPolicy({ booking, customer, tariff, nowMs = Date.now() }) {
+    const status = Number(booking?.status || 0);
+    const cancelLimit = Number(process.env.BOOKING_CANCEL_FREQ_LIMIT || 5);
+    const lateCancelWindowMs = Number(process.env.BOOKING_LATE_CANCEL_WINDOW_MS || 10 * 60 * 1000);
+
+    let canCancel = true;
+    let disabledReason = null;
+
+    if (customer && Number(customer.booking_cancel_freq || 0) >= cancelLimit) {
+        canCancel = false;
+        disabledReason = "Bạn đã vượt quá số lần hủy cho phép.";
+    } else if (TERMINAL_STATUSES.has(status)) {
+        canCancel = false;
+        disabledReason = "Chuyến đã kết thúc hoặc đã bị hủy.";
+    } else if (status !== BOOKING_STATUS.PENDING) {
+        canCancel = false;
+        disabledReason = "Chỉ có thể hủy chuyến khi đang tìm tài xế.";
+    } else if (booking?.pickup_datetime) {
+        const pickupAt = new Date(booking.pickup_datetime).getTime();
+        if (Number.isFinite(pickupAt) && nowMs > pickupAt + lateCancelWindowMs) {
+            canCancel = false;
+            disabledReason = "Đã quá thời gian cho phép hủy chuyến.";
+        }
+    }
+
+    const nowHour = new Date(nowMs).getHours();
+    const isNight = nowHour >= 22 || nowHour < 5;
+    const estimatedCancellationFee = Number(
+        (isNight ? tariff?.ncancel_cost || tariff?.cancel_cost || 0 : tariff?.cancel_cost || 0).toFixed(2)
+    );
+
+    return {
+        canCancel,
+        disabledReason,
+        estimatedCancellationFee,
+        warningText: canCancel ? "Bạn có thể hủy chuyến trong lúc đang tìm tài xế." : undefined,
+        reasons: CANCEL_REASONS,
+    };
+}
+
+function toBookingStatusString(status) {
+    switch (status) {
+        case 0: return "PENDING";
+        case 1: return "IN_PROGRESS";
+        case 2: case 4: case 5: return "CANCELLED";
+        case 3: return "COMPLETED";
+        case 6: return "ARRIVED";
+        default: return "PENDING";
+    }
+}
+
 function mapBookingRow(booking, { location = null, allocation = null } = {}) {
     if (!booking) return null;
     return {
         id: Number(booking.id),
         booking_code: booking.b_uuid,
         status: Number(booking.status || 0),
+        booking_status: toBookingStatusString(Number(booking.status || 0)),
         user_id: Number(booking.user_id),
         route_id: Number(booking.route_id || 0),
         route_name: booking.route_name,
@@ -345,6 +429,16 @@ function mapBookingRow(booking, { location = null, allocation = null } = {}) {
         distance_travelled: booking.distance_travelled === null ? null : Number(booking.distance_travelled),
         estimated_cost: Number(booking.estimated_cost || 0),
         actual_cost: Number(booking.actual_cost || 0),
+        // Aliases for customer mobile field name compatibility
+        pickup_lat:                 booking.pickup_lat  === null ? null : Number(booking.pickup_lat),
+        pickup_lng:                 booking.pickup_long === null ? null : Number(booking.pickup_long),
+        destination_address:        booking.dropoff_address ?? null,
+        destination_lat:            booking.dropoff_lat  === null ? null : Number(booking.dropoff_lat),
+        destination_lng:            booking.dropoff_long === null ? null : Number(booking.dropoff_long),
+        distance_km:                Number(booking.est_distance  || 0),
+        estimated_duration_minutes: Number(booking.est_duration  || 0),
+        estimated_fare:             Number(booking.estimated_cost || 0),
+        final_fare:                 Number(booking.actual_cost   || 0) > 0 ? Number(booking.actual_cost) : null,
         cancel_amount: Number(booking.cancel_amount || 0),
         haspaid: Number(booking.haspaid || 0),
         paid_amount: Number(booking.paid_amount || 0),
@@ -363,7 +457,17 @@ function mapBookingRow(booking, { location = null, allocation = null } = {}) {
                   driver_id: Number(booking.driver_id),
                   firstname: booking.driver_firstname,
                   lastname: booking.driver_lastname,
+                  full_name: [booking.driver_firstname, booking.driver_lastname].filter(Boolean).join(' ') || null,
                   phone: booking.driver_phone,
+                  rating: booking.driver_rating !== undefined && booking.driver_rating !== null
+                      ? Number(booking.driver_rating)
+                      : null,
+                  car_plate_num: booking.driver_car_plate_num || null,
+                  car_model: booking.driver_car_model || null,
+                  photo_file: booking.driver_photo_file || null,
+                  avatar_url:    booking.driver_photo_file    || null,
+                  vehicle_name:  booking.driver_car_model     || null,
+                  license_plate: booking.driver_car_plate_num || null,
                   account_active: Number(booking.driver_account_active || 0),
                   available: Number(booking.driver_available || 0),
                   operation_status: Number(booking.driver_operation_status || 0),
@@ -404,7 +508,8 @@ export async function estimateRoute(auth, payload) {
     const waypoints = normalizeWaypointList(payload.waypoints || []);
     const points = [pickup, ...waypoints, dropoff];
     const fromGoogle = await estimateByGoogleMaps(points).catch(() => null);
-    const estimate = fromGoogle || estimateByFallback(points);
+    const fromOSRM = fromGoogle ? null : await estimateByOSRM(points).catch(() => null);
+    const estimate = fromGoogle || fromOSRM || estimateByFallback(points);
     return {
         ...estimate,
         route_id: customer.route_id ? Number(customer.route_id) : null,
@@ -720,37 +825,13 @@ export async function getBookingHistory(auth, query = {}) {
     };
 }
 
-export async function cancelBooking(auth, bookingIdInput, payload = {}) {
+export async function getBookingCancelPolicy(auth, bookingIdInput) {
     const userId = assertCustomer(auth);
-
     return runInTransaction(async (conn) => {
         const customer = await ensureCustomerReady(userId, conn);
-        const cancelLimit = Number(process.env.BOOKING_CANCEL_FREQ_LIMIT || 5);
-
-        if (customer.booking_cancel_freq >= cancelLimit) {
-            throw new AppError("You have reached the cancellation limit.", 403, "BOOKING_CANCEL_LIMIT_REACHED");
-        }
-
         const bookingId = Number(bookingIdInput);
         const booking = await findBookingByIdForUser(bookingId, userId, conn, true);
-
         if (!booking) throw new AppError("Booking not found.", 404, "BOOKING_NOT_FOUND");
-        if (TERMINAL_STATUSES.has(Number(booking.status || 0))) {
-            throw new AppError("Booking is already finalized.", 409, "BOOKING_FINALIZED");
-        }
-        if (Number(booking.status) === BOOKING_STATUS.ONRIDE) {
-            throw new AppError("Cannot cancel booking after trip has started.", 409, "BOOKING_ALREADY_STARTED");
-        }
-
-        if (booking.pickup_datetime) {
-            const pickupAt = new Date(booking.pickup_datetime).getTime();
-            if (Number.isFinite(pickupAt)) {
-                const lateCancelWindowMs = Number(process.env.BOOKING_LATE_CANCEL_WINDOW_MS || 10 * 60 * 1000);
-                if (Date.now() > pickupAt + lateCancelWindowMs) {
-                    throw new AppError("Cancellation window has passed for this booking.", 409, "BOOKING_LATE_CANCEL");
-                }
-            }
-        }
 
         const tariff = await findTariff(
             {
@@ -761,9 +842,38 @@ export async function cancelBooking(auth, bookingIdInput, payload = {}) {
             conn
         );
 
-        const nowHour = new Date().getHours();
-        const isNight = nowHour >= 22 || nowHour < 5;
-        const cancelAmount = Number((isNight ? tariff?.ncancel_cost || tariff?.cancel_cost || 0 : tariff?.cancel_cost || 0).toFixed(2));
+        const policy = resolveCancellationPolicy({ booking, customer, tariff });
+        return {
+            bookingId: Number(booking.id),
+            ...policy,
+        };
+    });
+}
+
+export async function cancelBooking(auth, bookingIdInput, payload = {}) {
+    const userId = assertCustomer(auth);
+
+    return runInTransaction(async (conn) => {
+        const customer = await ensureCustomerReady(userId, conn);
+        const bookingId = Number(bookingIdInput);
+        const booking = await findBookingByIdForUser(bookingId, userId, conn, true);
+
+        if (!booking) throw new AppError("Booking not found.", 404, "BOOKING_NOT_FOUND");
+
+        const tariff = await findTariff(
+            {
+                routeId: Number(booking.route_id),
+                rideId: Number(booking.ride_id),
+                serviceType: Number(booking.service_type || 0),
+            },
+            conn
+        );
+
+        const policy = resolveCancellationPolicy({ booking, customer, tariff });
+        if (!policy.canCancel) {
+            throw new AppError(policy.disabledReason || "Booking cannot be cancelled.", 409, "BOOKING_CANCEL_NOT_ALLOWED");
+        }
+        const cancelAmount = policy.estimatedCancellationFee;
 
         if (cancelAmount > 0 && Number(booking.payment_type) === 2) {
             let wallet = await findWalletByActorForUpdate({ actorType: 0, actorId: userId }, conn);

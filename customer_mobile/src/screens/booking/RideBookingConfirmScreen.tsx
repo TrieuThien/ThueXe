@@ -13,6 +13,7 @@ import {
 } from "../../components";
 import { getRideFlowErrorMessage, useCreateRideBookingMutation } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
+import { ApiError } from "../../services";
 import { useRideFlowStore } from "../../store";
 import { useTheme } from "../../theme";
 
@@ -49,7 +50,7 @@ export function RideBookingConfirmScreen({ navigation }: Props) {
         Alert.alert("Đặt lịch thành công", "Chuyến xe hẹn giờ đã được tạo.", [
           {
             text: "Xem lịch sử",
-            onPress: () => navigation.navigate("BookingHistory"),
+            onPress: () => navigation.navigate("DriverHireHistory"),
           },
         ]);
         return;
@@ -57,6 +58,20 @@ export function RideBookingConfirmScreen({ navigation }: Props) {
 
       navigation.replace("RideSearchingDriver", { bookingId: response.bookingId });
     } catch (error) {
+      if (error instanceof ApiError && error.code === "INSUFFICIENT_WALLET_BALANCE") {
+        Alert.alert(
+          "Số dư không đủ",
+          "Số dư ví ThueXe không đủ để đặt xe. Vui lòng nạp thêm tiền vào ví.",
+          [
+            { text: "Hủy", style: "cancel" },
+            {
+              text: "Nạp tiền",
+              onPress: () => (navigation.getParent() as any)?.navigate("Wallet", { screen: "TopUpWallet" }),
+            },
+          ],
+        );
+        return;
+      }
       setErrorMessage(getRideFlowErrorMessage(error));
     }
   };

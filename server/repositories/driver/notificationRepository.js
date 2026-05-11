@@ -8,15 +8,20 @@ function db(conn = null) {
 
 export async function listDriverNotifications(
     driverId,
-    { nType, limit, offset } = {},
+    { nType, isRead, limit, offset } = {},
     conn = null
 ) {
     const clauses = ["driver_id = ?"];
-    const params  = [driverId];
+    const params = [driverId];
 
     if (nType !== undefined && nType !== null) {
         clauses.push("n_type = ?");
         params.push(nType);
+    }
+
+    if (isRead !== undefined && isRead !== null) {
+        clauses.push("is_read = ?");
+        params.push(isRead);
     }
 
     params.push(limit, offset);
@@ -36,15 +41,20 @@ export async function listDriverNotifications(
 
 export async function countDriverNotifications(
     driverId,
-    { nType } = {},
+    { nType, isRead } = {},
     conn = null
 ) {
     const clauses = ["driver_id = ?"];
-    const params  = [driverId];
+    const params = [driverId];
 
     if (nType !== undefined && nType !== null) {
         clauses.push("n_type = ?");
         params.push(nType);
+    }
+
+    if (isRead !== undefined && isRead !== null) {
+        clauses.push("is_read = ?");
+        params.push(isRead);
     }
 
     const [rows] = await db(conn).query(
@@ -120,14 +130,15 @@ export async function markAllNotificationsRead(driverId, conn = null) {
 
 function mapNotificationRow(row) {
     return {
-        id:           Number(row.id),
-        driver_id:    Number(row.driver_id),
-        content:      row.content || "",
-        route_id:     row.route_id  === null ? null : Number(row.route_id),
-        rental_id:    row.rental_id === null ? null : Number(row.rental_id),
-        n_type:       Number(row.n_type  || 0),
-        is_read:      Number(row.is_read || 0),
-        read_at:      row.read_at || null,
-        date_created: row.date_created,
+        id: Number(row.id),
+        driver_id: Number(row.driver_id),
+        n_type: Number(row.n_type || 0),
+        title: row.content || "",
+        body: row.content || "",
+        is_read: Number(row.is_read || 0),
+        read_at: row.read_at || null,
+        created_at: row.date_created,
+        route_id: row.route_id === null ? null : Number(row.route_id),
+        rental_id: row.rental_id === null ? null : Number(row.rental_id),
     };
 }

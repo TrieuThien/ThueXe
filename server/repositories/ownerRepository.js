@@ -444,6 +444,7 @@ export async function listOwnerVehicles(ownerId, { search, status, page = 1, pag
     const [rows] = await sqldb.query(
         `SELECT v.vehicle_id, v.owner_id, v.type_id, v.brand, v.model, v.year, v.color, v.license_plate, v.vin,
                 v.seat_count, v.transmission, v.fuel_type, v.odometer_km, v.status, v.is_verified, v.verification_status,
+                v.current_lat, v.current_long,
                 v.date_added, v.notes, v.photo_url, v.interior_photo_urls, vt.type_name
          FROM vehicles v
          LEFT JOIN vehicle_types vt ON vt.type_id = v.type_id
@@ -807,7 +808,7 @@ export async function findOwnerRentalById(ownerId, rentalId, conn = null) {
                 rb.base_price, rb.extra_time_fee, rb.extra_distance_fee, rb.deposit_amount, rb.total_price,
                 rb.payment_status, rb.payment_type, rb.transaction_id, rb.status, rb.cancel_reason,
                 rb.created_at, rb.updated_at,
-                u.firstname, u.lastname, u.phone AS customer_phone,
+                u.firstname, u.lastname, u.phone AS customer_phone, u.email AS customer_email,
                 v.brand, v.model, v.year, v.license_plate,
                 rp.package_name
          FROM rental_bookings rb
@@ -832,6 +833,14 @@ export async function updateOwnerRentalStatus(rentalId, status, cancelReason = n
     await db.query(
         `INSERT INTO rental_booking_status_history (rental_id, status, note) VALUES (?, ?, ?)`,
         [rentalId, status, cancelReason || null]
+    );
+}
+
+export async function updateRentalPaymentStatus(rentalId, paymentStatus, conn = null) {
+    const db = dbConnection(conn);
+    await db.query(
+        `UPDATE rental_bookings SET payment_status = ?, updated_at = NOW() WHERE rental_id = ?`,
+        [paymentStatus, rentalId]
     );
 }
 

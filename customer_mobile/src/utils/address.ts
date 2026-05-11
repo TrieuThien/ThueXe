@@ -1,5 +1,6 @@
 ﻿import * as Location from "expo-location";
 import { formatVietnameseAddress } from "./vietnameseAddressParser";
+import { hasGooglePlacesKey, reverseGeocodeWithGoogle } from "./googlePlaces";
 
 export function formatAddressFromGeocode(geo?: Location.LocationGeocodedAddress | null): string | undefined {
   if (!geo) {
@@ -43,7 +44,17 @@ export async function reverseGeocodeToDisplayAddress(
   latitude: number,
   longitude: number,
 ): Promise<string | undefined> {
-  // Phase 5: Try Nominatim reverse API first for consistency
+  // 1. Google Geocoding API — most accurate for Vietnamese administrative units
+  if (hasGooglePlacesKey()) {
+    try {
+      const googleAddress = await reverseGeocodeWithGoogle(latitude, longitude);
+      if (googleAddress) return googleAddress;
+    } catch {
+      // fall through to Nominatim
+    }
+  }
+
+  // 2. Nominatim reverse API
   try {
     const nominatimParams = new URLSearchParams({
       format: "jsonv2",

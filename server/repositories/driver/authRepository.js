@@ -61,7 +61,7 @@ export async function findDriverById(driverId) {
             d.push_notification_token, d.country_code, d.country_dial_code,
             d.is_activated, d.account_active, d.account_deleted,
             d.allow_photo_edit, d.allow_vehicle_edit, d.allow_city_edit,
-            d.disp_lang, d.account_create_date,
+            d.disp_lang, d.account_create_date, d.driver_commision,
             r.r_title AS route_name,
             rd.ride_type
          FROM drivers d
@@ -114,6 +114,7 @@ export async function findDriverById(driverId) {
         allow_city_edit: Number(row.allow_city_edit || 0),
         disp_lang: row.disp_lang,
         account_create_date: row.account_create_date,
+        driver_commision: Number(row.driver_commision || 0),
         userType: USER_TYPE.DRIVER,
         role: "driver",
         accountType: null,

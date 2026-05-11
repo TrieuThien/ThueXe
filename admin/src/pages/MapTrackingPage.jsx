@@ -1,6 +1,6 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, Loader2, MapPinned, RefreshCw, UserRound } from "lucide-react";
-import { getDriverLocation, getDrivers } from "../services/driverService";
+import { getOnlineDriversWithLocations } from "../services/driverService";
 
 const DEFAULT_CENTER = { lat: 10.7769, lng: 106.7009 };
 const DEFAULT_ZOOM = 11;
@@ -18,29 +18,6 @@ function formatDateTime(value) {
         hour: "2-digit",
         minute: "2-digit",
     }).format(date);
-}
-
-function toNumber(value) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
-}
-
-function normalizeTrackedDriver(driver, location) {
-    const lat = toNumber(location?.lat ?? location?.latitude);
-    const lng = toNumber(location?.lng ?? location?.long ?? location?.longitude);
-
-    if (lat === null || lng === null) {
-        return null;
-    }
-
-    return {
-        ...driver,
-        tracking: {
-            lat,
-            lng,
-            location_date: location?.location_date || null,
-        },
-    };
 }
 
 function loadGoogleMapsScript(apiKey) {
@@ -90,6 +67,7 @@ export default function MapTrackingPage() {
     const [mapErrorMessage, setMapErrorMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [trackedDrivers, setTrackedDrivers] = useState([]);
+    const [totalOnline, setTotalOnline] = useState(0);
     const [selectedDriverId, setSelectedDriverId] = useState(null);
 
     const mapContainerRef = useRef(null);
@@ -188,7 +166,7 @@ export default function MapTrackingPage() {
                 const marker = new window.google.maps.Marker({
                     map: mapRef.current,
                     position,
-                    title: firstItem.full_name || `Driver #${firstItem.driver_id}`,
+                    title: firstItem.full_name || `Tài xế #${firstItem.driver_id}`,
                 });
 
                 marker.addListener("click", () => {
@@ -212,7 +190,7 @@ export default function MapTrackingPage() {
                 const marker = new window.google.maps.Marker({
                     map: mapRef.current,
                     position,
-                    title: item.full_name || `Driver #${item.driver_id}`,
+                    title: item.full_name || `Tài xế #${item.driver_id}`,
                 });
 
                 marker.addListener("click", () => {
@@ -233,45 +211,28 @@ export default function MapTrackingPage() {
         setErrorMessage("");
 
         try {
+            const payload = await getOnlineDriversWithLocations();
+            const allDrivers = payload?.drivers || [];
 
-            const listPayload = await getDrivers({
-                page: 1,
-                limit: 100,
-                available: 1,
-                account_deleted: 0,
-                sort_by: "driver_id",
-                sort_order: "DESC",
-            });
+            setTotalOnline(payload?.total_online ?? 0);
 
-            const drivers = listPayload?.items || [];
+            const tracked = allDrivers
+                .filter((d) => d.lat !== null && d.lng !== null)
+                .map((d) => ({
+                    ...d,
+                    tracking: { lat: d.lat, lng: d.lng, location_date: d.location_date },
+                }));
 
-            const locationResults = await Promise.allSettled(
-                drivers.map((driver) => getDriverLocation(driver.driver_id))
-            );
-
-            const merged = drivers
-                .map((driver, index) => {
-                    const locationResult = locationResults[index];
-
-                    if (locationResult?.status !== "fulfilled") {
-                        return null;
-                    }
-
-                    const location = locationResult.value?.location;
-                    return normalizeTrackedDriver(driver, location);
-                })
-                .filter(Boolean);
-
-            setTrackedDrivers(merged);
+            setTrackedDrivers(tracked);
             setSelectedDriverId((prev) => {
-                if (prev && merged.some((item) => item.driver_id === prev)) {
+                if (prev && tracked.some((item) => item.driver_id === prev)) {
                     return prev;
                 }
-
-                return merged[0]?.driver_id || null;
+                return tracked[0]?.driver_id || null;
             });
         } catch (error) {
             setTrackedDrivers([]);
+            setTotalOnline(0);
             setSelectedDriverId(null);
             setErrorMessage(error?.response?.data?.message || error?.message || "Không tải được dữ liệu bản đồ theo dõi.");
         } finally {
@@ -337,6 +298,16 @@ export default function MapTrackingPage() {
                     <p className="mt-2 max-w-2xl text-sm text-slate-200">
                         Hiển thị vị trí mới nhất của tài xế online trên Google Maps.
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-sm font-medium text-white">
+                            <span className="h-2 w-2 rounded-full bg-green-400" />
+                            Tài xế online: {loading ? "..." : totalOnline}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-sm font-medium text-white">
+                            <MapPinned className="h-3.5 w-3.5 text-cyan-300" />
+                            Có vị trí GPS: {loading ? "..." : trackedDrivers.length}
+                        </span>
+                    </div>
                 </div>
                 <button
                     type="button"
@@ -370,7 +341,7 @@ export default function MapTrackingPage() {
                 <article className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-3 flex items-center gap-2 text-slate-900">
                         <MapPinned className="h-5 w-5 text-cyan-600" />
-                        <h2 className="text-base font-bold">Tài xế đang có vị trí ({trackedDrivers.length})</h2>
+                        <h2 className="text-base font-bold">Tài xế có vị trí GPS ({trackedDrivers.length})</h2>
                     </div>
 
                     {loading ? (
@@ -399,15 +370,11 @@ export default function MapTrackingPage() {
                                     >
                                         <p className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                                             <UserRound className="h-4 w-4 text-cyan-600" />
-                                            {driver.full_name || `Driver #${driver.driver_id}`}
+                                            {driver.full_name || `Tài xế #${driver.driver_id}`}
                                         </p>
-                                        <p className="mt-1 text-xs text-slate-500">Driver #{driver.driver_id}</p>
-                                        <p className="mt-1 text-xs text-slate-600">Khu vuc: {driver.route_name || "--"}</p>
+                                        <p className="mt-1 text-xs text-slate-500">Tài xế #{driver.driver_id}</p>
                                         <p className="mt-1 text-xs text-slate-600">
-                                            Cap nhat: {formatDateTime(driver.tracking.location_date)}
-                                        </p>
-                                        <p className="mt-1 text-xs text-slate-600">
-                                            ({driver.tracking.lat.toFixed(6)}, {driver.tracking.lng.toFixed(6)})
+                                            Vị trí: ({driver.tracking.lat.toFixed(6)}, {driver.tracking.lng.toFixed(6)}) | Cập nhật: {formatDateTime(driver.tracking.location_date)} 
                                         </p>
                                     </button>
                                 );

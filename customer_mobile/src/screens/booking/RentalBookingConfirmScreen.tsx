@@ -1,10 +1,10 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppHeader, AuthErrorNotice, PrimaryButton, RentalSummaryCard } from "../../components";
-import { getRentalFlowErrorMessage, useCreateRentalBookingMutation, usePayRentalDepositMutation, useRentalPricingQuery, useWalletOverviewQuery } from "../../hooks";
+import { AppHeader, AuthErrorNotice, CouponSuggestionList, PrimaryButton, RentalSummaryCard, TextField } from "../../components";
+import { getRentalFlowErrorMessage, useCreateRentalBookingMutation, usePayRentalDepositMutation, useRentalPricingQuery, useRideCouponsQuery, useWalletOverviewQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
 import { useRentalFlowStore } from "../../store";
 import { useTheme } from "../../theme";
@@ -15,11 +15,17 @@ type Props = NativeStackScreenProps<BookingStackParamList, "RentalBookingConfirm
 export function RentalBookingConfirmScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const criteria = useRentalFlowStore((state) => state.criteria);
+  const selectedServiceType = useRentalFlowStore((state) => state.selectedServiceType);
   const selectedPackage = useRentalFlowStore((state) => state.selectedPackage);
   const couponCode = useRentalFlowStore((state) => state.couponCode);
   const note = useRentalFlowStore((state) => state.note);
+  const setExtraInfo = useRentalFlowStore((state) => state.setExtraInfo);
   const setPricing = useRentalFlowStore((state) => state.setPricing);
   const buildCreatePayload = useRentalFlowStore((state) => state.buildCreatePayload);
+
+  const [couponInput, setCouponInput] = useState(couponCode ?? "");
+  const couponsQuery = useRideCouponsQuery();
+  const safeCoupons = Array.isArray(couponsQuery.data) ? couponsQuery.data : [];
 
   const createMutation = useCreateRentalBookingMutation();
   const depositMutation = usePayRentalDepositMutation();
@@ -28,11 +34,11 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
   const pricingQuery = useRentalPricingQuery(
     criteria && selectedPackage
       ? {
-          packageId: selectedPackage.packageId,
-          criteria,
-          couponCode,
-          note,
-        }
+        packageId: selectedPackage.packageId,
+        criteria,
+        couponCode,
+        note,
+      }
       : undefined,
   );
 
@@ -88,17 +94,28 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
                 {
                   text: "Nạp tiền ngay",
                   onPress: () => {
-                    navigation.replace("RentalBookingSuccess", {
-                      bookingId,
-                      status: result.bookingStatus,
-                      message: result.message,
-                    });
+                    // Navigate to searching driver screen first for driver hiring
+                    if (selectedServiceType === "RENTAL_DRIVER") {
+                      navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+                    } else {
+                      navigation.replace("RentalBookingSuccess", {
+                        bookingId,
+                        status: result.bookingStatus,
+                        message: result.message,
+                      });
+                    };
                     (navigation.getParent() as any)?.navigate("Wallet", { screen: "TopUpWallet" });
                   },
                 },
                 {
                   text: "Để sau",
-                  onPress: () => navigation.replace("RentalBookingSuccess", { bookingId, status: result.bookingStatus, message: result.message }),
+                  onPress: () => {
+                    if (selectedServiceType === "RENTAL_DRIVER") {
+                      navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+                    } else {
+                      navigation.replace("RentalBookingSuccess", { bookingId, status: result.bookingStatus, message: result.message });
+                    }
+                  },
                 },
               ],
             );
@@ -108,11 +125,16 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
         }
       }
 
-      navigation.replace("RentalBookingSuccess", {
-        bookingId,
-        status: result.bookingStatus,
-        message: result.message,
-      });
+      // Navigate based on service type
+      if (selectedServiceType === "RENTAL_DRIVER") {
+        navigation.replace("RentalSearchingDriver", { rentalId: bookingId });
+      } else {
+        navigation.replace("RentalBookingSuccess", {
+          bookingId,
+          status: result.bookingStatus,
+          message: result.message,
+        });
+      }
     } catch {
       // errors displayed below
     }
@@ -157,6 +179,27 @@ export function RentalBookingConfirmScreen({ navigation }: Props) {
           </View>
         ) : null}
 
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Coupon</Text>
+        <TextField
+          value={couponInput}
+          onChangeText={setCouponInput}
+          placeholder="Nhập mã coupon"
+        />
+        <PrimaryButton
+          title="Áp dụng coupon"
+          onPress={() => setExtraInfo(couponInput.trim() || undefined, note)}
+          style={styles.applyButton}
+        />
+        {safeCoupons.length > 0 ? (
+          <CouponSuggestionList
+            coupons={safeCoupons}
+            onSelectCoupon={(code) => {
+              setCouponInput(code);
+              setExtraInfo(code, note);
+            }}
+          />
+        ) : null}
+
         {pricingQuery.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(pricingQuery.error)} /> : null}
         {createMutation.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(createMutation.error)} /> : null}
         {depositMutation.error ? <AuthErrorNotice message={getRentalFlowErrorMessage(depositMutation.error)} /> : null}
@@ -197,5 +240,13 @@ const styles = StyleSheet.create({
   balanceRow: {
     flexDirection: "row",
     alignItems: "center",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  applyButton: {
+    marginTop: -2,
   },
 });

@@ -1,4 +1,4 @@
-import { APP_CONFIG, QUERY_KEYS } from "../../constants";
+﻿import { APP_CONFIG, QUERY_KEYS } from "../../constants";
 import {
   Coordinate,
   CreateRideBookingRequest,
@@ -56,7 +56,6 @@ interface BackendCreateBookingResponse {
 const FALLBACK_PAYMENT_METHODS: RidePaymentMethodOption[] = [
   { id: "1", type: "CASH", displayName: "Tiền mặt" },
   { id: "2", type: "WALLET", displayName: "Ví ThueXe" },
-  { id: "3", type: "BANK_CARD", displayName: "Thẻ/Online Banking" },
 ];
 
 function normalizeRidePaymentMethodType(value: unknown): RidePaymentMethodOption["type"] {
@@ -107,7 +106,8 @@ function toRidePaymentMethods(payload: unknown): RidePaymentMethodOption[] {
         subtitle: row.subtitle ? String(row.subtitle) : undefined,
       };
     })
-    .filter((method) => method.id.length > 0);
+    .filter((method) => method.id.length > 0)
+    .filter((method) => method.type !== "BANK_CARD" && method.type !== "SEPAY");
 
   if (normalized.length === 0) {
     return FALLBACK_PAYMENT_METHODS;
@@ -241,7 +241,7 @@ function toDriverAllocationStatusResponse(payload: unknown): DriverAllocationSta
     return {
       bookingId: String(booking.id ?? "0"),
       allocationStatus: "FAILED",
-      reason: booking.cancel_comment ? String(booking.cancel_comment) : "Khong tim duoc tai xe",
+      reason: booking.cancel_comment ? String(booking.cancel_comment) : "Không tìm được tài xế",
     };
   }
 
@@ -514,3 +514,4 @@ export const rideFlowQueryKeys = {
     ] as const,
   driverAllocation: (bookingId: string) => [...QUERY_KEYS.driverAllocation, bookingId] as const,
 };
+

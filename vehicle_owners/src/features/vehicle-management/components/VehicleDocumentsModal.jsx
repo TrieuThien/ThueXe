@@ -77,8 +77,8 @@ export default function VehicleDocumentsModal({
   });
 
   return (
-    <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
-      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div className="fixed inset-0 z-40 overflow-y-auto bg-slate-900/35 p-4">
+      <div className="mx-auto my-4 w-full max-w-3xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-900">Cập nhật giấy tờ xe</h3>
           <button type="button" className="btn" onClick={onClose}>

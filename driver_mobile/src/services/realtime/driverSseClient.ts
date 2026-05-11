@@ -15,7 +15,7 @@ import { API_BASE_URL } from '../../constants/app';
 type EventHandler = (payload: any) => void;
 
 class DriverSseClient {
-  private es: EventSource | null = null;
+  private abortController: AbortController | null = null;
   private listeners = new Map<string, Set<EventHandler>>();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private token: string | null = null;
@@ -51,23 +51,23 @@ class DriverSseClient {
   }
 
   private _close() {
+    this.abortController?.abort();
+    this.abortController = null;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
-    }
-    if (this.es) {
-      // @ts-ignore — EventSource may be polyfilled
-      this.es.close?.();
-      this.es = null;
     }
   }
 
   private async _fetchLoop() {
     if (!this.token) return;
 
+    this.abortController = new AbortController();
+
     try {
       const url = `${API_BASE_URL}/api/driver/realtime`;
       const response = await fetch(url, {
+        signal: this.abortController.signal,
         headers: {
           Authorization: `Bearer ${this.token}`,
           Accept: 'text/event-stream',
@@ -94,8 +94,8 @@ class DriverSseClient {
           this._parseChunk(chunk);
         }
       }
-    } catch (_err) {
-      // Reconnect after 3 seconds
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return; // Intentionally closed — do not reconnect
     }
 
     if (this.token) {
