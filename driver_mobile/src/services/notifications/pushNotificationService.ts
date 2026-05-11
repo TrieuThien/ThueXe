@@ -6,12 +6,21 @@
  *
  * Android: tạo notification channel "driver-requests" để push hiển thị
  * ngay cả khi app bị kill.
+ *
+ * NOTE: Remote push notifications không hoạt động trong Expo Go (SDK 53+).
+ * Chức năng này chỉ có tác dụng trong development build hoặc production build.
+ * Trong Expo Go, SSE vẫn hoạt động bình thường cho trường hợp app foreground.
  */
 
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { authService } from '../api/authService';
+
+// Kiểm tra đang chạy trong Expo Go hay không
+function isExpoGo(): boolean {
+  return Constants.executionEnvironment === 'storeClient';
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -22,6 +31,12 @@ Notifications.setNotificationHandler({
 });
 
 export async function setupAndRegisterPushToken(): Promise<void> {
+  // Remote push không hỗ trợ trong Expo Go từ SDK 53 trở đi
+  if (isExpoGo()) {
+    console.info('[Push] Expo Go detected — remote push skipped. Use a development build for full push support.');
+    return;
+  }
+
   try {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('driver-requests', {
