@@ -27,9 +27,7 @@ export function RideCostBreakdownCard({ breakdown }: RideCostBreakdownCardProps)
     <AppCard>
       <Text style={[styles.title, { color: theme.colors.text }]}>Tóm tắt chi phí</Text>
       <Row label="Giá ước tính" value={formatCurrencyVND(breakdown.estimatedFare)} />
-      <Row label="Phí quãng đường" value={formatCurrencyVND(breakdown.distanceFee)} />
-      <Row label="Phí dịch vụ" value={formatCurrencyVND(breakdown.serviceFee)} />
-      <Row label="Phí đặt xe" value={formatCurrencyVND(breakdown.bookingFee)} />
+      <Row label="Phí dịch vụ" value={formatCurrencyVND(breakdown.serviceFee + breakdown.distanceFee + breakdown.bookingFee)} />
       <Row label="Phụ phí" value={formatCurrencyVND(breakdown.surcharge)} />
       <Row label="Giảm giá" value={`-${formatCurrencyVND(breakdown.discount)}`} color={theme.colors.success} />
       <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />

@@ -11,7 +11,7 @@ import {
   RouteSummaryCard,
   TextField,
 } from "../../components";
-import { getRideFlowErrorMessage, useCreateRideBookingMutation } from "../../hooks";
+import { getRideFlowErrorMessage, useCreateRideBookingMutation, useWalletOverviewQuery } from "../../hooks";
 import { BookingStackParamList } from "../../navigation";
 import { ApiError } from "../../services";
 import { useRideFlowStore } from "../../store";
@@ -19,12 +19,20 @@ import { useTheme } from "../../theme";
 
 type Props = NativeStackScreenProps<BookingStackParamList, "RideBookingConfirm">;
 
+function isWalletPaymentMethod(paymentMethodId?: string): boolean {
+  if (!paymentMethodId) return false;
+  const normalized = paymentMethodId.trim().toLowerCase();
+  return normalized === "2" || normalized.includes("wallet");
+}
+
 export function RideBookingConfirmScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const createBookingMutation = useCreateRideBookingMutation();
+  const walletOverviewQuery = useWalletOverviewQuery();
 
   const routeEstimate = useRideFlowStore((state) => state.routeEstimate);
   const pricingEstimate = useRideFlowStore((state) => state.pricingEstimate);
+  const paymentMethodId = useRideFlowStore((state) => state.paymentMethodId);
   const isScheduled = useRideFlowStore((state) => state.isScheduled);
   const scheduledAt = useRideFlowStore((state) => state.scheduledAt);
   const setNote = useRideFlowStore((state) => state.setNote);
@@ -32,10 +40,26 @@ export function RideBookingConfirmScreen({ navigation }: Props) {
 
   const [note, setLocalNote] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
+  const walletBalance = walletOverviewQuery.data?.availableBalance ?? walletOverviewQuery.data?.balance ?? 0;
+  const totalPayable = pricingEstimate?.breakdown?.totalPayable ?? 0;
 
   const onConfirmBooking = async () => {
     setErrorMessage(undefined);
     setNote(note);
+    if (isWalletPaymentMethod(paymentMethodId) && walletBalance < totalPayable) {
+      Alert.alert(
+        "Số dư không đủ",
+        "Số dư ví ThueXe không đủ để đặt xe. Vui lòng nạp thêm tiền vào ví.",
+        [
+          { text: "Hủy", style: "cancel" },
+          {
+            text: "Nạp tiền",
+            onPress: () => (navigation.getParent() as any)?.navigate("Wallet", { screen: "TopUpWallet" }),
+          },
+        ],
+      );
+      return;
+    }
 
     const payload = buildPayload();
     if (!payload) {

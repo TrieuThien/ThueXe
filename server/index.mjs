@@ -31,6 +31,7 @@ const envOrigins = (process.env.CORS_ORIGINS || "")
 const allowedOrigins = [
   // Add production URLs
   process.env.ADMIN_URL,
+  process.env.VEHICLE_OWNERS_URL,
   ...envOrigins,
   // Add localhost for development
   "http://localhost:3000", // React development server
